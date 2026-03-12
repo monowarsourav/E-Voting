@@ -1,0 +1,432 @@
+basePath: /api/v1
+definitions:
+  models.Candidate:
+    properties:
+      description:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      party:
+        type: string
+    required:
+    - id
+    - name
+    type: object
+  models.ElectionInfo:
+    properties:
+      candidates:
+        items:
+          $ref: '#/definitions/models.Candidate'
+        type: array
+      description:
+        type: string
+      election_id:
+        type: string
+      end_time:
+        type: integer
+      is_active:
+        type: boolean
+      start_time:
+        type: integer
+      title:
+        type: string
+      total_votes:
+        type: integer
+    type: object
+  models.ElectionListResponse:
+    properties:
+      elections:
+        items:
+          $ref: '#/definitions/models.ElectionInfo'
+        type: array
+      total:
+        type: integer
+    type: object
+  models.ElectionRequest:
+    properties:
+      admin_token:
+        type: string
+      candidates:
+        items:
+          $ref: '#/definitions/models.Candidate'
+        minItems: 2
+        type: array
+      description:
+        type: string
+      end_time:
+        type: integer
+      start_time:
+        type: integer
+      title:
+        type: string
+    required:
+    - admin_token
+    - candidates
+    - end_time
+    - start_time
+    - title
+    type: object
+  models.ElectionResponse:
+    properties:
+      candidates:
+        items:
+          $ref: '#/definitions/models.Candidate'
+        type: array
+      election_id:
+        type: string
+      end_time:
+        type: integer
+      is_active:
+        type: boolean
+      message:
+        type: string
+      start_time:
+        type: integer
+      title:
+        type: string
+    type: object
+  models.ErrorResponse:
+    properties:
+      code:
+        type: integer
+      error:
+        type: string
+      message:
+        type: string
+    type: object
+  models.HealthResponse:
+    properties:
+      status:
+        type: string
+      uptime:
+        type: integer
+      version:
+        type: string
+    type: object
+  models.LoginRequest:
+    properties:
+      fingerprint_data:
+        description: 'Option 1: Biometric authentication'
+        items:
+          type: integer
+        type: array
+      password:
+        description: 'Option 2: Password authentication'
+        type: string
+      voter_id:
+        type: string
+    required:
+    - voter_id
+    type: object
+  models.LoginResponse:
+    properties:
+      auth_token:
+        type: string
+      expires_in:
+        type: integer
+      message:
+        type: string
+      voter_id:
+        type: string
+    type: object
+  models.RegistrationRequest:
+    properties:
+      biographic_data:
+        description: Additional data
+        type: string
+      eligibility_proof:
+        type: string
+      fingerprint_data:
+        description: 'Option 1: Biometric registration'
+        items:
+          type: integer
+        type: array
+      liveness_data:
+        items:
+          type: integer
+        type: array
+      password:
+        description: 'Option 2: Password registration'
+        type: string
+      voter_id:
+        type: string
+    required:
+    - voter_id
+    type: object
+  models.RegistrationResponse:
+    properties:
+      merkle_root:
+        type: string
+      message:
+        type: string
+      public_key:
+        type: string
+      registration_time:
+        type: integer
+      smdc_public_credential:
+        type: string
+      voter_id:
+        type: string
+    type: object
+  models.VoteRequest:
+    properties:
+      auth_token:
+        type: string
+      candidate_id:
+        type: integer
+      election_id:
+        type: string
+      fingerprint_data:
+        description: Biometric verification (required for every vote)
+        items:
+          type: integer
+        type: array
+      liveness_data:
+        items:
+          type: integer
+        type: array
+      smdc_slot_index:
+        type: integer
+      voter_id:
+        type: string
+    required:
+    - auth_token
+    - candidate_id
+    - election_id
+    - fingerprint_data
+    - liveness_data
+    - smdc_slot_index
+    - voter_id
+    type: object
+  models.VoteResponse:
+    properties:
+      blockchain_tx_id:
+        type: string
+      election_id:
+        type: string
+      key_image:
+        type: string
+      message:
+        type: string
+      receipt_id:
+        type: string
+      timestamp:
+        type: integer
+      voter_id:
+        type: string
+    type: object
+host: localhost:8080
+info:
+  contact:
+    email: support@covertvote.io
+    name: API Support
+    url: http://www.covertvote.io/support
+  description: |-
+    Blockchain-based secure e-voting system with homomorphic encryption, SMDC coercion resistance, and anonymous voting
+    Features: Paillier encryption, Pedersen commitments, Ring signatures, Zero-knowledge proofs, SA² aggregation
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+  termsOfService: http://swagger.io/terms/
+  title: CovertVote E-Voting API
+  version: 1.0.0
+paths:
+  /admin/elections:
+    post:
+      consumes:
+      - application/json
+      description: Create a new election with candidates and time range (admin only)
+      parameters:
+      - description: Election details
+        in: body
+        name: election
+        required: true
+        schema:
+          $ref: '#/definitions/models.ElectionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.ElectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - AdminAuth: []
+      summary: Create a new election
+      tags:
+      - Elections
+  /elections:
+    get:
+      consumes:
+      - application/json
+      description: Retrieve list of all elections with their candidates and status
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.ElectionListResponse'
+      summary: Get all elections
+      tags:
+      - Elections
+  /health:
+    get:
+      consumes:
+      - application/json
+      description: Returns the health status of the API server
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.HealthResponse'
+      summary: Health check
+      tags:
+      - Health
+  /live:
+    get:
+      consumes:
+      - application/json
+      description: Returns whether the system is alive
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Liveness check
+      tags:
+      - Health
+  /login:
+    post:
+      consumes:
+      - application/json
+      description: Login with either fingerprint OR password
+      parameters:
+      - description: Login credentials
+        in: body
+        name: login
+        required: true
+        schema:
+          $ref: '#/definitions/models.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/models.LoginResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Login voter
+      tags:
+      - Authentication
+  /ready:
+    get:
+      consumes:
+      - application/json
+      description: Returns whether the system is ready to accept requests
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: Readiness check
+      tags:
+      - Health
+  /register:
+    post:
+      consumes:
+      - application/json
+      description: Register with either biometric (fingerprint + liveness) OR password
+      parameters:
+      - description: Registration details
+        in: body
+        name: registration
+        required: true
+        schema:
+          $ref: '#/definitions/models.RegistrationRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.RegistrationResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      summary: Register a new voter
+      tags:
+      - Authentication
+  /vote:
+    post:
+      consumes:
+      - application/json
+      description: Cast an anonymous encrypted vote using ring signatures and homomorphic
+        encryption
+      parameters:
+      - description: Vote details
+        in: body
+        name: vote
+        required: true
+        schema:
+          $ref: '#/definitions/models.VoteRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/models.VoteResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/models.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cast a vote
+      tags:
+      - Voting
+schemes:
+- http
+securityDefinitions:
+  AdminAuth:
+    description: Admin bearer token for administrative operations
+    in: header
+    name: Authorization
+    type: apiKey
+  BearerAuth:
+    description: Type "Bearer" followed by a space and JWT token.
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"

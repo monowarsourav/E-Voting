@@ -1,0 +1,646 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "Blockchain-based secure e-voting system with homomorphic encryption, SMDC coercion resistance, and anonymous voting\nFeatures: Paillier encryption, Pedersen commitments, Ring signatures, Zero-knowledge proofs, SA² aggregation",
+        "title": "CovertVote E-Voting API",
+        "termsOfService": "http://swagger.io/terms/",
+        "contact": {
+            "name": "API Support",
+            "url": "http://www.covertvote.io/support",
+            "email": "support@covertvote.io"
+        },
+        "license": {
+            "name": "MIT",
+            "url": "https://opensource.org/licenses/MIT"
+        },
+        "version": "1.0.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/api/v1",
+    "paths": {
+        "/admin/elections": {
+            "post": {
+                "security": [
+                    {
+                        "AdminAuth": []
+                    }
+                ],
+                "description": "Create a new election with candidates and time range (admin only)",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Elections"
+                ],
+                "summary": "Create a new election",
+                "parameters": [
+                    {
+                        "description": "Election details",
+                        "name": "election",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.ElectionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.ElectionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/elections": {
+            "get": {
+                "description": "Retrieve list of all elections with their candidates and status",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Elections"
+                ],
+                "summary": "Get all elections",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.ElectionListResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "Returns the health status of the API server",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.HealthResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/live": {
+            "get": {
+                "description": "Returns whether the system is alive",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Liveness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/login": {
+            "post": {
+                "description": "Login with either fingerprint OR password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Login voter",
+                "parameters": [
+                    {
+                        "description": "Login credentials",
+                        "name": "login",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.LoginRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/models.LoginResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ready": {
+            "get": {
+                "description": "Returns whether the system is ready to accept requests",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Health"
+                ],
+                "summary": "Readiness check",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
+                        }
+                    }
+                }
+            }
+        },
+        "/register": {
+            "post": {
+                "description": "Register with either biometric (fingerprint + liveness) OR password",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Authentication"
+                ],
+                "summary": "Register a new voter",
+                "parameters": [
+                    {
+                        "description": "Registration details",
+                        "name": "registration",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.RegistrationRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.RegistrationResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/vote": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Cast an anonymous encrypted vote using ring signatures and homomorphic encryption",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Voting"
+                ],
+                "summary": "Cast a vote",
+                "parameters": [
+                    {
+                        "description": "Vote details",
+                        "name": "vote",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/models.VoteRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/models.VoteResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/models.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "models.Candidate": {
+            "type": "object",
+            "required": [
+                "id",
+                "name"
+            ],
+            "properties": {
+                "description": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "integer"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "party": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ElectionInfo": {
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Candidate"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "election_id": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "total_votes": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ElectionListResponse": {
+            "type": "object",
+            "properties": {
+                "elections": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.ElectionInfo"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                }
+            }
+        },
+        "models.ElectionRequest": {
+            "type": "object",
+            "required": [
+                "admin_token",
+                "candidates",
+                "end_time",
+                "start_time",
+                "title"
+            ],
+            "properties": {
+                "admin_token": {
+                    "type": "string"
+                },
+                "candidates": {
+                    "type": "array",
+                    "minItems": 2,
+                    "items": {
+                        "$ref": "#/definitions/models.Candidate"
+                    }
+                },
+                "description": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "integer"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ElectionResponse": {
+            "type": "object",
+            "properties": {
+                "candidates": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/models.Candidate"
+                    }
+                },
+                "election_id": {
+                    "type": "string"
+                },
+                "end_time": {
+                    "type": "integer"
+                },
+                "is_active": {
+                    "type": "boolean"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "start_time": {
+                    "type": "integer"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.ErrorResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "integer"
+                },
+                "error": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.HealthResponse": {
+            "type": "object",
+            "properties": {
+                "status": {
+                    "type": "string"
+                },
+                "uptime": {
+                    "type": "integer"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LoginRequest": {
+            "type": "object",
+            "required": [
+                "voter_id"
+            ],
+            "properties": {
+                "fingerprint_data": {
+                    "description": "Option 1: Biometric authentication",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "password": {
+                    "description": "Option 2: Password authentication",
+                    "type": "string"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.LoginResponse": {
+            "type": "object",
+            "properties": {
+                "auth_token": {
+                    "type": "string"
+                },
+                "expires_in": {
+                    "type": "integer"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RegistrationRequest": {
+            "type": "object",
+            "required": [
+                "voter_id"
+            ],
+            "properties": {
+                "biographic_data": {
+                    "description": "Additional data",
+                    "type": "string"
+                },
+                "eligibility_proof": {
+                    "type": "string"
+                },
+                "fingerprint_data": {
+                    "description": "Option 1: Biometric registration",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "liveness_data": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "password": {
+                    "description": "Option 2: Password registration",
+                    "type": "string"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.RegistrationResponse": {
+            "type": "object",
+            "properties": {
+                "merkle_root": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "public_key": {
+                    "type": "string"
+                },
+                "registration_time": {
+                    "type": "integer"
+                },
+                "smdc_public_credential": {
+                    "type": "string"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.VoteRequest": {
+            "type": "object",
+            "required": [
+                "auth_token",
+                "candidate_id",
+                "election_id",
+                "fingerprint_data",
+                "liveness_data",
+                "smdc_slot_index",
+                "voter_id"
+            ],
+            "properties": {
+                "auth_token": {
+                    "type": "string"
+                },
+                "candidate_id": {
+                    "type": "integer"
+                },
+                "election_id": {
+                    "type": "string"
+                },
+                "fingerprint_data": {
+                    "description": "Biometric verification (required for every vote)",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "liveness_data": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "smdc_slot_index": {
+                    "type": "integer"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "models.VoteResponse": {
+            "type": "object",
+            "properties": {
+                "blockchain_tx_id": {
+                    "type": "string"
+                },
+                "election_id": {
+                    "type": "string"
+                },
+                "key_image": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "receipt_id": {
+                    "type": "string"
+                },
+                "timestamp": {
+                    "type": "integer"
+                },
+                "voter_id": {
+                    "type": "string"
+                }
+            }
+        }
+    },
+    "securityDefinitions": {
+        "AdminAuth": {
+            "description": "Admin bearer token for administrative operations",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        },
+        "BearerAuth": {
+            "description": "Type \"Bearer\" followed by a space and JWT token.",
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    }
+}

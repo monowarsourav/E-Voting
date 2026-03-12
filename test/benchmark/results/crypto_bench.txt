@@ -1,0 +1,21 @@
+goos: linux
+goarch: amd64
+cpu: AMD Ryzen 5 7530U with Radeon Graphics         
+BenchmarkPaillierKeyGen-12            	       6	 196529129 ns/op	 2240340 B/op	    5833 allocs/op
+BenchmarkPaillierEncrypt-12           	      67	  18376894 ns/op	   30888 B/op	      37 allocs/op
+BenchmarkPaillierDecrypt-12           	      67	  17633603 ns/op	   25984 B/op	      29 allocs/op
+BenchmarkPaillierHomomorphicAdd-12    	  102748	     11718 ns/op	    1761 B/op	       3 allocs/op
+BenchmarkPedersenParamsGen-12         	       1	1668055585 ns/op	76127336 B/op	  285736 allocs/op
+BenchmarkPedersenCommit-12            	   13614	     81336 ns/op	    5322 B/op	      38 allocs/op
+BenchmarkSMDCGenerate-12              	     673	   1783523 ns/op	   91013 B/op	     765 allocs/op
+BenchmarkSMDCVerify-12                	     652	   1816699 ns/op	   90461 B/op	     673 allocs/op
+BenchmarkSMDCGenerateK3-12            	    1129	   1082546 ns/op	   55835 B/op	     470 allocs/op
+BenchmarkSMDCGenerateK5-12            	     688	   1739421 ns/op	   90941 B/op	     764 allocs/op
+BenchmarkSMDCGenerateK10-12           	     352	   3362341 ns/op	  178589 B/op	    1496 allocs/op
+BenchmarkSA2Split-12                  	      33	  35350498 ns/op	  104089 B/op	     118 allocs/op
+BenchmarkRingSign10-12                	    1276	   1224266 ns/op	   87088 B/op	    1019 allocs/op
+BenchmarkRingSign50-12                	     237	   5489455 ns/op	  443320 B/op	    5162 allocs/op
+BenchmarkRingSign100-12               	     123	   9802458 ns/op	  888887 B/op	   10360 allocs/op
+BenchmarkRingVerify100-12             	     120	   9855812 ns/op	  875513 B/op	    9983 allocs/op
+PASS
+ok  	command-line-arguments	65.946s

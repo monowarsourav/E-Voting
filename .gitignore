@@ -1,0 +1,65 @@
+# .gitignore
+
+# Binaries
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+covertvote-api
+aggregator-a
+aggregator-b
+
+# Test binary
+*.test
+
+# Output
+*.out
+coverage.out
+coverage.html
+
+# Go workspace
+go.work
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# Environment
+.env
+.env.local
+
+# Database
+*.db
+*.db-shm
+*.db-wal
+data/
+
+# Logs
+logs/
+*.log
+
+# Build
+dist/
+build/
+
+# Temporary
+tmp/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Keys and secrets
+*.pem
+*.key
+*.crt
+keys/
+
+# Fabric credentials
+wallet/
+connection-profile.json
