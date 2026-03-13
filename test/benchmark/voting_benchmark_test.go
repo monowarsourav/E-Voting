@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/covertvote/e-voting/internal/crypto"
+	"github.com/covertvote/e-voting/internal/sa2"
 	"github.com/covertvote/e-voting/internal/smdc"
 	"github.com/covertvote/e-voting/internal/voter"
 	"github.com/covertvote/e-voting/internal/voting"
@@ -191,6 +192,127 @@ func saveResultsToFile(results []BenchmarkResult, filename string) {
 			f.WriteString(fmt.Sprintf("| %d | %v |\n", n, projected.Round(time.Second)))
 		}
 	}
+}
+
+// ============================================================
+// END-TO-END VOTE CASTING PIPELINE BENCHMARKS
+// ============================================================
+
+func BenchmarkFullVoteCastPipeline(b *testing.B) {
+	// Setup (not timed)
+	paillierKey, _ := crypto.GeneratePaillierKeyPair(2048)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
+
+	// Create 100 ring members
+	ringKeys := make([]*crypto.RingKeyPair, 100)
+	ringPubKeys := make([]*big.Int, 100)
+	for i := 0; i < 100; i++ {
+		kp, _ := ringParams.GenerateRingKeyPair()
+		ringKeys[i] = kp
+		ringPubKeys[i] = kp.PublicKey
+	}
+	signerIndex := 42 // arbitrary signer
+
+	// SMDC setup
+	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "bench-election")
+
+	// SA2 setup
+	splitter := sa2.NewVoteSplitter(paillierKey.PublicKey)
+
+	electionID := "bench-election-001"
+	candidateVote := big.NewInt(1)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		// Step 1: Paillier encrypt vote
+		encVote, _ := paillierKey.PublicKey.Encrypt(candidateVote)
+
+		// Step 2: Pedersen commitment
+		commitment, _ := pedersenParams.Commit(candidateVote)
+
+		// Step 3: ZKP Binary Proof
+		nonce, _ := crypto.GenerateNonce()
+		_, _ = pedersenParams.ProveBinary(candidateVote, commitment.R, commitment.C, nonce, electionID)
+
+		// Step 4: SMDC credential generate + get real slot
+		cred, realIdx, _ := smdcGen.GenerateCredential(fmt.Sprintf("voter-%d", i))
+		slot := cred.Slots[realIdx]
+
+		// Step 5: Apply SMDC weight
+		weightedVote := paillierKey.PublicKey.Multiply(encVote, slot.Weight)
+
+		// Step 6: Ring signature (100 members)
+		message := weightedVote.Bytes()
+		_, _ = ringParams.Sign(message, ringKeys[signerIndex], ringPubKeys, signerIndex)
+
+		// Step 7: SA2 split
+		_, _ = splitter.SplitVote(fmt.Sprintf("voter-%d", i), weightedVote)
+	}
+}
+
+func BenchmarkVoteCastPhases(b *testing.B) {
+	// Setup
+	paillierKey, _ := crypto.GeneratePaillierKeyPair(2048)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
+
+	ringKeys := make([]*crypto.RingKeyPair, 100)
+	ringPubKeys := make([]*big.Int, 100)
+	for i := 0; i < 100; i++ {
+		kp, _ := ringParams.GenerateRingKeyPair()
+		ringKeys[i] = kp
+		ringPubKeys[i] = kp.PublicKey
+	}
+
+	candidateVote := big.NewInt(1)
+	electionID := "bench-election-001"
+
+	b.Run("1_PaillierEncrypt", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			paillierKey.PublicKey.Encrypt(candidateVote)
+		}
+	})
+
+	b.Run("2_PedersenCommit", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			pedersenParams.Commit(candidateVote)
+		}
+	})
+
+	b.Run("3_ZKPBinaryProve", func(b *testing.B) {
+		commitment, _ := pedersenParams.Commit(candidateVote)
+		nonce, _ := crypto.GenerateNonce()
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			pedersenParams.ProveBinary(candidateVote, commitment.R, commitment.C, nonce, electionID)
+		}
+	})
+
+	b.Run("4_SMDCGenerate", func(b *testing.B) {
+		smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, electionID)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			smdcGen.GenerateCredential(fmt.Sprintf("voter-%d", i))
+		}
+	})
+
+	b.Run("5_RingSign100", func(b *testing.B) {
+		msg := []byte("test-vote-message")
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			ringParams.Sign(msg, ringKeys[42], ringPubKeys, 42)
+		}
+	})
+
+	b.Run("6_SA2Split", func(b *testing.B) {
+		encVote, _ := paillierKey.PublicKey.Encrypt(candidateVote)
+		splitter := sa2.NewVoteSplitter(paillierKey.PublicKey)
+		b.ResetTimer()
+		for i := 0; i < b.N; i++ {
+			splitter.SplitVote("voter-bench", encVote)
+		}
+	})
 }
 
 // ============================================================

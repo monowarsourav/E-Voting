@@ -1,6 +1,7 @@
 package tally
 
 import (
+	"fmt"
 	"math/big"
 	"testing"
 
@@ -10,7 +11,7 @@ import (
 
 func TestDecryption(t *testing.T) {
 	// Setup
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	decryptor := NewDecryptor(sk)
@@ -31,7 +32,7 @@ func TestDecryption(t *testing.T) {
 }
 
 func TestDecryptMultiple(t *testing.T) {
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	decryptor := NewDecryptor(sk)
@@ -63,7 +64,7 @@ func TestDecryptMultiple(t *testing.T) {
 
 func TestVoteTallying(t *testing.T) {
 	// Setup
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	counter := NewCounter(pk, sk)
@@ -110,7 +111,7 @@ func TestVoteTallying(t *testing.T) {
 }
 
 func TestTallyByCandidate(t *testing.T) {
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	counter := NewCounter(pk, sk)
@@ -158,7 +159,7 @@ func TestTallyByCandidate(t *testing.T) {
 }
 
 func TestEmptyTally(t *testing.T) {
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	counter := NewCounter(pk, sk)
@@ -171,5 +172,80 @@ func TestEmptyTally(t *testing.T) {
 
 	if result.TotalVotes != 0 {
 		t.Errorf("Empty tally should have 0 votes, got %d", result.TotalVotes)
+	}
+}
+
+// TestTallyCorrectness is a property-based test: encrypt N random votes,
+// tally homomorphically, decrypt, verify sum matches plaintext sum.
+func TestTallyCorrectness(t *testing.T) {
+	key, err := crypto.GeneratePaillierKeyPair(2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pk := key.PublicKey
+
+	// 50 voters, distributed among 3 candidates
+	candidates := 3
+	votes := make([]int64, 50)
+	expected := make([]int64, candidates)
+
+	for i := range votes {
+		votes[i] = int64(i % candidates) // distribute among candidates
+		expected[votes[i]]++
+	}
+
+	// Encrypt and tally per candidate
+	for c := 0; c < candidates; c++ {
+		tally := big.NewInt(1) // identity for multiplication
+		for _, v := range votes {
+			vote := big.NewInt(0)
+			if v == int64(c) {
+				vote = big.NewInt(1)
+			}
+			enc, _ := pk.Encrypt(vote)
+			tally = pk.Add(tally, enc)
+		}
+
+		result, _ := key.Decrypt(tally)
+		if result.Int64() != expected[c] {
+			t.Errorf("Candidate %d: expected %d votes, got %d", c, expected[c], result.Int64())
+		}
+	}
+}
+
+// TestSA2TallyIntegrity tests that SA² split → aggregate → combine → decrypt gives correct result.
+func TestSA2TallyIntegrity(t *testing.T) {
+	key, err := crypto.GeneratePaillierKeyPair(2048)
+	if err != nil {
+		t.Fatal(err)
+	}
+	pk := key.PublicKey
+	splitter := sa2.NewVoteSplitter(pk)
+	aggA := sa2.NewAggregator("server-a", pk)
+	aggB := sa2.NewAggregator("server-b", pk)
+	combiner := sa2.NewCombiner(pk)
+
+	// 20 voters
+	nVoters := 20
+	var sharesA, sharesB []*big.Int
+	expectedSum := int64(0)
+
+	for i := 0; i < nVoters; i++ {
+		vote := big.NewInt(int64(i % 2))
+		expectedSum += int64(i % 2)
+
+		enc, _ := pk.Encrypt(vote)
+		share, _ := splitter.SplitVote(fmt.Sprintf("v%d", i), enc)
+		sharesA = append(sharesA, share.ShareA)
+		sharesB = append(sharesB, share.ShareB)
+	}
+
+	resultA := aggA.AggregateShares(sharesA)
+	resultB := aggB.AggregateShares(sharesB)
+	combined := combiner.CombineAggregates(resultA, resultB)
+
+	decrypted, _ := key.Decrypt(combined.EncryptedTally)
+	if decrypted.Int64() != expectedSum {
+		t.Errorf("SA2 tally: expected %d, got %d", expectedSum, decrypted.Int64())
 	}
 }

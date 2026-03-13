@@ -63,3 +63,9 @@ keys/
 # Fabric credentials
 wallet/
 connection-profile.json
+
+# Go vendor (using modules)
+vendor/
+
+# Binary output directory
+bin/

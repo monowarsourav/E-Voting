@@ -179,6 +179,81 @@ func benchmarkRingSign(b *testing.B, ringSize int) {
 	}
 }
 
+// ============================================================
+// ZKP BENCHMARKS
+// ============================================================
+
+func BenchmarkZKPBinaryProve(b *testing.B) {
+	pp, _ := crypto.GeneratePedersenParams(512)
+	weight := big.NewInt(1)
+	commitment, _ := pp.Commit(weight)
+	nonce, _ := crypto.GenerateNonce()
+	electionID := "bench-election-001"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp.ProveBinary(weight, commitment.R, commitment.C, nonce, electionID)
+	}
+}
+
+func BenchmarkZKPBinaryVerify(b *testing.B) {
+	pp, _ := crypto.GeneratePedersenParams(512)
+	weight := big.NewInt(1)
+	commitment, _ := pp.Commit(weight)
+	nonce, _ := crypto.GenerateNonce()
+	electionID := "bench-election-001"
+	proof, _ := pp.ProveBinary(weight, commitment.R, commitment.C, nonce, electionID)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp.VerifyBinary(commitment.C, proof)
+	}
+}
+
+func BenchmarkZKPSumOneProve(b *testing.B) {
+	pp, _ := crypto.GeneratePedersenParams(512)
+	// Create 5 commitments (k=5 SMDC slots): one weight=1, rest weight=0
+	commitments := make([]*crypto.Commitment, 5)
+	for i := 0; i < 5; i++ {
+		w := big.NewInt(0)
+		if i == 2 {
+			w = big.NewInt(1)
+		}
+		c, _ := pp.Commit(w)
+		commitments[i] = c
+	}
+	nonce, _ := crypto.GenerateNonce()
+	electionID := "bench-election-001"
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp.ProveSumOne(commitments, nonce, electionID)
+	}
+}
+
+func BenchmarkZKPSumOneVerify(b *testing.B) {
+	pp, _ := crypto.GeneratePedersenParams(512)
+	commitments := make([]*crypto.Commitment, 5)
+	commitmentValues := make([]*big.Int, 5)
+	for i := 0; i < 5; i++ {
+		w := big.NewInt(0)
+		if i == 2 {
+			w = big.NewInt(1)
+		}
+		c, _ := pp.Commit(w)
+		commitments[i] = c
+		commitmentValues[i] = c.C
+	}
+	nonce, _ := crypto.GenerateNonce()
+	electionID := "bench-election-001"
+	proof, _ := pp.ProveSumOne(commitments, nonce, electionID)
+
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		pp.VerifySumOne(commitmentValues, proof)
+	}
+}
+
 func BenchmarkRingVerify100(b *testing.B) {
 	rp, _ := crypto.GenerateRingParams(256)
 	ringSize := 100

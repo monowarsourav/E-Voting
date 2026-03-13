@@ -18,10 +18,10 @@ import (
 
 func setupTestVotingHandler() (*VotingHandler, *voter.RegistrationSystem) {
 	// Initialize crypto params
-	paillierSK, _ := crypto.GeneratePaillierKeyPair(512)
+	paillierSK, _ := crypto.GeneratePaillierKeyPair(2048)
 	paillierPK := paillierSK.PublicKey
-	pedersenParams, _ := crypto.GeneratePedersenParams(256)
-	ringParams, _ := crypto.GenerateRingParams(256)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
 
 	// Eligible voters
 	eligibleVoters := []string{"voter001", "voter002", "test_voter"}

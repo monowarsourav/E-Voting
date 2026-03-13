@@ -50,7 +50,7 @@ func TestKyberEncapsulateDecapsulate(t *testing.T) {
 }
 
 func TestHybridKeyGeneration(t *testing.T) {
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid key pair: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestHybridKeyGeneration(t *testing.T) {
 
 func TestHybridEncryptDecrypt(t *testing.T) {
 	// Generate hybrid keys
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}
@@ -94,7 +94,7 @@ func TestHybridEncryptDecrypt(t *testing.T) {
 
 func TestHybridHomomorphicAdd(t *testing.T) {
 	// Generate hybrid keys
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestHybridHomomorphicAdd(t *testing.T) {
 
 func TestHybridHomomorphicMultiply(t *testing.T) {
 	// Generate hybrid keys
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}
@@ -163,7 +163,7 @@ func TestHybridHomomorphicMultiply(t *testing.T) {
 
 func TestReEncapsulate(t *testing.T) {
 	// Generate hybrid keys
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}
@@ -215,7 +215,7 @@ func TestPostQuantumSecurity(t *testing.T) {
 	// This test demonstrates that Kyber provides post-quantum security
 	// In a real attack, classical algorithms can't break Kyber encryption
 
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}
@@ -238,7 +238,7 @@ func TestPostQuantumSecurity(t *testing.T) {
 }
 
 func TestSerializeDeserialize(t *testing.T) {
-	hybrid, err := GenerateHybridKeyPair(1024)
+	hybrid, err := GenerateHybridKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Failed to generate hybrid keys: %v", err)
 	}

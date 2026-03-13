@@ -6,8 +6,7 @@ import (
 )
 
 func TestPaillierEncryptDecrypt(t *testing.T) {
-	// Generate keys (1024 bits for testing, use 2048 in production)
-	sk, err := GeneratePaillierKeyPair(1024)
+	sk, err := GeneratePaillierKeyPair(2048)
 	if err != nil {
 		t.Fatalf("Key generation failed: %v", err)
 	}
@@ -31,7 +30,7 @@ func TestPaillierEncryptDecrypt(t *testing.T) {
 }
 
 func TestPaillierHomomorphicAdd(t *testing.T) {
-	sk, _ := GeneratePaillierKeyPair(1024)
+	sk, _ := GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	m1 := big.NewInt(15)
@@ -53,7 +52,7 @@ func TestPaillierHomomorphicAdd(t *testing.T) {
 }
 
 func TestPaillierHomomorphicMultiply(t *testing.T) {
-	sk, _ := GeneratePaillierKeyPair(1024)
+	sk, _ := GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	m := big.NewInt(7)
@@ -74,7 +73,7 @@ func TestPaillierHomomorphicMultiply(t *testing.T) {
 }
 
 func TestPaillierAddMultiple(t *testing.T) {
-	sk, _ := GeneratePaillierKeyPair(1024)
+	sk, _ := GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	// Encrypt multiple values
@@ -99,5 +98,16 @@ func TestPaillierAddMultiple(t *testing.T) {
 	expected := big.NewInt(60) // 10 + 20 + 30
 	if expected.Cmp(result) != 0 {
 		t.Errorf("AddMultiple failed: expected %v, got %v", expected, result)
+	}
+}
+
+func TestPaillierKeyGenRejectsSmallKeys(t *testing.T) {
+	_, err := GeneratePaillierKeyPair(1024)
+	if err == nil {
+		t.Fatal("expected error for 1024-bit key, got nil")
+	}
+	_, err = GeneratePaillierKeyPair(512)
+	if err == nil {
+		t.Fatal("expected error for 512-bit key, got nil")
 	}
 }

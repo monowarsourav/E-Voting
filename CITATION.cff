@@ -1,0 +1,23 @@
+cff-version: 1.2.0
+title: "CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA2"
+message: "If you use this software, please cite our paper."
+type: software
+authors:
+  - given-names: Student
+    family-names: Author
+    affiliation: "CSE400 Capstone Project"
+repository-code: "https://github.com/covertvote/e-voting"
+license: MIT
+keywords:
+  - e-voting
+  - homomorphic encryption
+  - blockchain
+  - zero-knowledge proofs
+  - ring signatures
+  - coercion resistance
+  - post-quantum cryptography
+  - SMDC
+  - SA2
+  - Paillier
+  - Pedersen
+  - Kyber768

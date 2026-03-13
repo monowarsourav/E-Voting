@@ -11,7 +11,7 @@ import (
 
 func TestBallotCreation(t *testing.T) {
 	// Setup
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	bc := NewBallotCreator(pk)
@@ -38,7 +38,7 @@ func TestBallotCreation(t *testing.T) {
 }
 
 func TestWeightApplication(t *testing.T) {
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	bc := NewBallotCreator(pk)
@@ -68,7 +68,7 @@ func TestWeightApplication(t *testing.T) {
 
 func TestVoteCasting(t *testing.T) {
 	// Setup cryptographic parameters
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 	pp, _ := crypto.GeneratePedersenParams(512)
 	rp, _ := crypto.GenerateRingParams(512)
@@ -118,7 +118,7 @@ func TestVoteCasting(t *testing.T) {
 }
 
 func TestElectionTiming(t *testing.T) {
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 	pp, _ := crypto.GeneratePedersenParams(512)
 	rp, _ := crypto.GenerateRingParams(512)

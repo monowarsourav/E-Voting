@@ -3,6 +3,7 @@ package crypto
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
 )
 
@@ -32,8 +33,15 @@ type PaillierPrivateKey struct {
 }
 
 // GeneratePaillierKeyPair generates a new Paillier key pair
-// bits: key size (2048 recommended for security)
+// bits: key size (minimum 2048 for security)
 func GeneratePaillierKeyPair(bits int) (*PaillierPrivateKey, error) {
+	if bits < 2048 {
+		return nil, fmt.Errorf("paillier: key size must be >= 2048 bits for security, got %d", bits)
+	}
+	if bits%2 != 0 {
+		return nil, fmt.Errorf("paillier: key size must be even, got %d", bits)
+	}
+
 	// Step 1: Generate two large primes p and q
 	p, err := rand.Prime(rand.Reader, bits/2)
 	if err != nil {

@@ -9,7 +9,7 @@ import (
 
 func TestVoteSplitAndReconstruct(t *testing.T) {
 	// Setup
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	// Encrypt a vote
@@ -37,7 +37,7 @@ func TestVoteSplitAndReconstruct(t *testing.T) {
 
 func TestSA2FullFlow(t *testing.T) {
 	// Setup
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	// Create multiple votes
@@ -88,7 +88,7 @@ func TestSA2FullFlow(t *testing.T) {
 
 func TestSA2Privacy(t *testing.T) {
 	// This test demonstrates that individual shares don't reveal votes
-	sk, _ := crypto.GeneratePaillierKeyPair(1024)
+	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
 	vote := big.NewInt(100)

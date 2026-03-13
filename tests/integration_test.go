@@ -22,10 +22,10 @@ func TestCompleteVotingFlowWithPassword(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Setup
-	paillierSK, _ := crypto.GeneratePaillierKeyPair(512)
+	paillierSK, _ := crypto.GeneratePaillierKeyPair(2048)
 	paillierPK := paillierSK.PublicKey
-	pedersenParams, _ := crypto.GeneratePedersenParams(256)
-	ringParams, _ := crypto.GenerateRingParams(256)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"alice", "bob"}
 	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
@@ -165,10 +165,10 @@ func TestCompleteVotingFlowWithBiometric(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Setup
-	paillierSK, _ := crypto.GeneratePaillierKeyPair(512)
+	paillierSK, _ := crypto.GeneratePaillierKeyPair(2048)
 	paillierPK := paillierSK.PublicKey
-	pedersenParams, _ := crypto.GeneratePedersenParams(256)
-	ringParams, _ := crypto.GenerateRingParams(256)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"bob"}
 	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
@@ -294,10 +294,10 @@ func TestVotingWithoutBiometricsRejected(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	// Setup
-	paillierSK, _ := crypto.GeneratePaillierKeyPair(512)
+	paillierSK, _ := crypto.GeneratePaillierKeyPair(2048)
 	paillierPK := paillierSK.PublicKey
-	pedersenParams, _ := crypto.GeneratePedersenParams(256)
-	ringParams, _ := crypto.GenerateRingParams(256)
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"charlie"}
 	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")

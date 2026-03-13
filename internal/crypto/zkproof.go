@@ -2,6 +2,7 @@ package crypto
 
 import (
 	"crypto/rand"
+	"encoding/binary"
 	"errors"
 	"math/big"
 
@@ -88,7 +89,7 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 		a0 = new(big.Int).Exp(pp.H, r0, pp.P) // g^0 * h^r0 = h^r0
 
 		// Get challenge with nonce and election context
-		c := hashChallenge(pp.Q, nonce, electionID, C, a0, a1)
+		c := hashChallenge(pp.Q, nonce, electionID, pp, C, a0, a1)
 
 		// d0 = c - d1 mod q
 		d0 = new(big.Int).Sub(c, d1)
@@ -124,7 +125,7 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 		a1.Mod(a1, pp.P)
 
 		// Get challenge with nonce and election context
-		c := hashChallenge(pp.Q, nonce, electionID, C, a0, a1)
+		c := hashChallenge(pp.Q, nonce, electionID, pp, C, a0, a1)
 
 		// d1 = c - d0 mod q
 		d1 = new(big.Int).Sub(c, d0)
@@ -158,7 +159,7 @@ func (pp *PedersenParams) VerifyBinary(C *big.Int, proof *BinaryProof) bool {
 	}
 
 	// Recompute challenge with nonce and election context
-	c := hashChallenge(pp.Q, proof.Nonce, proof.ElectionID, C, proof.A0, proof.A1)
+	c := hashChallenge(pp.Q, proof.Nonce, proof.ElectionID, pp, C, proof.A0, proof.A1)
 
 	// Check d0 + d1 = c mod q
 	dSum := new(big.Int).Add(proof.D0, proof.D1)
@@ -229,7 +230,7 @@ func (pp *PedersenParams) ProveSumOne(commitments []*Commitment, nonce []byte, e
 	a := new(big.Int).Exp(pp.H, k, pp.P) // h^k
 
 	// Challenge with nonce and election context
-	c := hashChallenge(pp.Q, nonce, electionID, product, a, pp.G)
+	c := hashChallenge(pp.Q, nonce, electionID, pp, product, a, pp.G)
 
 	// Response: s = k + c * totalR mod q
 	s := new(big.Int).Mul(c, totalR)
@@ -280,24 +281,39 @@ func (pp *PedersenParams) VerifySumOne(commitments []*big.Int, proof *SumProof) 
 	computedA.Mod(computedA, pp.P)
 
 	// Hash and verify with nonce and election context
-	expectedC := hashChallenge(pp.Q, proof.Nonce, proof.ElectionID, product, computedA, pp.G)
+	expectedC := hashChallenge(pp.Q, proof.Nonce, proof.ElectionID, pp, product, computedA, pp.G)
 
 	return expectedC.Cmp(proof.Challenge) == 0
 }
 
-// hashChallenge creates a Fiat-Shamir challenge bound to a nonce and election context.
+// hashChallenge creates a Strong Fiat-Shamir challenge per Bernhard-Pereira-Warinschi
+// (ASIACRYPT 2012). It includes the public parameters (the "statement") in the hash
+// to prevent attacks demonstrated against Helios voting system.
 // The nonce prevents replay attacks across sessions, and the electionID binds the
 // proof to a specific election, preventing cross-election proof reuse.
-func hashChallenge(q *big.Int, nonce []byte, electionID string, values ...*big.Int) *big.Int {
+func hashChallenge(q *big.Int, nonce []byte, electionID string, pp *PedersenParams, values ...*big.Int) *big.Int {
 	hasher := sha3.New256()
 
-	// Domain separation: include nonce and election context first
+	// Domain separation tag (prevents cross-protocol attacks)
+	hasher.Write([]byte("CovertVote-ZKP-v1"))
+
+	// Include public parameters (the "statement" in Strong Fiat-Shamir)
+	hasher.Write(pp.P.Bytes())
+	hasher.Write(pp.Q.Bytes())
+	hasher.Write(pp.G.Bytes())
+	hasher.Write(pp.H.Bytes())
+
+	// Context binding
 	hasher.Write(nonce)
 	hasher.Write([]byte(electionID))
 
-	// Then include the proof-specific values
+	// Length-prefix each value to prevent concatenation ambiguity
 	for _, v := range values {
-		hasher.Write(v.Bytes())
+		vBytes := v.Bytes()
+		lenBuf := make([]byte, 4)
+		binary.BigEndian.PutUint32(lenBuf, uint32(len(vBytes)))
+		hasher.Write(lenBuf)
+		hasher.Write(vBytes)
 	}
 
 	hashBytes := hasher.Sum(nil)
