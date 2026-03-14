@@ -258,6 +258,7 @@ func VerifyPartialDecryption(pd *ThresholdPartialDecryption, c *big.Int, pk *Pai
 
 	// Recompute challenge — must match generatePartialDecryptProof
 	h := sha256.New()
+	h.Write([]byte("CovertVote-ThresholdProof-v1"))
 	h.Write(c.Bytes())
 	h.Write(pd.Ci.Bytes())
 	h.Write(bRecon.Bytes())
@@ -281,8 +282,9 @@ func generatePartialDecryptProof(c, ci *big.Int, share *KeyShare, pk *PaillierPu
 	// b = v^r mod N^2
 	b := new(big.Int).Exp(v, r, nSquared)
 
-	// Challenge e = SHA-256(c, ci, b, vk, v)
+	// Challenge e = SHA-256(domain_tag, c, ci, b, vk, v)
 	h := sha256.New()
+	h.Write([]byte("CovertVote-ThresholdProof-v1"))
 	h.Write(c.Bytes())
 	h.Write(ci.Bytes())
 	h.Write(b.Bytes())
@@ -307,20 +309,19 @@ func generatePartialDecryptProof(c, ci *big.Int, share *KeyShare, pk *PaillierPu
 // lambda_{0,i}^S = delta * prod_{j in S, j!=i} (j / (j - i))
 // Since we work with integers, we compute numerator and denominator separately.
 func computeLagrangeCoeff(i int, indices []int, delta *big.Int) *big.Int {
-	lambda := new(big.Int).Set(delta)
+	num := new(big.Int).Set(delta)
+	den := big.NewInt(1)
 
 	for _, j := range indices {
 		if j == i {
 			continue
 		}
-
-		num := big.NewInt(int64(j))
-		den := big.NewInt(int64(j - i))
-
-		lambda.Mul(lambda, num)
-		lambda.Div(lambda, den)
+		num.Mul(num, big.NewInt(int64(j)))
+		den.Mul(den, big.NewInt(int64(j-i)))
 	}
 
+	// Single division at the end preserves precision
+	lambda := new(big.Int).Div(num, den)
 	return lambda
 }
 
