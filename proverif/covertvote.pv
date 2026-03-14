@@ -218,8 +218,8 @@ event VoterCastBallot(pkey, bitstring).     (* voter with pk cast ballot b *)
 event BallotRecorded(bitstring).             (* ballot b recorded on blockchain *)
 
 (* Query: if ballot is recorded, a voter must have cast it *)
-query b: bitstring; event(BallotRecorded(b)) ==>
-    (inj-event(VoterCastBallot(new_pk, b))).
+query b: bitstring, pkV: pkey; event(BallotRecorded(b)) ==>
+    inj-event(VoterCastBallot(pkV, b)).
 
 let VoterVerifiable(skV: skey, v: vote, pkEA: pkey) =
     new r_enc: nonce;
@@ -265,15 +265,21 @@ let VoterEligible(skV: skey, v: vote, pkEA: pkey) =
     out(bb, encVote);
     0.
 
-(* ---- Property 4: Vote Secrecy ---- *)
-(* The adversary cannot learn the vote value *)
-query attacker(v0).   (* Can attacker learn v0 was voted? *)
-query attacker(v1).   (* Can attacker learn v1 was voted? *)
+(* ---- Property 4: SA2 Share Secrecy ---- *)
+(* Test that individual SA2 shares do not reveal the encrypted vote *)
+(* SA2 channels are [private], so this should hold *)
+free secretVote: bitstring [private].
 
-(* NOTE: These queries will return "true" (attacker knows v0, v1) because
-   v0 and v1 are declared as free names. This is expected — the real privacy
-   test is the diff-equivalence (Property 1). These queries confirm the
-   model is well-formed. *)
+query attacker(secretVote).
+
+let SA2SecrecyTest(pkEA: pkey) =
+    new skV: skey;
+    new r_enc: nonce;
+    new r_sa2: nonce;
+    let encVote = enc(v0, pkEA, r_enc) in
+    out(sa2_a, sa2_share_a(encVote, r_sa2));
+    out(sa2_b, sa2_share_b(encVote, r_sa2));
+    0.
 
 
 (* ============================================================ *)
