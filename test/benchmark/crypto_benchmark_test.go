@@ -254,6 +254,41 @@ func BenchmarkZKPSumOneVerify(b *testing.B) {
 	}
 }
 
+// ============================================================
+// THRESHOLD PAILLIER BENCHMARKS
+// ============================================================
+
+func BenchmarkThresholdKeyGen(b *testing.B) {
+	for i := 0; i < b.N; i++ {
+		crypto.GenerateThresholdKey(2048, 5, 3)
+	}
+}
+
+func BenchmarkThresholdPartialDecrypt(b *testing.B) {
+	shares, _ := crypto.GenerateThresholdKey(2048, 5, 3)
+	pk := shares.PublicKey
+	ct, _ := pk.Encrypt(big.NewInt(42))
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		shares.Shares[0].PartialDecrypt(ct, pk, shares.Params, shares.VerifyKeys[0], shares.V)
+	}
+}
+
+func BenchmarkThresholdCombine3of5(b *testing.B) {
+	shares, _ := crypto.GenerateThresholdKey(2048, 5, 3)
+	pk := shares.PublicKey
+	ct, _ := pk.Encrypt(big.NewInt(42))
+	partials := make([]*crypto.ThresholdPartialDecryption, 3)
+	for i := 0; i < 3; i++ {
+		partials[i], _ = shares.Shares[i].PartialDecrypt(
+			ct, pk, shares.Params, shares.VerifyKeys[i], shares.V)
+	}
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		crypto.CombinePartialDecryptions(partials, pk, shares.Params)
+	}
+}
+
 func BenchmarkRingVerify100(b *testing.B) {
 	rp, _ := crypto.GenerateRingParams(256)
 	ringSize := 100

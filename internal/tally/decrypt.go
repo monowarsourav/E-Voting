@@ -2,6 +2,7 @@ package tally
 
 import (
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/covertvote/e-voting/internal/crypto"
@@ -237,6 +238,46 @@ func (td *ThresholdDecryptor) generatePartialDecryptionProof(
 	copy(proofData, crypto.SHA3Hash(hashInput))
 
 	return proofData
+}
+
+// ThresholdTally performs homomorphic tallying with threshold decryption.
+// This is the secure production method — no single entity can decrypt alone.
+// It first aggregates all encrypted votes homomorphically, then each trustee
+// computes a partial decryption on the aggregate, and finally the partials
+// are combined to recover the plaintext tally.
+func ThresholdTally(
+	encryptedVotes []*big.Int,
+	pk *crypto.PaillierPublicKey,
+	shares *crypto.ThresholdKeyShares,
+	trusteeIndices []int,
+) (*big.Int, error) {
+	params := shares.Params
+	if len(trusteeIndices) < params.Threshold {
+		return nil, fmt.Errorf("need at least %d trustees, got %d",
+			params.Threshold, len(trusteeIndices))
+	}
+
+	// Step 1: Homomorphic addition of all encrypted votes
+	tally := pk.AddMultiple(encryptedVotes)
+
+	// Step 2: Each selected trustee computes a partial decryption
+	partials := make([]*crypto.ThresholdPartialDecryption, len(trusteeIndices))
+	for i, idx := range trusteeIndices {
+		pd, err := shares.Shares[idx].PartialDecrypt(
+			tally, pk, params, shares.VerifyKeys[idx], shares.V)
+		if err != nil {
+			return nil, fmt.Errorf("trustee %d partial decrypt failed: %w", idx, err)
+		}
+		partials[i] = pd
+	}
+
+	// Step 3: Combine partial decryptions
+	result, err := crypto.CombinePartialDecryptions(partials, pk, params)
+	if err != nil {
+		return nil, fmt.Errorf("threshold decryption failed: %w", err)
+	}
+
+	return result, nil
 }
 
 // factorial computes n!
