@@ -1,0 +1,39 @@
+name: covertvote-org1
+version: "1.0"
+
+client:
+  organization: Org1
+  connection:
+    timeout:
+      peer:
+        endorser: 300
+      orderer: 300
+
+channels:
+  covertvotechannel:
+    orderers:
+      - orderer.covertvote.com
+    peers:
+      peer0.org1.covertvote.com:
+        endorsingPeer: true
+        chaincodeQuery: true
+        ledgerQuery: true
+        eventSource: true
+
+organizations:
+  Org1:
+    mspid: Org1MSP
+    peers:
+      - peer0.org1.covertvote.com
+
+orderers:
+  orderer.covertvote.com:
+    url: grpcs://localhost:7050
+    tlsCACerts:
+      path: '../network/crypto-config/ordererOrganizations/covertvote.com/orderers/orderer.covertvote.com/tls/ca.crt'
+
+peers:
+  peer0.org1.covertvote.com:
+    url: grpcs://localhost:7051
+    tlsCACerts:
+      path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/peers/peer0.org1.covertvote.com/tls/ca.crt'

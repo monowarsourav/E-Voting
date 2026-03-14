@@ -69,3 +69,5 @@ vendor/
 
 # Binary output directory
 bin/
+caliper/node_modules/
+node_modules/
