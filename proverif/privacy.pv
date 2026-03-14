@@ -1,0 +1,63 @@
+(* CovertVote: Ballot Privacy via Observational Equivalence *)
+(* NO queries allowed in this file — diff mode only *)
+
+type skey.
+type pkey.
+type vote.
+type nonce.
+type commitment.
+type zkprf.
+type signature.
+type keyimage.
+
+free ch: channel.
+free bb: channel.
+free sa2_a: channel [private].
+free sa2_b: channel [private].
+
+free v0: vote.
+free v1: vote.
+
+fun pk(skey): pkey.
+fun enc(vote, pkey, nonce): bitstring.
+fun commit(vote, nonce): commitment.
+fun zkp_make(vote, nonce, commitment): zkprf.
+fun ring_sign(bitstring, skey, pkey): signature.
+fun key_image(skey): keyimage.
+fun sa2_share_a(bitstring, nonce): bitstring.
+fun sa2_share_b(bitstring, nonce): bitstring.
+fun make_ballot(bitstring, commitment, zkprf, signature, keyimage): bitstring.
+
+let SA2ServerA() = in(sa2_a, x: bitstring); 0.
+let SA2ServerB() = in(sa2_b, x: bitstring); 0.
+
+let VoterPrivacy(skV: skey, pkEA: pkey) =
+    new r_enc: nonce;
+    new r_com: nonce;
+    new r_sa2: nonce;
+    let v = diff[v0, v1] in
+    let encVote = enc(v, pkEA, r_enc) in
+    let com = commit(v, r_com) in
+    let zk = zkp_make(v, r_com, com) in
+    let sig = ring_sign(encVote, skV, pk(skV)) in
+    let ki = key_image(skV) in
+    let b = make_ballot(encVote, com, zk, sig, ki) in
+    out(sa2_a, sa2_share_a(encVote, r_sa2));
+    out(sa2_b, sa2_share_b(encVote, r_sa2));
+    out(bb, b);
+    0.
+
+process
+    new skEA: skey;
+    let pkEA = pk(skEA) in
+    out(ch, pkEA);
+    (
+        new skAlice: skey;
+        new skBob: skey;
+        out(ch, pk(skAlice));
+        out(ch, pk(skBob));
+        VoterPrivacy(skAlice, pkEA) |
+        VoterPrivacy(skBob, pkEA) |
+        SA2ServerA() |
+        SA2ServerB()
+    )

@@ -1,0 +1,51 @@
+(* CovertVote: Voter Eligibility *)
+(* NO diff allowed — query mode only *)
+
+type skey.
+type pkey.
+type vote.
+type credential.
+type nonce.
+
+free ch: channel.
+free bb: channel.
+free reg: channel [private].
+
+free v0: vote.
+
+fun pk(skey): pkey.
+fun enc(vote, pkey, nonce): bitstring.
+fun real_cred(skey): credential.
+fun fake_cred(skey): credential.
+
+event VoterRegistered(pkey).
+event ValidBallotCast(pkey).
+
+query pkV: pkey;
+    event(ValidBallotCast(pkV)) ==> event(VoterRegistered(pkV)).
+
+let RegistrationAuthority() =
+    in(reg, voterPK: pkey);
+    new skCred: skey;
+    out(reg, (real_cred(skCred), fake_cred(skCred)));
+    0.
+
+let VoterEligible(skV: skey, v: vote, pkEA: pkey) =
+    out(reg, pk(skV));
+    in(reg, (realC: credential, fakeC: credential));
+    event VoterRegistered(pk(skV));
+    new r_enc: nonce;
+    let encVote = enc(v, pkEA, r_enc) in
+    event ValidBallotCast(pk(skV));
+    out(bb, encVote);
+    0.
+
+process
+    new skEA: skey;
+    let pkEA = pk(skEA) in
+    out(ch, pkEA);
+    (
+        new skV: skey;
+        RegistrationAuthority() |
+        VoterEligible(skV, v0, pkEA)
+    )

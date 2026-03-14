@@ -1,16 +1,18 @@
 # CovertVote ProVerif Formal Verification
 
 ## Overview
-This directory contains ProVerif models for formal verification of CovertVote's security properties.
+This directory contains ProVerif models for formal verification of CovertVote's security properties. Each property is in a separate file because ProVerif's diff-equivalence mode (for privacy) is incompatible with query mode (for correspondence properties).
 
 ## Files
-- `covertvote.pv` — Main protocol model with ballot privacy, verifiability, and eligibility verification
+- `privacy.pv` — Ballot Privacy via observational equivalence (diff-equivalence)
+- `verifiability.pv` — Individual Verifiability via correspondence property
+- `eligibility.pv` — Voter Eligibility via correspondence property
+- `run_verification.sh` — Script to run all 3 checks
 
 ## Security Properties Verified
 1. **Ballot Privacy** — Observational equivalence (diff-equivalence): adversary cannot distinguish which voter cast which vote
 2. **Individual Verifiability** — Correspondence property: every recorded ballot was cast by a legitimate voter
 3. **Eligibility** — Correspondence property: only registered voters can cast valid ballots
-4. **Vote Secrecy** — Reachability: adversary cannot learn individual vote values from SA2 shares
 
 ## What ProVerif CANNOT Verify (by design)
 - Paillier homomorphic tally correctness (requires algebraic reasoning)
@@ -18,44 +20,29 @@ This directory contains ProVerif models for formal verification of CovertVote's 
 - Kyber768 post-quantum security (requires lattice assumptions)
 - SMDC k-slot indistinguishability (requires computational indistinguishability)
 
-These are covered by pen-and-paper proofs in `security_analysis.tex`.
+These are covered by pen-and-paper proofs in the paper (Section 6).
 
 ## How to Run
 
-### Install ProVerif
 ```bash
-# Ubuntu/Debian
-sudo apt-get install proverif
+eval $(opam env)
+cd proverif/
 
-# macOS
-brew install proverif
+# Run all 3 checks
+bash run_verification.sh
 
-# Or from source: https://bblanche.gitlabpages.inria.fr/proverif/
-```
-
-### Run Verification
-```bash
-# Check ballot privacy (diff-equivalence)
-proverif covertvote.pv
-
-# Expected output for ballot privacy:
-# "RESULT Observational equivalence is true."
-# This means: adversary CANNOT distinguish which voter voted for which candidate
-
-# To check other properties, edit covertvote.pv:
-# 1. Comment out OPTION A process block
-# 2. Uncomment OPTION B (verifiability) or OPTION C (eligibility)
-# 3. Run proverif again
+# Or run individually:
+proverif privacy.pv          # Ballot Privacy
+proverif verifiability.pv    # Individual Verifiability
+proverif eligibility.pv      # Voter Eligibility
 ```
 
 ### Expected Results
-| Property | ProVerif Query | Expected Result |
-|----------|---------------|-----------------|
-| Ballot Privacy | Observational equivalence | `true` (privacy holds) |
-| Individual Verifiability | `event(BallotRecorded(b)) ==> event(VoterCastBallot(pk,b))` | `true` |
-| Eligibility | `event(ValidBallotCast(pk)) ==> event(VoterRegistered(pk))` | `true` |
-| Vote Secrecy (v0) | `attacker(v0)` | `true` (expected — v0 is public constant) |
-| Vote Secrecy (v1) | `attacker(v1)` | `true` (expected — v1 is public constant) |
+| Property | File | Expected Output |
+|----------|------|-----------------|
+| Ballot Privacy | privacy.pv | `Observational equivalence is true` |
+| Verifiability | verifiability.pv | `event(BallotRecorded(b)) ==> inj-event(VoterCastBallot(pkV,b)) is true` |
+| Eligibility | eligibility.pv | `event(ValidBallotCast(pkV)) ==> event(VoterRegistered(pkV)) is true` |
 
 ## References
 - Baloglu et al., "Election Verifiability in Receipt-free Voting Protocols" (ProVerif models: github.com/sbaloglu/proverif-codes)
