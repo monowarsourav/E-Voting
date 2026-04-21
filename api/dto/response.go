@@ -57,12 +57,12 @@ type VoterResponse struct {
 
 // RegistrationResponse represents the response from voter registration
 type RegistrationResponse struct {
-	Success      bool              `json:"success"`
-	VoterID      string            `json:"voter_id"`
-	Message      string            `json:"message"`
-	Credential   *CredentialInfo   `json:"credential,omitempty"`
-	RingKey      *RingKeyInfo      `json:"ring_key,omitempty"`
-	MerkleProof  []string          `json:"merkle_proof,omitempty"`
+	Success     bool            `json:"success"`
+	VoterID     string          `json:"voter_id"`
+	Message     string          `json:"message"`
+	Credential  *CredentialInfo `json:"credential,omitempty"`
+	RingKey     *RingKeyInfo    `json:"ring_key,omitempty"`
+	MerkleProof []string        `json:"merkle_proof,omitempty"`
 }
 
 // CredentialInfo represents SMDC credential information
@@ -80,33 +80,33 @@ type RingKeyInfo struct {
 
 // VoteResponse represents the response from casting a vote
 type VoteResponse struct {
-	Success           bool      `json:"success"`
-	Message           string    `json:"message"`
-	ReceiptID         string    `json:"receipt_id"`
-	KeyImage          string    `json:"key_image"`
-	BlockchainTxID    string    `json:"blockchain_tx_id,omitempty"`
-	Timestamp         time.Time `json:"timestamp"`
+	Success        bool      `json:"success"`
+	Message        string    `json:"message"`
+	ReceiptID      string    `json:"receipt_id"`
+	KeyImage       string    `json:"key_image"`
+	BlockchainTxID string    `json:"blockchain_tx_id,omitempty"`
+	Timestamp      time.Time `json:"timestamp"`
 }
 
 // TallyResponse represents the response from tallying votes
 type TallyResponse struct {
-	Success          bool                   `json:"success"`
-	ElectionID       string                 `json:"election_id"`
-	TotalVotes       int                    `json:"total_votes"`
-	CandidateTallies map[string]int         `json:"candidate_tallies"`
-	Winner           string                 `json:"winner,omitempty"`
-	TallyTime        time.Time              `json:"tally_time"`
-	Verified         bool                   `json:"verified"`
+	Success          bool           `json:"success"`
+	ElectionID       string         `json:"election_id"`
+	TotalVotes       int            `json:"total_votes"`
+	CandidateTallies map[string]int `json:"candidate_tallies"`
+	Winner           string         `json:"winner,omitempty"`
+	TallyTime        time.Time      `json:"tally_time"`
+	Verified         bool           `json:"verified"`
 }
 
 // VoteVerificationResponse represents the response from verifying a vote
 type VoteVerificationResponse struct {
-	Success    bool      `json:"success"`
-	Valid      bool      `json:"valid"`
-	ReceiptID  string    `json:"receipt_id"`
-	KeyImage   string    `json:"key_image"`
-	Timestamp  time.Time `json:"timestamp,omitempty"`
-	Message    string    `json:"message"`
+	Success   bool      `json:"success"`
+	Valid     bool      `json:"valid"`
+	ReceiptID string    `json:"receipt_id"`
+	KeyImage  string    `json:"key_image"`
+	Timestamp time.Time `json:"timestamp,omitempty"`
+	Message   string    `json:"message"`
 }
 
 // HealthResponse represents the health check response
@@ -133,9 +133,9 @@ type VoteCountResponse struct {
 
 // AdminStatsResponse represents admin statistics
 type AdminStatsResponse struct {
-	TotalElections      int            `json:"total_elections"`
-	ActiveElections     int            `json:"active_elections"`
-	TotalVoters         int            `json:"total_voters"`
-	TotalVotesCast      int            `json:"total_votes_cast"`
-	ElectionsByStatus   map[string]int `json:"elections_by_status"`
+	TotalElections    int            `json:"total_elections"`
+	ActiveElections   int            `json:"active_elections"`
+	TotalVoters       int            `json:"total_voters"`
+	TotalVotesCast    int            `json:"total_votes_cast"`
+	ElectionsByStatus map[string]int `json:"elections_by_status"`
 }

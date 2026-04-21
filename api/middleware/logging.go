@@ -1,110 +1,73 @@
-// api/middleware/logging.go
-
 package middleware
 
 import (
-	"fmt"
+	"log/slog"
 	"time"
 
 	"github.com/gin-gonic/gin"
 )
 
-// LoggingMiddleware logs HTTP requests
-func LoggingMiddleware() gin.HandlerFunc {
+// RequestLogger returns a gin middleware that emits one structured log line
+// per request via the supplied slog.Logger. Requests to /health, /ready, and
+// /live are intentionally skipped to keep probe traffic out of the log
+// stream.
+func RequestLogger(logger *slog.Logger) gin.HandlerFunc {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	skip := map[string]struct{}{
+		"/health": {},
+		"/ready":  {},
+		"/live":   {},
+	}
+
 	return func(c *gin.Context) {
-		// Start timer
-		startTime := time.Now()
-
-		// Get request details
+		start := time.Now()
 		path := c.Request.URL.Path
-		raw := c.Request.URL.RawQuery
-		method := c.Request.Method
-		clientIP := c.ClientIP()
+		rawQuery := c.Request.URL.RawQuery
 
-		// Process request
 		c.Next()
 
-		// Calculate latency
-		latency := time.Since(startTime)
-
-		// Get status code
-		statusCode := c.Writer.Status()
-
-		// Get error if exists
-		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
-
-		// Build log message
-		if raw != "" {
-			path = path + "?" + raw
+		if _, ok := skip[path]; ok {
+			return
 		}
 
-		// Color-code based on status
-		statusColor := getStatusColor(statusCode)
+		status := c.Writer.Status()
+		level := slog.LevelInfo
+		switch {
+		case status >= 500:
+			level = slog.LevelError
+		case status >= 400:
+			level = slog.LevelWarn
+		}
 
-		// Log format: [timestamp] status method path latency ip error
-		fmt.Printf("[%s] %s%d%s %s %s %v %s %s\n",
-			time.Now().Format("2006-01-02 15:04:05"),
-			statusColor,
-			statusCode,
-			resetColor(),
-			method,
-			path,
-			latency,
-			clientIP,
-			errorMessage,
-		)
+		attrs := []any{
+			slog.Int("status", status),
+			slog.String("method", c.Request.Method),
+			slog.String("path", path),
+			slog.String("ip", c.ClientIP()),
+			slog.Duration("duration", time.Since(start)),
+		}
+		if rawQuery != "" {
+			attrs = append(attrs, slog.String("query", rawQuery))
+		}
+		if errs := c.Errors.ByType(gin.ErrorTypePrivate).String(); errs != "" {
+			attrs = append(attrs, slog.String("errors", errs))
+		}
+
+		logger.LogAttrs(c.Request.Context(), level, "http_request", toAttrs(attrs)...)
 	}
 }
 
-// StructuredLoggingMiddleware provides structured logging
-func StructuredLoggingMiddleware(logger interface{}) gin.HandlerFunc {
-	return func(c *gin.Context) {
-		startTime := time.Now()
-
-		// Process request
-		c.Next()
-
-		// Calculate latency
-		latency := time.Since(startTime)
-
-		// Get request details
-		statusCode := c.Writer.Status()
-		method := c.Request.Method
-		path := c.Request.URL.Path
-		clientIP := c.ClientIP()
-		errorMessage := c.Errors.ByType(gin.ErrorTypePrivate).String()
-
-		// Log using structured logger if available
-		// This is a simple implementation - can be enhanced with actual logger
-		fmt.Printf("[GIN] %s | %3d | %13v | %15s | %-7s %s %s\n",
-			time.Now().Format("2006/01/02 - 15:04:05"),
-			statusCode,
-			latency,
-			clientIP,
-			method,
-			path,
-			errorMessage,
-		)
+// toAttrs converts a variadic list of slog.Attr-shaped values to a []slog.Attr.
+// slog.LogAttrs is faster than variadic Log because it skips reflection.
+func toAttrs(vals []any) []slog.Attr {
+	out := make([]slog.Attr, 0, len(vals))
+	for _, v := range vals {
+		if a, ok := v.(slog.Attr); ok {
+			out = append(out, a)
+		}
 	}
-}
-
-// getStatusColor returns ANSI color code based on HTTP status
-func getStatusColor(status int) string {
-	switch {
-	case status >= 200 && status < 300:
-		return "\033[32m" // Green
-	case status >= 300 && status < 400:
-		return "\033[36m" // Cyan
-	case status >= 400 && status < 500:
-		return "\033[33m" // Yellow
-	case status >= 500:
-		return "\033[31m" // Red
-	default:
-		return "\033[37m" // White
-	}
-}
-
-// resetColor returns ANSI reset color code
-func resetColor() string {
-	return "\033[0m"
+	return out
 }

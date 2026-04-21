@@ -8,18 +8,18 @@ import (
 
 // Election represents an election in the system
 type Election struct {
-	ID                    string    `json:"id"`
-	Name                  string    `json:"name"`
-	Description           string    `json:"description"`
-	Candidates            []string  `json:"candidates"`
-	NumCandidates         int       `json:"num_candidates"`
-	StartTime             time.Time `json:"start_time"`
-	EndTime               time.Time `json:"end_time"`
-	RegistrationDeadline  time.Time `json:"registration_deadline"`
-	Status                string    `json:"status"` // pending, active, closed, tallied
-	MerkleRoot            string    `json:"merkle_root"`
-	CreatedAt             time.Time `json:"created_at"`
-	UpdatedAt             time.Time `json:"updated_at"`
+	ID                   string    `json:"id"`
+	Name                 string    `json:"name"`
+	Description          string    `json:"description"`
+	Candidates           []string  `json:"candidates"`
+	NumCandidates        int       `json:"num_candidates"`
+	StartTime            time.Time `json:"start_time"`
+	EndTime              time.Time `json:"end_time"`
+	RegistrationDeadline time.Time `json:"registration_deadline"`
+	Status               string    `json:"status"` // pending, active, closed, tallied
+	MerkleRoot           string    `json:"merkle_root"`
+	CreatedAt            time.Time `json:"created_at"`
+	UpdatedAt            time.Time `json:"updated_at"`
 }
 
 // ElectionStatus represents the status of an election

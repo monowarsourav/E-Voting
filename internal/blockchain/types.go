@@ -42,14 +42,14 @@ type ElectionOnChain struct {
 
 // VoteOnChain represents a vote stored on blockchain
 type VoteOnChain struct {
-	ID                string `json:"id"`
-	ElectionID        string `json:"election_id"`
-	EncryptedVote     string `json:"encrypted_vote"`     // Base64 encoded
-	RingSignature     string `json:"ring_signature"`     // JSON encoded
-	KeyImage          string `json:"key_image"`          // Hex encoded
-	SMDCSlot          int    `json:"smdc_slot"`
-	Timestamp         string `json:"timestamp"`
-	SubmitterOrgID    string `json:"submitter_org_id"`
+	ID             string `json:"id"`
+	ElectionID     string `json:"election_id"`
+	EncryptedVote  string `json:"encrypted_vote"` // Base64 encoded
+	RingSignature  string `json:"ring_signature"` // JSON encoded
+	KeyImage       string `json:"key_image"`      // Hex encoded
+	SMDCSlot       int    `json:"smdc_slot"`
+	Timestamp      string `json:"timestamp"`
+	SubmitterOrgID string `json:"submitter_org_id"`
 }
 
 // CredentialOnChain represents a voter credential stored on blockchain

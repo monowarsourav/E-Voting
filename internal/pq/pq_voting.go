@@ -24,15 +24,15 @@ type PQVoteCaster struct {
 
 // PQCastVote represents a post-quantum secure cast vote
 type PQCastVote struct {
-	VoterID           string
-	HybridCiphertext  *HybridCiphertext
-	SMDCSlotIndex     int
-	SMDCCommitment    *big.Int
-	RingSignature     *crypto.RingSignature
-	Timestamp         int64
-	PQVoteShares      *PQVoteShares
-	MerkleProof       [][]byte
-	PublicCredential  *smdc.PublicCredential
+	VoterID          string
+	HybridCiphertext *HybridCiphertext
+	SMDCSlotIndex    int
+	SMDCCommitment   *big.Int
+	RingSignature    *crypto.RingSignature
+	Timestamp        int64
+	PQVoteShares     *PQVoteShares
+	MerkleProof      [][]byte
+	PublicCredential *smdc.PublicCredential
 }
 
 // PQVoteShares represents post-quantum vote shares for SA²
@@ -181,15 +181,15 @@ func (pqvc *PQVoteCaster) CastPQVote(
 
 	// Step 13: Create cast vote
 	castVote := &PQCastVote{
-		VoterID:           voterID,
-		HybridCiphertext:  weightedCiphertext,
-		SMDCSlotIndex:     smdcSlotIndex,
-		SMDCCommitment:    slot.Commitment.C,
-		RingSignature:     ringSignature,
-		Timestamp:         currentTime,
-		PQVoteShares:      pqShares,
-		MerkleProof:       merkleProof,
-		PublicCredential:  voterRecord.SMDCCredential.GetPublicCredential(),
+		VoterID:          voterID,
+		HybridCiphertext: weightedCiphertext,
+		SMDCSlotIndex:    smdcSlotIndex,
+		SMDCCommitment:   slot.Commitment.C,
+		RingSignature:    ringSignature,
+		Timestamp:        currentTime,
+		PQVoteShares:     pqShares,
+		MerkleProof:      merkleProof,
+		PublicCredential: voterRecord.SMDCCredential.GetPublicCredential(),
 	}
 
 	// Step 14: Store vote

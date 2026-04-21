@@ -38,19 +38,19 @@ type ChaincodeInterface interface {
 
 // MockChaincode provides a mock implementation for testing
 type MockChaincode struct {
-	elections  map[string]*ElectionOnChain
-	votes      map[string]*VoteOnChain
+	elections   map[string]*ElectionOnChain
+	votes       map[string]*VoteOnChain
 	credentials map[string]*CredentialOnChain
-	tallies    map[string]*TallyResultOnChain
+	tallies     map[string]*TallyResultOnChain
 }
 
 // NewMockChaincode creates a new mock chaincode
 func NewMockChaincode() *MockChaincode {
 	return &MockChaincode{
-		elections:  make(map[string]*ElectionOnChain),
-		votes:      make(map[string]*VoteOnChain),
+		elections:   make(map[string]*ElectionOnChain),
+		votes:       make(map[string]*VoteOnChain),
 		credentials: make(map[string]*CredentialOnChain),
-		tallies:    make(map[string]*TallyResultOnChain),
+		tallies:     make(map[string]*TallyResultOnChain),
 	}
 }
 

@@ -81,7 +81,7 @@ func TestCastVoteWithBiometrics(t *testing.T) {
 	// Register voter with password
 	fingerprintData := make([]byte, 512)
 	for i := range fingerprintData {
-		fingerprintData[i] = byte((i * 37 + i/3*17 + 13) % 256) // Varied pseudo-random pattern
+		fingerprintData[i] = byte((i*37 + i/3*17 + 13) % 256) // Varied pseudo-random pattern
 	}
 
 	_, err := regSystem.RegisterVoterWithPassword("voter001", []byte("password123"))
@@ -92,7 +92,7 @@ func TestCastVoteWithBiometrics(t *testing.T) {
 	// Generate valid biometric data with proper entropy (minimum 500 bytes)
 	livenessData := make([]byte, 512)
 	for i := range livenessData {
-		livenessData[i] = byte((i * 73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
+		livenessData[i] = byte((i*73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
 	}
 
 	tests := []struct {
@@ -199,11 +199,11 @@ func TestCastVotePasswordUserRequiresBiometrics(t *testing.T) {
 	// Try to vote WITH biometrics
 	fingerprintData := make([]byte, 512)
 	for i := range fingerprintData {
-		fingerprintData[i] = byte((i * 41 + i/7*23 + 19) % 256) // Different varied pseudo-random pattern
+		fingerprintData[i] = byte((i*41 + i/7*23 + 19) % 256) // Different varied pseudo-random pattern
 	}
 	livenessData := make([]byte, 512)
 	for i := range livenessData {
-		livenessData[i] = byte((i * 73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
+		livenessData[i] = byte((i*73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
 	}
 
 	w := httptest.NewRecorder()

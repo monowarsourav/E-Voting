@@ -3,7 +3,9 @@ package crypto
 import (
 	"crypto/rand"
 	"errors"
+	"fmt"
 	"math/big"
+	"sort"
 )
 
 // RING_SIZE is the fixed ring size for O(n) scalability
@@ -102,14 +104,8 @@ func SelectRandomRing(allPublicKeys []*big.Int, signerKey *big.Int, signerIndex 
 		indices = append(indices, idx)
 	}
 
-	// Sort indices to maintain deterministic ordering
-	for i := 0; i < len(indices)-1; i++ {
-		for j := i + 1; j < len(indices); j++ {
-			if indices[i] > indices[j] {
-				indices[i], indices[j] = indices[j], indices[i]
-			}
-		}
-	}
+	// Sort indices to maintain deterministic ordering (O(n log n)).
+	sort.Ints(indices)
 
 	// Build the fixed-size ring
 	ring := make([]*big.Int, RING_SIZE)
@@ -159,8 +155,13 @@ func (rp *RingParams) Sign(message []byte, signerKey *RingKeyPair, ring []*big.I
 	challenges := make([]*big.Int, n)
 	responses := make([]*big.Int, n)
 
-	// Step 3: Generate random commitment for signer
-	alpha, _ := rand.Int(rand.Reader, rp.Q)
+	// Step 3: Generate random commitment for signer.
+	// Entropy failures here would silently produce an insecure signature, so
+	// we propagate the error rather than ignoring it.
+	alpha, err := rand.Int(rand.Reader, rp.Q)
+	if err != nil {
+		return nil, fmt.Errorf("ring sign: read entropy for alpha: %w", err)
+	}
 
 	// L_s = g^alpha
 	Ls := new(big.Int).Exp(rp.G, alpha, rp.P)
@@ -176,7 +177,10 @@ func (rp *RingParams) Sign(message []byte, signerKey *RingKeyPair, ring []*big.I
 		nextIdx := (idx + 1) % n
 
 		// Random response
-		responses[idx], _ = rand.Int(rand.Reader, rp.Q)
+		responses[idx], err = rand.Int(rand.Reader, rp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("ring sign: read entropy for response: %w", err)
+		}
 
 		// L_i = g^r_i × pk_i^c_i
 		gri := new(big.Int).Exp(rp.G, responses[idx], rp.P)

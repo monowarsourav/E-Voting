@@ -126,8 +126,8 @@ func (pp *PedersenParams) Commit(m *big.Int) (*Commitment, error) {
 	// C = g^m × h^r mod p
 	gm := new(big.Int).Exp(pp.G, m, pp.P) // g^m mod p
 	hr := new(big.Int).Exp(pp.H, r, pp.P) // h^r mod p
-	c := new(big.Int).Mul(gm, hr)          // g^m × h^r
-	c.Mod(c, pp.P)                         // mod p
+	c := new(big.Int).Mul(gm, hr)         // g^m × h^r
+	c.Mod(c, pp.P)                        // mod p
 
 	return &Commitment{
 		C: c,

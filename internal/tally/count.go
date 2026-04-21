@@ -11,11 +11,11 @@ import (
 
 // Counter handles vote counting
 type Counter struct {
-	PublicKey    *crypto.PaillierPublicKey
-	PrivateKey   *crypto.PaillierPrivateKey
-	Aggregator   *sa2.Aggregator
-	Combiner     *sa2.Combiner
-	Decryptor    *Decryptor
+	PublicKey  *crypto.PaillierPublicKey
+	PrivateKey *crypto.PaillierPrivateKey
+	Aggregator *sa2.Aggregator
+	Combiner   *sa2.Combiner
+	Decryptor  *Decryptor
 }
 
 // NewCounter creates a new counter

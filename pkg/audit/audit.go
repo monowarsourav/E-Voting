@@ -34,26 +34,26 @@ const (
 	EventConfigChanged AuditEventType = "config_changed"
 
 	// Security events
-	EventAuthFailed       AuditEventType = "auth_failed"
-	EventRateLimitHit     AuditEventType = "rate_limit_hit"
-	EventInvalidRequest   AuditEventType = "invalid_request"
+	EventAuthFailed        AuditEventType = "auth_failed"
+	EventRateLimitHit      AuditEventType = "rate_limit_hit"
+	EventInvalidRequest    AuditEventType = "invalid_request"
 	EventDoubleVoteAttempt AuditEventType = "double_vote_attempt"
 )
 
 // AuditEvent represents an audit log entry
 type AuditEvent struct {
-	ID          int64          `json:"id"`
-	Timestamp   time.Time      `json:"timestamp"`
-	EventType   AuditEventType `json:"event_type"`
-	UserID      string         `json:"user_id,omitempty"`      // Voter ID or Admin ID
-	ElectionID  string         `json:"election_id,omitempty"`
-	IPAddress   string         `json:"ip_address,omitempty"`
-	UserAgent   string         `json:"user_agent,omitempty"`
-	Action      string         `json:"action"`
-	Resource    string         `json:"resource,omitempty"`
-	Result      string         `json:"result"` // success, failure, error
-	ErrorMsg    string         `json:"error_msg,omitempty"`
-	Metadata    string         `json:"metadata,omitempty"` // JSON-encoded additional data
+	ID         int64          `json:"id"`
+	Timestamp  time.Time      `json:"timestamp"`
+	EventType  AuditEventType `json:"event_type"`
+	UserID     string         `json:"user_id,omitempty"` // Voter ID or Admin ID
+	ElectionID string         `json:"election_id,omitempty"`
+	IPAddress  string         `json:"ip_address,omitempty"`
+	UserAgent  string         `json:"user_agent,omitempty"`
+	Action     string         `json:"action"`
+	Resource   string         `json:"resource,omitempty"`
+	Result     string         `json:"result"` // success, failure, error
+	ErrorMsg   string         `json:"error_msg,omitempty"`
+	Metadata   string         `json:"metadata,omitempty"` // JSON-encoded additional data
 }
 
 // AuditLogger handles audit logging
@@ -66,8 +66,12 @@ func NewAuditLogger(db *sql.DB) *AuditLogger {
 	return &AuditLogger{db: db}
 }
 
-// Log logs an audit event
+// Log logs an audit event. Nil-safe: a nil logger silently no-ops so callers
+// don't need to branch on whether auditing is configured.
 func (al *AuditLogger) Log(event *AuditEvent) error {
+	if al == nil {
+		return nil
+	}
 	if event.Timestamp.IsZero() {
 		event.Timestamp = time.Now()
 	}
@@ -108,6 +112,9 @@ func (al *AuditLogger) Log(event *AuditEvent) error {
 
 // LogSuccess logs a successful event
 func (al *AuditLogger) LogSuccess(eventType AuditEventType, action string, userID string, metadata map[string]interface{}) error {
+	if al == nil {
+		return nil
+	}
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return al.Log(&AuditEvent{
@@ -121,6 +128,9 @@ func (al *AuditLogger) LogSuccess(eventType AuditEventType, action string, userI
 
 // LogFailure logs a failed event
 func (al *AuditLogger) LogFailure(eventType AuditEventType, action string, userID string, errorMsg string, metadata map[string]interface{}) error {
+	if al == nil {
+		return nil
+	}
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return al.Log(&AuditEvent{
@@ -135,6 +145,9 @@ func (al *AuditLogger) LogFailure(eventType AuditEventType, action string, userI
 
 // LogElectionCreated logs election creation
 func (al *AuditLogger) LogElectionCreated(electionID string, adminID string, metadata map[string]interface{}) error {
+	if al == nil {
+		return nil
+	}
 	metadataJSON, _ := json.Marshal(metadata)
 
 	return al.Log(&AuditEvent{

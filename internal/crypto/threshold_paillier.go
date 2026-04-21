@@ -17,11 +17,11 @@ type ThresholdParams struct {
 // ThresholdKeyShares holds the result of distributed key generation.
 type ThresholdKeyShares struct {
 	PublicKey  *PaillierPublicKey
-	Shares    []*KeyShare    // one per trustee
-	VerifyKeys []*big.Int    // verification key for each share
-	Params    *ThresholdParams
-	V         *big.Int       // verification base
-	Delta     *big.Int       // n! (factorial of total trustees)
+	Shares     []*KeyShare // one per trustee
+	VerifyKeys []*big.Int  // verification key for each share
+	Params     *ThresholdParams
+	V          *big.Int // verification base
+	Delta      *big.Int // n! (factorial of total trustees)
 }
 
 // KeyShare represents one trustee's share of the private key.
@@ -32,9 +32,9 @@ type KeyShare struct {
 
 // ThresholdPartialDecryption represents one trustee's partial decryption.
 type ThresholdPartialDecryption struct {
-	Index int                         // trustee index (1-based)
-	Ci    *big.Int                    // partial decryption value
-	Proof *PartialDecryptionProof     // ZK proof of correct partial decryption
+	Index int                     // trustee index (1-based)
+	Ci    *big.Int                // partial decryption value
+	Proof *PartialDecryptionProof // ZK proof of correct partial decryption
 }
 
 // PartialDecryptionProof proves correct partial decryption without revealing the share.
@@ -130,11 +130,11 @@ func GenerateThresholdKey(bits, n, t int) (*ThresholdKeyShares, error) {
 
 	return &ThresholdKeyShares{
 		PublicKey:  pk,
-		Shares:    shares,
+		Shares:     shares,
 		VerifyKeys: verifyKeys,
-		Params:    params,
-		V:         v,
-		Delta:     delta,
+		Params:     params,
+		V:          v,
+		Delta:      delta,
 	}, nil
 }
 

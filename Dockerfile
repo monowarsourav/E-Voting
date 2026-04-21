@@ -1,7 +1,7 @@
 # Dockerfile for CovertVote API Server
 
 # Build stage
-FROM golang:1.21-alpine AS builder
+FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
@@ -28,7 +28,6 @@ RUN apk --no-cache add ca-certificates sqlite
 
 # Copy binary from builder
 COPY --from=builder /app/covertvote-api .
-COPY --from=builder /app/pkg/config/config.yaml ./config.yaml
 COPY --from=builder /app/migrations ./migrations
 
 # Create data and logs directories

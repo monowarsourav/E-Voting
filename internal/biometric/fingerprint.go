@@ -1,6 +1,7 @@
 package biometric
 
 import (
+	"crypto/subtle"
 	"errors"
 
 	"github.com/covertvote/e-voting/internal/crypto"
@@ -44,22 +45,14 @@ func (fp *FingerprintProcessor) ProcessFingerprint(voterID string, rawData []byt
 	}, nil
 }
 
-// VerifyFingerprint verifies a fingerprint against stored hash
+// VerifyFingerprint verifies a fingerprint against a stored hash using
+// constant-time comparison to prevent timing side-channel attacks.
 func (fp *FingerprintProcessor) VerifyFingerprint(rawData []byte, storedHash []byte) bool {
 	computedHash := crypto.FingerprintToHash(rawData)
-
-	// Compare hashes
 	if len(computedHash) != len(storedHash) {
 		return false
 	}
-
-	for i := range computedHash {
-		if computedHash[i] != storedHash[i] {
-			return false
-		}
-	}
-
-	return true
+	return subtle.ConstantTimeCompare(computedHash, storedHash) == 1
 }
 
 // GenerateVoterID generates a deterministic voter ID from fingerprint

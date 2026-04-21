@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"context"
+	"database/sql"
 	"net/http"
 	"time"
 
@@ -10,69 +12,54 @@ import (
 
 var startTime = time.Now()
 
-// HealthHandler handles health checks
+// HealthHandler handles health-check endpoints. A non-nil DB enables real
+// readiness checks (ping) rather than always reporting ready.
 type HealthHandler struct {
 	Version string
+	DB      *sql.DB
 }
 
-// NewHealthHandler creates a new health handler
-func NewHealthHandler(version string) *HealthHandler {
-	return &HealthHandler{
-		Version: version,
-	}
+// NewHealthHandler creates a new health handler.
+func NewHealthHandler(version string, db *sql.DB) *HealthHandler {
+	return &HealthHandler{Version: version, DB: db}
 }
 
-// HealthCheck handles GET /health
-// @Summary Health check
-// @Description Returns the health status of the API server
-// @Tags Health
-// @Accept json
-// @Produce json
-// @Success 200 {object} models.HealthResponse
-// @Router /health [get]
+// HealthCheck handles GET /health — process liveness. Always returns 200 if
+// the process is running; useful for container orchestrators.
 func (h *HealthHandler) HealthCheck(c *gin.Context) {
-	uptime := time.Since(startTime).Seconds()
-
-	response := models.HealthResponse{
+	c.JSON(http.StatusOK, models.HealthResponse{
 		Status:  "healthy",
 		Version: h.Version,
-		Uptime:  int64(uptime),
+		Uptime:  int64(time.Since(startTime).Seconds()),
+	})
+}
+
+// ReadinessCheck handles GET /ready — reports whether the system is ready
+// to serve traffic. Returns 503 if any dependency check fails so load
+// balancers can route traffic away.
+func (h *HealthHandler) ReadinessCheck(c *gin.Context) {
+	checks := gin.H{"crypto": "ok"}
+	status := http.StatusOK
+	overall := "ready"
+
+	if h.DB != nil {
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 2*time.Second)
+		defer cancel()
+		if err := h.DB.PingContext(ctx); err != nil {
+			checks["database"] = "unhealthy: " + err.Error()
+			status = http.StatusServiceUnavailable
+			overall = "not_ready"
+		} else {
+			checks["database"] = "ok"
+		}
+	} else {
+		checks["database"] = "not_configured"
 	}
 
-	c.JSON(http.StatusOK, response)
+	c.JSON(status, gin.H{"status": overall, "checks": checks})
 }
 
-// ReadinessCheck handles GET /ready
-// @Summary Readiness check
-// @Description Returns whether the system is ready to accept requests
-// @Tags Health
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /ready [get]
-func (h *HealthHandler) ReadinessCheck(c *gin.Context) {
-	// Check if system is ready
-	// For now, always return ready
-	c.JSON(http.StatusOK, gin.H{
-		"status": "ready",
-		"checks": gin.H{
-			"database":    "ok",
-			"crypto":      "ok",
-			"blockchain":  "pending",
-		},
-	})
-}
-
-// LivenessCheck handles GET /live
-// @Summary Liveness check
-// @Description Returns whether the system is alive
-// @Tags Health
-// @Accept json
-// @Produce json
-// @Success 200 {object} map[string]interface{}
-// @Router /live [get]
+// LivenessCheck handles GET /live — always alive if we can respond.
 func (h *HealthHandler) LivenessCheck(c *gin.Context) {
-	c.JSON(http.StatusOK, gin.H{
-		"status": "alive",
-	})
+	c.JSON(http.StatusOK, gin.H{"status": "alive"})
 }

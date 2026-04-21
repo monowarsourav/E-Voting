@@ -1,138 +1,62 @@
-// pkg/logger/logger.go
-
+// Package logger configures an application-wide structured logger backed by
+// the standard library's log/slog.
+//
+// Callers should use the slog.Logger returned from New() (or the global
+// slog.Default() after calling Init()) so log output is machine-parseable in
+// production (JSON) and human-readable in development (text).
 package logger
 
 import (
-	"fmt"
-	"log"
+	"io"
+	"log/slog"
 	"os"
-	"time"
+	"strings"
 )
 
-// Logger provides structured logging capabilities
-type Logger struct {
-	prefix string
-	level  LogLevel
-	output *log.Logger
+// Config controls logger construction.
+type Config struct {
+	Level  string // debug, info, warn, error
+	Format string // json, text
+	Output io.Writer
 }
 
-// LogLevel represents the severity of a log message
-type LogLevel int
+// New returns a slog.Logger configured per cfg. An unset Output defaults to
+// os.Stdout. Unknown Level or Format values fall back to info/json.
+func New(cfg Config) *slog.Logger {
+	if cfg.Output == nil {
+		cfg.Output = os.Stdout
+	}
 
-const (
-	DEBUG LogLevel = iota
-	INFO
-	WARN
-	ERROR
-	FATAL
-)
+	opts := &slog.HandlerOptions{Level: parseLevel(cfg.Level)}
 
-// String returns the string representation of the log level
-func (l LogLevel) String() string {
-	switch l {
-	case DEBUG:
-		return "DEBUG"
-	case INFO:
-		return "INFO"
-	case WARN:
-		return "WARN"
-	case ERROR:
-		return "ERROR"
-	case FATAL:
-		return "FATAL"
+	var handler slog.Handler
+	switch strings.ToLower(cfg.Format) {
+	case "text":
+		handler = slog.NewTextHandler(cfg.Output, opts)
+	default: // json and any unknown value
+		handler = slog.NewJSONHandler(cfg.Output, opts)
+	}
+
+	return slog.New(handler)
+}
+
+// Init constructs a logger from cfg and installs it as slog.Default().
+// Returns the configured logger for convenience.
+func Init(cfg Config) *slog.Logger {
+	l := New(cfg)
+	slog.SetDefault(l)
+	return l
+}
+
+func parseLevel(s string) slog.Leveler {
+	switch strings.ToLower(s) {
+	case "debug":
+		return slog.LevelDebug
+	case "warn", "warning":
+		return slog.LevelWarn
+	case "error", "err":
+		return slog.LevelError
 	default:
-		return "UNKNOWN"
+		return slog.LevelInfo
 	}
-}
-
-// NewLogger creates a new logger instance
-func NewLogger() *Logger {
-	return &Logger{
-		prefix: "",
-		level:  INFO,
-		output: log.New(os.Stdout, "", 0),
-	}
-}
-
-// NewLoggerWithPrefix creates a logger with a prefix
-func NewLoggerWithPrefix(prefix string) *Logger {
-	return &Logger{
-		prefix: prefix,
-		level:  INFO,
-		output: log.New(os.Stdout, "", 0),
-	}
-}
-
-// SetLevel sets the minimum log level
-func (l *Logger) SetLevel(level LogLevel) {
-	l.level = level
-}
-
-// log is the internal logging method
-func (l *Logger) log(level LogLevel, msg string, keysAndValues ...interface{}) {
-	if level < l.level {
-		return
-	}
-
-	timestamp := time.Now().Format("2006-01-02 15:04:05.000")
-	prefix := ""
-	if l.prefix != "" {
-		prefix = fmt.Sprintf("[%s] ", l.prefix)
-	}
-
-	// Format key-value pairs
-	kvPairs := ""
-	for i := 0; i < len(keysAndValues); i += 2 {
-		if i+1 < len(keysAndValues) {
-			kvPairs += fmt.Sprintf(" %v=%v", keysAndValues[i], keysAndValues[i+1])
-		}
-	}
-
-	logLine := fmt.Sprintf("[%s] %s%s: %s%s", timestamp, prefix, level.String(), msg, kvPairs)
-	l.output.Println(logLine)
-
-	if level == FATAL {
-		os.Exit(1)
-	}
-}
-
-// Debug logs a debug message
-func (l *Logger) Debug(msg string, keysAndValues ...interface{}) {
-	l.log(DEBUG, msg, keysAndValues...)
-}
-
-// Info logs an info message
-func (l *Logger) Info(msg string, keysAndValues ...interface{}) {
-	l.log(INFO, msg, keysAndValues...)
-}
-
-// Warn logs a warning message
-func (l *Logger) Warn(msg string, keysAndValues ...interface{}) {
-	l.log(WARN, msg, keysAndValues...)
-}
-
-// Error logs an error message
-func (l *Logger) Error(msg string, keysAndValues ...interface{}) {
-	l.log(ERROR, msg, keysAndValues...)
-}
-
-// Fatal logs a fatal message and exits
-func (l *Logger) Fatal(msg string, keysAndValues ...interface{}) {
-	l.log(FATAL, msg, keysAndValues...)
-}
-
-// WithFields creates a new logger with predefined fields
-func (l *Logger) WithFields(fields map[string]interface{}) *Logger {
-	// Create a shallow copy
-	newLogger := &Logger{
-		prefix: l.prefix,
-		level:  l.level,
-		output: l.output,
-	}
-	return newLogger
-}
-
-// SetOutput sets the output destination
-func (l *Logger) SetOutput(output *log.Logger) {
-	l.output = output
 }

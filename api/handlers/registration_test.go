@@ -121,11 +121,11 @@ func TestRegisterWithBiometric(t *testing.T) {
 	// Generate valid biometric data with proper entropy (minimum 500 bytes for liveness)
 	fingerprintData := make([]byte, 512)
 	for i := range fingerprintData {
-		fingerprintData[i] = byte((i * 37 + i/3*17 + 13) % 256) // Varied pseudo-random pattern
+		fingerprintData[i] = byte((i*37 + i/3*17 + 13) % 256) // Varied pseudo-random pattern
 	}
 	livenessData := make([]byte, 512)
 	for i := range livenessData {
-		livenessData[i] = byte((i * 73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
+		livenessData[i] = byte((i*73 + i/5*41 + 29) % 256) // Varied pseudo-random pattern with good entropy
 	}
 
 	tests := []struct {

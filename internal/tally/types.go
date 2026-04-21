@@ -8,10 +8,10 @@ import (
 
 // TallyResult represents the final tally of an election
 type TallyResult struct {
-	ElectionID    string
+	ElectionID       string
 	CandidateTallies map[int]*big.Int // candidateID -> vote count
-	TotalVotes    int
-	Timestamp     int64
+	TotalVotes       int
+	Timestamp        int64
 }
 
 // PartialDecryption represents a partial decryption from one server

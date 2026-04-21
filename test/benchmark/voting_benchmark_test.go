@@ -45,13 +45,13 @@ func TestScalabilityBenchmark(t *testing.T) {
 }
 
 type BenchmarkResult struct {
-	VoterCount     int
-	TotalTime      time.Duration
-	PerVoteTime    time.Duration
-	CredGenTime    time.Duration
-	VoteCastTime   time.Duration
-	AggregateTime  time.Duration
-	DecryptTime    time.Duration
+	VoterCount    int
+	TotalTime     time.Duration
+	PerVoteTime   time.Duration
+	CredGenTime   time.Duration
+	VoteCastTime  time.Duration
+	AggregateTime time.Duration
+	DecryptTime   time.Duration
 }
 
 func runVotingBenchmark(t *testing.T, numVoters int) BenchmarkResult {

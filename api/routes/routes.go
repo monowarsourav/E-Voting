@@ -6,68 +6,59 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// SetupRoutes configures all API routes
-func SetupRoutes(
-	router *gin.Engine,
-	registrationHandler *handlers.RegistrationHandler,
-	votingHandler *handlers.VotingHandler,
-	tallyHandler *handlers.TallyHandler,
-	healthHandler *handlers.HealthHandler,
-) {
-	// Health checks (no auth required)
-	router.GET("/health", healthHandler.HealthCheck)
-	router.GET("/ready", healthHandler.ReadinessCheck)
-	router.GET("/live", healthHandler.LivenessCheck)
+// Dependencies bundles the objects required to configure the API router.
+// Injecting limiters (rather than constructing new ones per middleware call)
+// ensures their janitor goroutines can be shut down cleanly on exit.
+type Dependencies struct {
+	Registration *handlers.RegistrationHandler
+	Voting       *handlers.VotingHandler
+	Tally        *handlers.TallyHandler
+	Health       *handlers.HealthHandler
 
-	// API v1 routes
+	// Rate limiters — standard for public reads, strict for sensitive ops.
+	StandardLimiter *middleware.RateLimiter
+	StrictLimiter   *middleware.RateLimiter
+}
+
+// SetupRoutes configures all API routes using the provided dependencies.
+func SetupRoutes(router *gin.Engine, deps Dependencies) {
+	// Health checks (no auth required, not rate-limited so probes always work).
+	router.GET("/health", deps.Health.HealthCheck)
+	router.GET("/ready", deps.Health.ReadinessCheck)
+	router.GET("/live", deps.Health.LivenessCheck)
+
 	v1 := router.Group("/api/v1")
 	{
-		// Public routes (with rate limiting)
 		public := v1.Group("")
-		public.Use(middleware.StandardRateLimitMiddleware())
+		public.Use(middleware.RateLimitMiddleware(deps.StandardLimiter))
 		{
-			// Registration and Login
-			public.POST("/register", registrationHandler.Register)
-			public.POST("/login", registrationHandler.Login)
-			public.POST("/verify-eligibility", registrationHandler.VerifyEligibility)
+			public.POST("/register", deps.Registration.Register)
+			public.POST("/login", deps.Registration.Login)
+			public.POST("/verify-eligibility", deps.Registration.VerifyEligibility)
 
-			// Elections (read-only)
-			public.GET("/elections", votingHandler.GetElections)
-			public.GET("/elections/:id", votingHandler.GetElection)
+			public.GET("/elections", deps.Voting.GetElections)
+			public.GET("/elections/:id", deps.Voting.GetElection)
 
-			// Vote count summary (read-only, no sensitive data)
-			public.GET("/vote-count", tallyHandler.GetVoteCount)
+			public.GET("/vote-count", deps.Tally.GetVoteCount)
 		}
 
-		// Authenticated routes (voter auth required)
 		authenticated := v1.Group("")
 		authenticated.Use(middleware.AuthMiddleware())
-		authenticated.Use(middleware.StrictRateLimitMiddleware())
+		authenticated.Use(middleware.RateLimitMiddleware(deps.StrictLimiter))
 		{
-			// Voter info
-			authenticated.GET("/voter/:id", registrationHandler.GetVoterInfo)
-
-			// Vote casting
-			authenticated.POST("/vote", votingHandler.CastVote)
-			authenticated.POST("/verify-vote", votingHandler.VerifyVote)
-
-			// Results (requires authentication)
-			authenticated.GET("/results/:electionId", tallyHandler.GetResults)
+			authenticated.GET("/voter/:id", deps.Registration.GetVoterInfo)
+			authenticated.POST("/vote", deps.Voting.CastVote)
+			authenticated.POST("/verify-vote", deps.Voting.VerifyVote)
+			authenticated.GET("/results/:electionId", deps.Tally.GetResults)
 		}
 
-		// Admin routes (admin auth required)
 		admin := v1.Group("/admin")
 		admin.Use(middleware.AdminAuthMiddleware())
-		admin.Use(middleware.StrictRateLimitMiddleware())
+		admin.Use(middleware.RateLimitMiddleware(deps.StrictLimiter))
 		{
-			// Election management
-			admin.POST("/elections", votingHandler.CreateElection)
-
-			// Tallying
-			admin.POST("/tally", tallyHandler.TallyVotes)
-
-			// System info
-			admin.GET("/voters", registrationHandler.GetAllVoters)
+			admin.POST("/elections", deps.Voting.CreateElection)
+			admin.POST("/tally", deps.Tally.TallyVotes)
+			admin.GET("/voters", deps.Registration.GetAllVoters)
 		}
 	}
 }

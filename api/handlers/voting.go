@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"encoding/hex"
+	"errors"
 	"log"
 	"net/http"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/voter"
 	"github.com/covertvote/e-voting/internal/voting"
+	"github.com/covertvote/e-voting/pkg/audit"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,11 +21,11 @@ import (
 func safeErrorMessage(context string, err error) string {
 	log.Printf("[ERROR] %s: %v", context, err)
 	messages := map[string]string{
-		"bind_json":               "The request body is malformed or missing required fields.",
-		"fingerprint_processing":  "Fingerprint processing failed. Please try again.",
-		"vote_casting":            "Vote could not be cast. Please try again later.",
-		"election_bind_json":      "Invalid election request. Check the required fields.",
-		"liveness_check":          "Liveness detection encountered an error. Please retry.",
+		"bind_json":              "The request body is malformed or missing required fields.",
+		"fingerprint_processing": "Fingerprint processing failed. Please try again.",
+		"vote_casting":           "Vote could not be cast. Please try again later.",
+		"election_bind_json":     "Invalid election request. Check the required fields.",
+		"liveness_check":         "Liveness detection encountered an error. Please retry.",
 	}
 	if msg, ok := messages[context]; ok {
 		return msg
@@ -31,14 +33,16 @@ func safeErrorMessage(context string, err error) string {
 	return "An internal error occurred. Please try again later."
 }
 
-// VotingHandler handles vote casting
+// VotingHandler handles vote casting. Auditor is optional; when set, every
+// vote, double-vote attempt, and election creation is recorded.
 type VotingHandler struct {
-	VoteCaster           *voting.VoteCaster
-	RegistrationSystem   *voter.RegistrationSystem
-	BiometricProcessor   *biometric.FingerprintProcessor
-	LivenessDetector     *biometric.LivenessDetector
-	Elections            map[string]*voting.Election
-	mu                   sync.RWMutex
+	VoteCaster         *voting.VoteCaster
+	RegistrationSystem *voter.RegistrationSystem
+	BiometricProcessor *biometric.FingerprintProcessor
+	LivenessDetector   *biometric.LivenessDetector
+	Elections          map[string]*voting.Election
+	Auditor            *audit.AuditLogger
+	mu                 sync.RWMutex
 }
 
 // NewVotingHandler creates a new voting handler
@@ -165,6 +169,14 @@ func (h *VotingHandler) CastVote(c *gin.Context) {
 	receipt, err := h.VoteCaster.CastVote(req.VoterID, req.CandidateID, req.SMDCSlotIndex)
 	h.mu.Unlock()
 	if err != nil {
+		if errors.Is(err, voting.ErrKeyImageAlreadyUsed) {
+			_ = h.Auditor.LogDoubleVoteAttempt(req.ElectionID, req.VoterID, c.ClientIP())
+		} else {
+			_ = h.Auditor.LogFailure(audit.EventVoteCast, "cast_vote", req.VoterID, err.Error(), map[string]interface{}{
+				"election_id": req.ElectionID,
+				"ip":          c.ClientIP(),
+			})
+		}
 		c.JSON(http.StatusBadRequest, models.ErrorResponse{
 			Error:   "vote_casting_failed",
 			Code:    http.StatusBadRequest,
@@ -172,6 +184,8 @@ func (h *VotingHandler) CastVote(c *gin.Context) {
 		})
 		return
 	}
+
+	_ = h.Auditor.LogVoteCast(req.ElectionID, req.VoterID, c.ClientIP())
 
 	// Build response
 	response := models.VoteResponse{
@@ -245,6 +259,14 @@ func (h *VotingHandler) CreateElection(c *gin.Context) {
 	h.mu.Lock()
 	h.Elections[election.ElectionID] = election
 	h.mu.Unlock()
+
+	adminID, _ := c.Get("admin_id")
+	adminIDStr, _ := adminID.(string)
+	_ = h.Auditor.LogElectionCreated(election.ElectionID, adminIDStr, map[string]interface{}{
+		"title":      election.Title,
+		"candidates": len(election.Candidates),
+		"ip":         c.ClientIP(),
+	})
 
 	// Convert candidates back for response
 	var respCandidates []models.Candidate
@@ -383,5 +405,5 @@ func (h *VotingHandler) VerifyVote(c *gin.Context) {
 
 // generateElectionID generates a unique election ID
 func generateElectionID(title string) string {
-	return "election-" + hex.EncodeToString([]byte(title+time.Now().String()))[:16]
+	return "election-" + hex.EncodeToString([]byte(title + time.Now().String()))[:16]
 }

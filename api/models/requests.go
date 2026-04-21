@@ -1,36 +1,36 @@
 package models
 
-// RegistrationRequest represents voter registration request
-// Can register with either biometric OR username/password
+// voterIDRule constrains voter IDs to alphanumeric + underscore/dash, 3–64
+// chars. Applied via struct tags across request payloads — keeping the rule
+// in one place.
+const voterIDRule = "required,min=3,max=64,alphanumdash"
+
+// RegistrationRequest represents voter registration request.
+// Can register with either biometric OR username/password.
 type RegistrationRequest struct {
-	VoterID           string `json:"voter_id" binding:"required"`
-	// Option 1: Biometric registration
-	FingerprintData   []byte `json:"fingerprint_data"`
-	LivenessData      []byte `json:"liveness_data"`
-	// Option 2: Password registration
-	Password          string `json:"password"`
-	// Additional data
-	BiographicData    string `json:"biographic_data"`
-	EligibilityProof  string `json:"eligibility_proof"`
+	VoterID          string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
+	FingerprintData  []byte `json:"fingerprint_data"`
+	LivenessData     []byte `json:"liveness_data"`
+	Password         string `json:"password" binding:"omitempty,min=8,max=128"`
+	BiographicData   string `json:"biographic_data" binding:"omitempty,max=1024"`
+	EligibilityProof string `json:"eligibility_proof" binding:"omitempty,max=4096"`
 }
 
 // RegistrationResponse represents registration response
 type RegistrationResponse struct {
-	VoterID          string   `json:"voter_id"`
-	PublicKey        string   `json:"public_key"`
-	SMDCPublicCred   string   `json:"smdc_public_credential"`
-	MerkleRoot       string   `json:"merkle_root"`
-	RegistrationTime int64    `json:"registration_time"`
-	Message          string   `json:"message"`
+	VoterID          string `json:"voter_id"`
+	PublicKey        string `json:"public_key"`
+	SMDCPublicCred   string `json:"smdc_public_credential"`
+	MerkleRoot       string `json:"merkle_root"`
+	RegistrationTime int64  `json:"registration_time"`
+	Message          string `json:"message"`
 }
 
-// LoginRequest represents login request with either fingerprint or username/password
+// LoginRequest represents login request with either fingerprint or username/password.
 type LoginRequest struct {
-	VoterID         string `json:"voter_id" binding:"required"`
-	// Option 1: Biometric authentication
+	VoterID         string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
 	FingerprintData []byte `json:"fingerprint_data"`
-	// Option 2: Password authentication
-	Password        string `json:"password"`
+	Password        string `json:"password" binding:"omitempty,min=8,max=128"`
 }
 
 // LoginResponse represents login response
@@ -41,15 +41,14 @@ type LoginResponse struct {
 	Message   string `json:"message"`
 }
 
-// VoteRequest represents vote casting request
-// MUST include fingerprint + liveness for every vote
+// VoteRequest represents vote casting request.
+// MUST include fingerprint + liveness for every vote.
 type VoteRequest struct {
-	VoterID         string `json:"voter_id" binding:"required"`
-	ElectionID      string `json:"election_id" binding:"required"`
-	CandidateID     int    `json:"candidate_id" binding:"required"`
-	SMDCSlotIndex   int    `json:"smdc_slot_index"` // 0 is valid, so not using binding:"required"
+	VoterID         string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
+	ElectionID      string `json:"election_id" binding:"required,min=3,max=64,alphanumdash"`
+	CandidateID     int    `json:"candidate_id" binding:"required,min=1"`
+	SMDCSlotIndex   int    `json:"smdc_slot_index" binding:"min=0"`
 	AuthToken       string `json:"auth_token" binding:"required"`
-	// Biometric verification (required for every vote)
 	FingerprintData []byte `json:"fingerprint_data" binding:"required"`
 	LivenessData    []byte `json:"liveness_data" binding:"required"`
 }
@@ -73,21 +72,21 @@ type TallyRequest struct {
 
 // TallyResponse represents tally results
 type TallyResponse struct {
-	ElectionID       string         `json:"election_id"`
-	CandidateTallies map[int]int64  `json:"candidate_tallies"`
-	TotalVotes       int64          `json:"total_votes"`
-	TallyTime        int64          `json:"tally_time"`
-	Verified         bool           `json:"verified"`
+	ElectionID       string        `json:"election_id"`
+	CandidateTallies map[int]int64 `json:"candidate_tallies"`
+	TotalVotes       int64         `json:"total_votes"`
+	TallyTime        int64         `json:"tally_time"`
+	Verified         bool          `json:"verified"`
 }
 
 // ElectionRequest represents election creation request
 type ElectionRequest struct {
-	Title         string      `json:"title" binding:"required"`
-	Description   string      `json:"description"`
-	Candidates    []Candidate `json:"candidates" binding:"required,min=2"`
-	StartTime     int64       `json:"start_time" binding:"required"`
-	EndTime       int64       `json:"end_time" binding:"required"`
-	AdminToken    string      `json:"admin_token" binding:"required"`
+	Title       string      `json:"title" binding:"required"`
+	Description string      `json:"description"`
+	Candidates  []Candidate `json:"candidates" binding:"required,min=2"`
+	StartTime   int64       `json:"start_time" binding:"required"`
+	EndTime     int64       `json:"end_time" binding:"required"`
+	AdminToken  string      `json:"admin_token" binding:"required"`
 }
 
 // Candidate represents a candidate
@@ -100,19 +99,19 @@ type Candidate struct {
 
 // ElectionResponse represents election creation response
 type ElectionResponse struct {
-	ElectionID   string      `json:"election_id"`
-	Title        string      `json:"title"`
-	Candidates   []Candidate `json:"candidates"`
-	StartTime    int64       `json:"start_time"`
-	EndTime      int64       `json:"end_time"`
-	IsActive     bool        `json:"is_active"`
-	Message      string      `json:"message"`
+	ElectionID string      `json:"election_id"`
+	Title      string      `json:"title"`
+	Candidates []Candidate `json:"candidates"`
+	StartTime  int64       `json:"start_time"`
+	EndTime    int64       `json:"end_time"`
+	IsActive   bool        `json:"is_active"`
+	Message    string      `json:"message"`
 }
 
-// VerifyVoteRequest represents vote verification request
+// VerifyVoteRequest represents vote verification request.
 type VerifyVoteRequest struct {
-	ReceiptID string `json:"receipt_id" binding:"required"`
-	VoterID   string `json:"voter_id" binding:"required"`
+	ReceiptID string `json:"receipt_id" binding:"required,hexadecimal,min=16,max=128"`
+	VoterID   string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
 }
 
 // VerifyVoteResponse represents vote verification response
@@ -146,14 +145,14 @@ type ElectionListResponse struct {
 
 // ElectionInfo represents election information
 type ElectionInfo struct {
-	ElectionID    string      `json:"election_id"`
-	Title         string      `json:"title"`
-	Description   string      `json:"description"`
-	Candidates    []Candidate `json:"candidates"`
-	StartTime     int64       `json:"start_time"`
-	EndTime       int64       `json:"end_time"`
-	IsActive      bool        `json:"is_active"`
-	TotalVotes    int         `json:"total_votes"`
+	ElectionID  string      `json:"election_id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	Candidates  []Candidate `json:"candidates"`
+	StartTime   int64       `json:"start_time"`
+	EndTime     int64       `json:"end_time"`
+	IsActive    bool        `json:"is_active"`
+	TotalVotes  int         `json:"total_votes"`
 }
 
 // VoterInfoResponse represents voter information

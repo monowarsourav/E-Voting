@@ -54,38 +54,38 @@ func (fc *FabricClient) Connect(connectionProfile, walletPath, identity string) 
 
 	// PRODUCTION FABRIC SDK INTEGRATION (Uncomment when ready)
 	/*
-	// 1. Load connection profile
-	ccpPath := filepath.Clean(connectionProfile)
+		// 1. Load connection profile
+		ccpPath := filepath.Clean(connectionProfile)
 
-	// 2. Create a new file system based wallet for managing identities
-	wallet, err := gateway.NewFileSystemWallet(walletPath)
-	if err != nil {
-		return fmt.Errorf("failed to create wallet: %w", err)
-	}
+		// 2. Create a new file system based wallet for managing identities
+		wallet, err := gateway.NewFileSystemWallet(walletPath)
+		if err != nil {
+			return fmt.Errorf("failed to create wallet: %w", err)
+		}
 
-	// 3. Check if identity exists in wallet
-	if !wallet.Exists(identity) {
-		return fmt.Errorf("identity %s not found in wallet", identity)
-	}
+		// 3. Check if identity exists in wallet
+		if !wallet.Exists(identity) {
+			return fmt.Errorf("identity %s not found in wallet", identity)
+		}
 
-	// 4. Connect to gateway
-	gw, err := gateway.Connect(
-		gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-		gateway.WithIdentity(wallet, identity),
-	)
-	if err != nil {
-		return fmt.Errorf("failed to connect to gateway: %w", err)
-	}
-	fc.gateway = gw
+		// 4. Connect to gateway
+		gw, err := gateway.Connect(
+			gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
+			gateway.WithIdentity(wallet, identity),
+		)
+		if err != nil {
+			return fmt.Errorf("failed to connect to gateway: %w", err)
+		}
+		fc.gateway = gw
 
-	// 5. Get the network (channel) and contract (chaincode)
-	network, err := gw.GetNetwork(fc.ChannelName)
-	if err != nil {
-		return fmt.Errorf("failed to get network: %w", err)
-	}
+		// 5. Get the network (channel) and contract (chaincode)
+		network, err := gw.GetNetwork(fc.ChannelName)
+		if err != nil {
+			return fmt.Errorf("failed to get network: %w", err)
+		}
 
-	fc.contract = network.GetContract(fc.ChaincodeName)
-	fmt.Println("Successfully connected to Hyperledger Fabric network")
+		fc.contract = network.GetContract(fc.ChaincodeName)
+		fmt.Println("Successfully connected to Hyperledger Fabric network")
 	*/
 
 	return nil

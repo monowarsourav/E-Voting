@@ -19,8 +19,8 @@ type TallyHandler struct {
 	Elections  map[string]*voting.Election // shared reference to election state
 
 	// Result cache to prevent re-tallying on every GetResults call (DoS mitigation)
-	cacheMu      sync.RWMutex
-	resultCache  map[string]*cachedResult
+	cacheMu     sync.RWMutex
+	resultCache map[string]*cachedResult
 }
 
 // cachedResult stores a tally result with an expiration time.

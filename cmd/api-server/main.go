@@ -1,153 +1,159 @@
+// Package main launches the CovertVote API server. The program is kept thin:
+// it reads configuration, wires dependencies, and drives the HTTP server
+// lifecycle. Business logic lives under internal/, reusable libraries under
+// pkg/, and HTTP adapters under api/.
 package main
 
 import (
 	"context"
+	"crypto/tls"
+	"errors"
 	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
-	"path/filepath"
 	"syscall"
 	"time"
 
 	"github.com/covertvote/e-voting/api/handlers"
 	"github.com/covertvote/e-voting/api/middleware"
+	"github.com/covertvote/e-voting/api/models"
 	"github.com/covertvote/e-voting/api/routes"
-	_ "github.com/covertvote/e-voting/docs" // Swagger docs
+	_ "github.com/covertvote/e-voting/docs"
 	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/database"
+	"github.com/covertvote/e-voting/internal/repository/keyimage"
+	"github.com/covertvote/e-voting/internal/repository/session"
 	"github.com/covertvote/e-voting/internal/tally"
 	"github.com/covertvote/e-voting/internal/voter"
 	"github.com/covertvote/e-voting/internal/voting"
+	"github.com/covertvote/e-voting/pkg/audit"
 	"github.com/covertvote/e-voting/pkg/config"
+	"github.com/covertvote/e-voting/pkg/logger"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
-const VERSION = "1.0.0"
+// version is stamped at build time via -ldflags "-X main.version=...".
+var version = "1.0.0"
 
 // @title           CovertVote E-Voting API
 // @version         1.0.0
 // @description     Blockchain-based secure e-voting system with homomorphic encryption, SMDC coercion resistance, and anonymous voting
-// @description     Features: Paillier encryption, Pedersen commitments, Ring signatures, Zero-knowledge proofs, SA² aggregation
-// @termsOfService  http://swagger.io/terms/
-
-// @contact.name   API Support
-// @contact.url    http://www.covertvote.io/support
-// @contact.email  support@covertvote.io
-
-// @license.name  MIT
-// @license.url   https://opensource.org/licenses/MIT
-
-// @host      localhost:8080
-// @BasePath  /api/v1
-// @schemes   http
-
+// @BasePath        /api/v1
+// @schemes         http https
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Type "Bearer" followed by a space and JWT token.
-
 // @securityDefinitions.apikey AdminAuth
 // @in header
 // @name Authorization
-// @description Admin bearer token for administrative operations
-
 func main() {
-	// Load configuration
+	if err := run(); err != nil {
+		slog.Error("server exited with error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func run() error {
 	cfg, err := config.LoadConfig()
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		return fmt.Errorf("load config: %w", err)
+	}
+	if err := cfg.Validate(); err != nil {
+		return fmt.Errorf("invalid config: %w", err)
 	}
 
-	// Initialize database
-	log.Println("Initializing database...")
-	dbPath := cfg.Database.Path
-	if dbPath == "" {
-		dbPath = "./data/covertvote.db"
+	log := logger.Init(logger.Config{
+		Level:  cfg.Logging.Level,
+		Format: cfg.Logging.Format,
+	})
+	log.Info("starting CovertVote API",
+		"version", version,
+		"environment", cfg.Environment)
+
+	// --- Admin tokens ---
+	middleware.SetAdminTokens(cfg.Auth.AdminTokens)
+	if len(cfg.Auth.AdminTokens) == 0 {
+		log.Warn("ADMIN_TOKEN not configured — admin endpoints will reject all requests")
 	}
 
-	// Ensure database directory exists
-	dbDir := filepath.Dir(dbPath)
-	if err := os.MkdirAll(dbDir, 0755); err != nil {
-		log.Fatalf("Failed to create database directory: %v", err)
-	}
-
-	// Connect to database
-	db, err := database.New(dbPath)
+	// --- Database ---
+	db, err := database.New(cfg.Database.Path)
 	if err != nil {
-		log.Fatalf("Failed to initialize database: %v", err)
+		return fmt.Errorf("open database: %w", err)
 	}
 	defer db.Close()
 
-	// Run migrations
-	log.Println("Running database migrations...")
-	migrationsDir := "./migrations"
-	if err := db.RunMigrations(migrationsDir); err != nil {
-		log.Fatalf("Failed to run migrations: %v", err)
+	if err := db.RunMigrations("./migrations"); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
 	}
-	log.Println("Database initialized successfully")
+	if err := audit.InitAuditTable(db.DB); err != nil {
+		return fmt.Errorf("init audit table: %w", err)
+	}
+	log.Info("database initialised", "path", cfg.Database.Path)
 
-	// Set Gin mode
-	gin.SetMode(gin.ReleaseMode)
+	// --- Repositories ---
+	sessionStore := session.New(db.DB)
+	middleware.VoterSessions.Backend = sessionStore
+	keyImageStore := keyimage.New(db.DB)
+	auditLogger := audit.NewAuditLogger(db.DB)
 
-	// Create router
-	router := gin.Default()
+	// --- Gin ---
+	if cfg.IsProduction() {
+		gin.SetMode(gin.ReleaseMode)
+	}
+	router := gin.New()
+	router.Use(gin.Recovery())
+	router.Use(middleware.RequestLogger(log))
+	router.Use(middleware.CORSMiddleware(cfg.CORS.AllowedOrigins))
 
-	// Add CORS middleware
-	router.Use(middleware.CORSMiddleware())
+	if err := models.RegisterValidators(); err != nil {
+		return fmt.Errorf("register validators: %w", err)
+	}
 
-	// Initialize cryptographic components
-	log.Println("Initializing cryptographic components...")
+	// --- Rate limiters (tied to app lifecycle) ---
+	rlCtx, rlCancel := context.WithCancel(context.Background())
+	defer rlCancel()
+	standardLimiter := middleware.NewRateLimiter(rlCtx, 100, 200)
+	strictLimiter := middleware.NewRateLimiter(rlCtx, 10, 20)
 
-	// Generate Paillier keys
+	// --- Crypto parameters ---
+	log.Info("generating crypto parameters",
+		"paillier_bits", cfg.Crypto.PaillierKeySize,
+		"pedersen_bits", cfg.Crypto.PedersenKeySize,
+		"ring_bits", cfg.Crypto.RingKeySize)
+
 	paillierSK, err := crypto.GeneratePaillierKeyPair(cfg.Crypto.PaillierKeySize)
 	if err != nil {
-		log.Fatalf("Failed to generate Paillier keys: %v", err)
+		return fmt.Errorf("generate paillier keys: %w", err)
 	}
-	paillierPK := paillierSK.PublicKey
-
-	// Generate Pedersen parameters
 	pedersenParams, err := crypto.GeneratePedersenParams(cfg.Crypto.PedersenKeySize)
 	if err != nil {
-		log.Fatalf("Failed to generate Pedersen parameters: %v", err)
+		return fmt.Errorf("generate pedersen params: %w", err)
 	}
-
-	// Generate Ring parameters
 	ringParams, err := crypto.GenerateRingParams(cfg.Crypto.RingKeySize)
 	if err != nil {
-		log.Fatalf("Failed to generate Ring parameters: %v", err)
+		return fmt.Errorf("generate ring params: %w", err)
 	}
 
-	// Initialize biometric components
-	log.Println("Initializing biometric components...")
+	// --- Domain objects ---
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
-	livenessDetector := biometric.NewLivenessDetector(0.5) // 0.5 entropy threshold
+	livenessDetector := biometric.NewLivenessDetector(0.5)
 
-	// Initialize voter registration system
-	log.Println("Initializing voter registration system...")
-	// Development: Sample eligible voters (voter001-voter100)
-	eligibleVoters := []string{}
+	eligibleVoters := make([]string, 0, 105)
 	for i := 1; i <= 100; i++ {
 		eligibleVoters = append(eligibleVoters, fmt.Sprintf("voter%03d", i))
 	}
-	// Add some common test voter IDs
 	eligibleVoters = append(eligibleVoters, "test_voter", "admin", "alice", "bob", "charlie")
-	log.Printf("Loaded %d eligible voters for development", len(eligibleVoters))
 
 	registrationSystem := voter.NewRegistrationSystem(
-		pedersenParams,
-		ringParams,
-		cfg.Crypto.SMDCSlots,
-		eligibleVoters,
-		"election001",
+		pedersenParams, ringParams, cfg.Crypto.SMDCSlots, eligibleVoters, "election001",
 	)
 
-	// Create sample election
-	log.Println("Creating sample election...")
 	election := &voting.Election{
 		ElectionID:  "election001",
 		Title:       "Presidential Election 2026",
@@ -157,63 +163,50 @@ func main() {
 			{ID: 2, Name: "Candidate B", Description: "Reform candidate", Party: "Party 2"},
 		},
 		StartTime: time.Now().Unix(),
-		EndTime:   time.Now().Add(24 * time.Hour).Unix(),
+		EndTime:   time.Now().Add(time.Duration(cfg.Election.VotingPeriodHours) * time.Hour).Unix(),
 		IsActive:  true,
 	}
 
-	// Initialize vote caster
-	log.Println("Initializing vote casting system...")
-	voteCaster := voting.NewVoteCaster(paillierPK, ringParams, registrationSystem, election)
+	voteCaster := voting.NewVoteCaster(
+		paillierSK.PublicKey,
+		ringParams,
+		registrationSystem,
+		election,
+		voting.WithKeyImageStore(keyImageStore),
+	)
 
-	// Initialize tally counter
-	log.Println("Initializing tallying system...")
-	counter := tally.NewCounter(paillierPK, paillierSK)
+	counter := tally.NewCounter(paillierSK.PublicKey, paillierSK)
 
-	// Initialize handlers
-	log.Println("Initializing API handlers...")
+	// --- Handlers ---
 	registrationHandler := handlers.NewRegistrationHandler(
-		registrationSystem,
-		fingerprintProcessor,
-		livenessDetector,
+		registrationSystem, fingerprintProcessor, livenessDetector,
 	)
+	registrationHandler.Auditor = auditLogger
 	votingHandler := handlers.NewVotingHandler(
-		voteCaster,
-		registrationSystem,
-		fingerprintProcessor,
-		livenessDetector,
+		voteCaster, registrationSystem, fingerprintProcessor, livenessDetector,
 	)
-	votingHandler.Elections[election.ElectionID] = election // Add sample election
+	votingHandler.Auditor = auditLogger
+	votingHandler.Elections[election.ElectionID] = election
 	tallyHandler := handlers.NewTallyHandler(counter, voteCaster, votingHandler.Elections)
-	healthHandler := handlers.NewHealthHandler(VERSION)
+	healthHandler := handlers.NewHealthHandler(version, db.DB)
 
-	// Setup routes
-	log.Println("Setting up routes...")
-	routes.SetupRoutes(router, registrationHandler, votingHandler, tallyHandler, healthHandler)
-
-	// Swagger documentation
+	routes.SetupRoutes(router, routes.Dependencies{
+		Registration:    registrationHandler,
+		Voting:          votingHandler,
+		Tally:           tallyHandler,
+		Health:          healthHandler,
+		StandardLimiter: standardLimiter,
+		StrictLimiter:   strictLimiter,
+	})
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// Start session cleanup routine with panic recovery
-	go func() {
-		defer func() {
-			if r := recover(); r != nil {
-				log.Printf("PANIC in session cleanup goroutine: %v", r)
-			}
-		}()
-		ticker := time.NewTicker(10 * time.Minute)
-		defer ticker.Stop()
-		for range ticker.C {
-			middleware.CleanupExpiredSessions()
-		}
-	}()
+	// --- Background workers ---
+	workerCtx, workerCancel := context.WithCancel(context.Background())
+	defer workerCancel()
+	go sessionJanitor(workerCtx, log)
 
-	// Start server with graceful shutdown
+	// --- HTTP server ---
 	addr := fmt.Sprintf("%s:%d", cfg.Server.Host, cfg.Server.Port)
-	log.Printf("Starting CovertVote API Server v%s on %s", VERSION, addr)
-	log.Printf("Swagger UI: http://%s/swagger/index.html", addr)
-	log.Printf("API Documentation: http://%s/api/v1", addr)
-	log.Printf("Health Check: http://%s/health", addr)
-
 	srv := &http.Server{
 		Addr:         addr,
 		Handler:      router,
@@ -221,27 +214,70 @@ func main() {
 		WriteTimeout: cfg.Server.WriteTimeout,
 		IdleTimeout:  cfg.Server.IdleTimeout,
 	}
-
-	// Start server in goroutine
-	go func() {
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Failed to start server: %v", err)
-		}
-	}()
-
-	// Wait for interrupt signal for graceful shutdown
-	quit := make(chan os.Signal, 1)
-	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
-	<-quit
-	log.Println("Shutting down server...")
-
-	// Give outstanding requests 30 seconds to complete
-	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
-	defer cancel()
-
-	if err := srv.Shutdown(ctx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+	if cfg.TLS.Enabled {
+		srv.TLSConfig = &tls.Config{MinVersion: tls.VersionTLS12}
 	}
 
-	log.Println("Server exited gracefully")
+	serverErr := make(chan error, 1)
+	go func() {
+		log.Info("HTTP server listening",
+			"addr", addr,
+			"tls", cfg.TLS.Enabled)
+		var err error
+		if cfg.TLS.Enabled {
+			err = srv.ListenAndServeTLS(cfg.TLS.CertFile, cfg.TLS.KeyFile)
+		} else {
+			err = srv.ListenAndServe()
+		}
+		if err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serverErr <- err
+			return
+		}
+		serverErr <- nil
+	}()
+
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	select {
+	case sig := <-quit:
+		log.Info("shutdown signal received", "signal", sig.String())
+	case err := <-serverErr:
+		if err != nil {
+			return fmt.Errorf("http server: %w", err)
+		}
+	}
+
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+
+	workerCancel()
+	standardLimiter.Stop()
+	strictLimiter.Stop()
+
+	if err := srv.Shutdown(shutdownCtx); err != nil {
+		return fmt.Errorf("shutdown http server: %w", err)
+	}
+	log.Info("server exited gracefully")
+	return nil
+}
+
+// sessionJanitor periodically evicts expired sessions.
+func sessionJanitor(ctx context.Context, log *slog.Logger) {
+	ticker := time.NewTicker(10 * time.Minute)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			defer func() {
+				if r := recover(); r != nil {
+					log.Error("session janitor panic", "recover", r)
+				}
+			}()
+			middleware.CleanupExpiredSessions()
+		}
+	}
 }

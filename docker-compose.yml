@@ -7,7 +7,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfilesorrythi
+      dockerfile: Dockerfile
     container_name: covertvote-api
     ports:
       - "8080:8080"

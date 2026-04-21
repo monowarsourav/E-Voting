@@ -1,6 +1,7 @@
 package middleware
 
 import (
+	"context"
 	"net/http"
 	"sync"
 	"time"
@@ -8,45 +9,53 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// RateLimiter implements token bucket rate limiting
+// RateLimiter implements token-bucket rate limiting with a lifecycle tied to
+// a context so its janitor goroutine can be shut down cleanly on server exit.
 type RateLimiter struct {
-	visitors map[string]*Visitor
-	mu       sync.RWMutex
-	rate     int
-	burst    int
+	visitors map[string]*visitor
+	mu       sync.Mutex
+	rate     int // tokens added per second
+	burst    int // bucket capacity
+	done     chan struct{}
+	stopOnce sync.Once
 }
 
-// Visitor represents a visitor's rate limit state
-type Visitor struct {
+type visitor struct {
 	tokens     int
 	lastSeen   time.Time
 	lastRefill time.Time
 }
 
-// NewRateLimiter creates a new rate limiter
-func NewRateLimiter(rate, burst int) *RateLimiter {
+// NewRateLimiter creates a new rate limiter. Cancelling ctx stops the
+// background cleanup goroutine.
+func NewRateLimiter(ctx context.Context, rate, burst int) *RateLimiter {
 	rl := &RateLimiter{
-		visitors: make(map[string]*Visitor),
+		visitors: make(map[string]*visitor),
 		rate:     rate,
 		burst:    burst,
+		done:     make(chan struct{}),
 	}
-
-	// Cleanup goroutine
-	go rl.cleanupVisitors()
-
+	go rl.cleanupLoop(ctx)
 	return rl
 }
 
-// Allow checks if request is allowed
+// Stop halts the cleanup goroutine. Safe to call multiple times.
+func (rl *RateLimiter) Stop() {
+	rl.stopOnce.Do(func() {
+		close(rl.done)
+	})
+}
+
+// Allow reports whether a request from ip is permitted, consuming one token
+// if so.
 func (rl *RateLimiter) Allow(ip string) bool {
 	rl.mu.Lock()
 	defer rl.mu.Unlock()
 
-	visitor, exists := rl.visitors[ip]
 	now := time.Now()
-
+	v, exists := rl.visitors[ip]
 	if !exists {
-		rl.visitors[ip] = &Visitor{
+		rl.visitors[ip] = &visitor{
 			tokens:     rl.burst - 1,
 			lastSeen:   now,
 			lastRefill: now,
@@ -54,71 +63,62 @@ func (rl *RateLimiter) Allow(ip string) bool {
 		return true
 	}
 
-	// Refill tokens based on time elapsed
-	elapsed := now.Sub(visitor.lastRefill)
-	tokensToAdd := int(elapsed.Seconds()) * rl.rate
-	if tokensToAdd > 0 {
-		visitor.tokens += tokensToAdd
-		if visitor.tokens > rl.burst {
-			visitor.tokens = rl.burst
+	elapsed := now.Sub(v.lastRefill)
+	if add := int(elapsed.Seconds()) * rl.rate; add > 0 {
+		v.tokens += add
+		if v.tokens > rl.burst {
+			v.tokens = rl.burst
 		}
-		visitor.lastRefill = now
+		v.lastRefill = now
 	}
 
-	visitor.lastSeen = now
-
-	if visitor.tokens > 0 {
-		visitor.tokens--
+	v.lastSeen = now
+	if v.tokens > 0 {
+		v.tokens--
 		return true
 	}
-
 	return false
 }
 
-// cleanupVisitors removes inactive visitors
-func (rl *RateLimiter) cleanupVisitors() {
-	for {
-		time.Sleep(5 * time.Minute)
+// cleanupLoop periodically evicts stale visitors. It exits when ctx is
+// cancelled or Stop is called.
+func (rl *RateLimiter) cleanupLoop(ctx context.Context) {
+	ticker := time.NewTicker(5 * time.Minute)
+	defer ticker.Stop()
 
-		rl.mu.Lock()
-		now := time.Now()
-		for ip, visitor := range rl.visitors {
-			if now.Sub(visitor.lastSeen) > 10*time.Minute {
-				delete(rl.visitors, ip)
-			}
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-rl.done:
+			return
+		case <-ticker.C:
+			rl.evictStale()
 		}
-		rl.mu.Unlock()
 	}
 }
 
-// RateLimitMiddleware creates rate limiting middleware
-func RateLimitMiddleware(rate, burst int) gin.HandlerFunc {
-	limiter := NewRateLimiter(rate, burst)
+func (rl *RateLimiter) evictStale() {
+	cutoff := time.Now().Add(-10 * time.Minute)
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	for ip, v := range rl.visitors {
+		if v.lastSeen.Before(cutoff) {
+			delete(rl.visitors, ip)
+		}
+	}
+}
 
+// RateLimitMiddleware wraps an existing RateLimiter as gin middleware.
+func RateLimitMiddleware(rl *RateLimiter) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		ip := c.ClientIP()
-
-		if !limiter.Allow(ip) {
-			c.JSON(http.StatusTooManyRequests, gin.H{
+		if !rl.Allow(c.ClientIP()) {
+			c.AbortWithStatusJSON(http.StatusTooManyRequests, gin.H{
 				"error":   "rate_limit_exceeded",
 				"message": "too many requests, please try again later",
 			})
-			c.Abort()
 			return
 		}
-
 		c.Next()
 	}
-}
-
-// StrictRateLimitMiddleware creates stricter rate limiting for sensitive operations
-func StrictRateLimitMiddleware() gin.HandlerFunc {
-	// 10 requests per minute, burst of 20
-	return RateLimitMiddleware(10, 20)
-}
-
-// StandardRateLimitMiddleware creates standard rate limiting
-func StandardRateLimitMiddleware() gin.HandlerFunc {
-	// 100 requests per minute, burst of 200
-	return RateLimitMiddleware(100, 200)
 }

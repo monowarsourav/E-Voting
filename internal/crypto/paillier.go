@@ -78,8 +78,8 @@ func GeneratePaillierKeyPair(bits int) (*PaillierPrivateKey, error) {
 	// Step 5: Compute μ = L(g^λ mod n²)^(-1) mod n
 	// where L(x) = (x-1)/n
 	gLambda := new(big.Int).Exp(g, lambda, n2) // g^λ mod n²
-	l := lFunction(gLambda, n)                  // L(g^λ mod n²)
-	mu := new(big.Int).ModInverse(l, n)         // μ = L^(-1) mod n
+	l := lFunction(gLambda, n)                 // L(g^λ mod n²)
+	mu := new(big.Int).ModInverse(l, n)        // μ = L^(-1) mod n
 
 	if mu == nil {
 		return nil, errors.New("failed to compute modular inverse")

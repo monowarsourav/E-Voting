@@ -1,13 +1,13 @@
 // Package sa2 implements Samplable Anonymous Aggregation (SA²) for private vote tallying.
 //
 // THREAT MODEL:
-// - Adversary: PPT, Dolev-Yao network model
-// - Corruption: At most ONE of {SA²-Leader, SA²-Helper} may be corrupted
-// - Non-collusion: Leader and Helper MUST be operated by independent administrative domains
-// - Security guarantee: If at least one server is honest, individual vote shares are
-//   information-theoretically hidden from the adversary
-// - Mask cancellation: share_A = E(vote + mask), share_B = E(-mask)
-//   Combined: E(vote + mask) × E(-mask) = E(vote) (Paillier homomorphic property)
+//   - Adversary: PPT, Dolev-Yao network model
+//   - Corruption: At most ONE of {SA²-Leader, SA²-Helper} may be corrupted
+//   - Non-collusion: Leader and Helper MUST be operated by independent administrative domains
+//   - Security guarantee: If at least one server is honest, individual vote shares are
+//     information-theoretically hidden from the adversary
+//   - Mask cancellation: share_A = E(vote + mask), share_B = E(-mask)
+//     Combined: E(vote + mask) × E(-mask) = E(vote) (Paillier homomorphic property)
 //
 // SECURITY REQUIREMENT: The Leader and Helper aggregation servers MUST be deployed
 // on separate machines or containers managed by independent administrative domains.

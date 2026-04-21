@@ -71,3 +71,36 @@ vendor/
 bin/
 caliper/node_modules/
 node_modules/
+
+# Compiled binaries (tracked by accident — untrack with `git rm --cached -r bin/`)
+bin/
+build/
+
+# Fabric crypto material — NEVER commit private keys
+# To purge from history: `git filter-branch --force --index-filter \
+#   "git rm -r --cached --ignore-unmatch network/crypto-config/" --prune-empty -- --all`
+network/crypto-config/
+network/channel-artifacts/
+
+# Secrets
+.env
+.env.local
+.env.*.local
+
+# Data files
+data/
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+
+# TLS certificates
+certs/
+*.pem
+*.key
+*.crt

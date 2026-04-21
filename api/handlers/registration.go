@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"crypto/sha256"
+	"crypto/subtle"
 	"encoding/hex"
 	"net/http"
 	"time"
@@ -10,14 +11,18 @@ import (
 	"github.com/covertvote/e-voting/api/models"
 	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/voter"
+	"github.com/covertvote/e-voting/pkg/audit"
 	"github.com/gin-gonic/gin"
 )
 
-// RegistrationHandler handles voter registration
+// RegistrationHandler handles voter registration. Auditor is optional; when
+// non-nil, significant lifecycle events (register, login, auth failure) are
+// recorded to the audit log.
 type RegistrationHandler struct {
 	RegistrationSystem *voter.RegistrationSystem
 	BiometricProcessor *biometric.FingerprintProcessor
 	LivenessDetector   *biometric.LivenessDetector
+	Auditor            *audit.AuditLogger
 }
 
 // NewRegistrationHandler creates a new registration handler
@@ -147,6 +152,9 @@ func (h *RegistrationHandler) Register(c *gin.Context) {
 	}
 
 	if err != nil {
+		_ = h.Auditor.LogFailure(audit.EventVoterRegistered, "register", voterID, err.Error(), map[string]interface{}{
+			"ip": c.ClientIP(),
+		})
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
 			Error:   "registration_failed",
 			Code:    http.StatusInternalServerError,
@@ -156,7 +164,20 @@ func (h *RegistrationHandler) Register(c *gin.Context) {
 	}
 
 	// Create session
-	session := middleware.CreateSession(voterID)
+	session, err := middleware.CreateSession(voterID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "session_creation_failed",
+			Code:    http.StatusInternalServerError,
+			Message: "failed to create session",
+		})
+		return
+	}
+
+	_ = h.Auditor.LogSuccess(audit.EventVoterRegistered, "register", voterID, map[string]interface{}{
+		"method": map[bool]string{true: "biometric", false: "password"}[hasBiometric],
+		"ip":     c.ClientIP(),
+	})
 
 	// Get public credential
 	publicCred := voterRecord.SMDCCredential.GetPublicCredential()
@@ -212,6 +233,7 @@ func (h *RegistrationHandler) Login(c *gin.Context) {
 	// Get voter record
 	voterRecord, err := h.RegistrationSystem.GetVoter(req.VoterID)
 	if err != nil {
+		_ = h.Auditor.LogAuthFailure(req.VoterID, c.ClientIP(), "unknown voter")
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "authentication_failed",
 			Code:    http.StatusUnauthorized,
@@ -240,24 +262,16 @@ func (h *RegistrationHandler) Login(c *gin.Context) {
 		// Verify fingerprint
 		authenticated = h.BiometricProcessor.VerifyFingerprint(req.FingerprintData, voterRecord.FingerprintHash)
 	} else {
-		// Verify password
+		// Constant-time compare to avoid timing side-channels.
 		hash := sha256.Sum256([]byte(req.Password))
 		passwordHash := hash[:]
-
-		// Compare hashes
 		if len(passwordHash) == len(voterRecord.PasswordHash) {
-			match := true
-			for i := range passwordHash {
-				if passwordHash[i] != voterRecord.PasswordHash[i] {
-					match = false
-					break
-				}
-			}
-			authenticated = match
+			authenticated = subtle.ConstantTimeCompare(passwordHash, voterRecord.PasswordHash) == 1
 		}
 	}
 
 	if !authenticated {
+		_ = h.Auditor.LogAuthFailure(req.VoterID, c.ClientIP(), "bad credentials")
 		c.JSON(http.StatusUnauthorized, models.ErrorResponse{
 			Error:   "authentication_failed",
 			Code:    http.StatusUnauthorized,
@@ -267,7 +281,15 @@ func (h *RegistrationHandler) Login(c *gin.Context) {
 	}
 
 	// Create session
-	session := middleware.CreateSession(req.VoterID)
+	session, err := middleware.CreateSession(req.VoterID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "session_creation_failed",
+			Code:    http.StatusInternalServerError,
+			Message: "failed to create session",
+		})
+		return
+	}
 
 	// Set session token in cookie
 	c.SetCookie(
@@ -279,6 +301,11 @@ func (h *RegistrationHandler) Login(c *gin.Context) {
 		false,
 		true,
 	)
+
+	_ = h.Auditor.LogSuccess(audit.EventVoterVerified, "login", req.VoterID, map[string]interface{}{
+		"method": map[bool]string{true: "biometric", false: "password"}[hasBiometric],
+		"ip":     c.ClientIP(),
+	})
 
 	// Return response
 	response := models.LoginResponse{
@@ -322,11 +349,18 @@ func (h *RegistrationHandler) GetVoterInfo(c *gin.Context) {
 		HasVoted:         false, // TODO: Check actual vote status
 	}
 
-	// Only return info if requested by the voter themselves or admin
+	// Only return info if requested by the voter themselves or admin.
+	// `is_admin` may be absent (non-admin routes do not set it) or of a
+	// different type, so guard against nil dereference / bad assertion.
 	requestedBy, _ := c.Get("voter_id")
-	isAdmin, _ := c.Get("is_admin")
+	isAdmin := false
+	if v, ok := c.Get("is_admin"); ok {
+		if b, ok := v.(bool); ok {
+			isAdmin = b
+		}
+	}
 
-	if requestedBy != voterID && !isAdmin.(bool) {
+	if requestedBy != voterID && !isAdmin {
 		c.JSON(http.StatusForbidden, models.ErrorResponse{
 			Error:   "forbidden",
 			Code:    http.StatusForbidden,

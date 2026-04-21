@@ -4,6 +4,7 @@ import (
 	"crypto/rand"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"golang.org/x/crypto/sha3"
@@ -61,13 +62,18 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 	}
 
 	var a0, a1, d0, d1, f0, f1 *big.Int
+	var err error
 
 	if isZero {
 		// Real proof for w=0, simulate w=1
-
-		// Simulate w=1 branch
-		d1, _ = rand.Int(rand.Reader, pp.Q)
-		r1, _ := rand.Int(rand.Reader, pp.Q)
+		d1, err = rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for d1: %w", err)
+		}
+		r1, err := rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for r1: %w", err)
+		}
 
 		// a1 = g * h^r1 * (C/g)^(-d1)
 		gInv := new(big.Int).ModInverse(pp.G, pp.P)
@@ -85,7 +91,10 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 		f1 = r1
 
 		// Real proof for w=0
-		r0, _ := rand.Int(rand.Reader, pp.Q)
+		r0, err := rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for r0: %w", err)
+		}
 		a0 = new(big.Int).Exp(pp.H, r0, pp.P) // g^0 * h^r0 = h^r0
 
 		// Get challenge with nonce and election context
@@ -102,10 +111,14 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 
 	} else {
 		// Real proof for w=1, simulate w=0
-
-		// Simulate w=0 branch
-		d0, _ = rand.Int(rand.Reader, pp.Q)
-		r0, _ := rand.Int(rand.Reader, pp.Q)
+		d0, err = rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for d0: %w", err)
+		}
+		r0, err := rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for r0: %w", err)
+		}
 
 		// a0 = h^r0 * C^(-d0)
 		hr0 := new(big.Int).Exp(pp.H, r0, pp.P)
@@ -116,7 +129,10 @@ func (pp *PedersenParams) ProveBinary(w, r *big.Int, C *big.Int, nonce []byte, e
 		f0 = r0
 
 		// Real proof for w=1
-		r1, _ := rand.Int(rand.Reader, pp.Q)
+		r1, err := rand.Int(rand.Reader, pp.Q)
+		if err != nil {
+			return nil, fmt.Errorf("zkp: entropy for r1: %w", err)
+		}
 
 		// a1 = g * h^r1 for w=1
 		g1 := new(big.Int).Set(pp.G)

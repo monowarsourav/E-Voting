@@ -3,10 +3,10 @@
 package main
 
 import (
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
-	"database/sql"
 
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/database"
