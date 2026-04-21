@@ -251,32 +251,32 @@ func (c *Config) Validate() error {
 		return errors.New("invalid server port")
 	}
 	if c.Crypto.PaillierKeySize < 2048 {
-		return errors.New("Paillier key size must be at least 2048 bits")
+		return errors.New("paillier key size must be at least 2048 bits")
 	}
 	if c.Crypto.SMDCSlots < 2 {
-		return errors.New("SMDC slots must be at least 2")
+		return errors.New("smdc slots must be at least 2")
 	}
 	if c.SA2.Threshold < 2 {
-		return errors.New("SA² threshold must be at least 2")
+		return errors.New("sa² threshold must be at least 2")
 	}
 
 	if c.IsProduction() {
 		if len(c.Auth.AdminTokens) == 0 {
-			return errors.New("ADMIN_TOKEN must be set in production")
+			return errors.New("admin_token must be set in production")
 		}
 		for _, tok := range c.Auth.AdminTokens {
 			if len(tok) < 32 {
-				return errors.New("ADMIN_TOKEN entries must be at least 32 characters in production")
+				return errors.New("admin_token entries must be at least 32 characters in production")
 			}
 		}
 		if c.Auth.JWTSecret == "" || len(c.Auth.JWTSecret) < 32 {
-			return errors.New("JWT_SECRET must be set (>= 32 chars) in production")
+			return errors.New("jwt_secret must be set (>= 32 chars) in production")
 		}
 		if c.TLS.Enabled && (c.TLS.CertFile == "" || c.TLS.KeyFile == "") {
-			return errors.New("TLS_CERT_FILE and TLS_KEY_FILE required when TLS_ENABLED=true")
+			return errors.New("tls_cert_file and tls_key_file required when tls_enabled=true")
 		}
 		if len(c.CORS.AllowedOrigins) == 0 {
-			return errors.New("CORS_ALLOWED_ORIGINS must be set in production")
+			return errors.New("cors_allowed_origins must be set in production")
 		}
 	}
 

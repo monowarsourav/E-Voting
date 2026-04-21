@@ -2,14 +2,37 @@ package crypto
 
 import (
 	"math/big"
+	"sync"
 	"testing"
 )
 
-func TestThresholdKeyGeneration(t *testing.T) {
-	shares, err := GenerateThresholdKey(2048, 5, 3)
-	if err != nil {
-		t.Fatal(err)
+// sharedThresholdShares is generated once per test binary execution
+// and reused across all tests. GenerateThresholdKey(2048, 5, 3) takes
+// 2-3 minutes; sharing the result brings test suite runtime from
+// ~15 minutes to ~4 minutes while preserving production-grade 2048-bit
+// keys across all correctness tests.
+var (
+	sharedThresholdShares     *ThresholdKeyShares
+	sharedThresholdSharesOnce sync.Once
+	sharedThresholdSharesErr  error
+)
+
+// getSharedThresholdShares returns production-grade 2048-bit threshold
+// shares with n=5 trustees and threshold t=3. Generated exactly once
+// per test binary execution via sync.Once.
+func getSharedThresholdShares(t *testing.T) *ThresholdKeyShares {
+	t.Helper()
+	sharedThresholdSharesOnce.Do(func() {
+		sharedThresholdShares, sharedThresholdSharesErr = GenerateThresholdKey(2048, 5, 3)
+	})
+	if sharedThresholdSharesErr != nil {
+		t.Fatal(sharedThresholdSharesErr)
 	}
+	return sharedThresholdShares
+}
+
+func TestThresholdKeyGeneration(t *testing.T) {
+	shares := getSharedThresholdShares(t)
 
 	if len(shares.Shares) != 5 {
 		t.Fatalf("expected 5 shares, got %d", len(shares.Shares))
@@ -27,7 +50,6 @@ func TestThresholdKeyGeneration(t *testing.T) {
 		t.Fatalf("params mismatch: got n=%d t=%d", shares.Params.N, shares.Params.Threshold)
 	}
 
-	// Verify indices are 1-based
 	for i, s := range shares.Shares {
 		if s.Index != i+1 {
 			t.Errorf("share %d has index %d, expected %d", i, s.Index, i+1)
@@ -36,10 +58,7 @@ func TestThresholdKeyGeneration(t *testing.T) {
 }
 
 func TestThresholdEncryptDecrypt(t *testing.T) {
-	shares, err := GenerateThresholdKey(2048, 5, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	shares := getSharedThresholdShares(t)
 	pk := shares.PublicKey
 
 	vote := big.NewInt(42)
@@ -48,7 +67,6 @@ func TestThresholdEncryptDecrypt(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get partial decryptions from trustees 1, 3, 5 (any 3 of 5)
 	partials := make([]*ThresholdPartialDecryption, 3)
 	indices := []int{0, 2, 4}
 	for i, idx := range indices {
@@ -71,14 +89,10 @@ func TestThresholdEncryptDecrypt(t *testing.T) {
 }
 
 func TestThresholdHomomorphicTally(t *testing.T) {
-	shares, err := GenerateThresholdKey(2048, 5, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	shares := getSharedThresholdShares(t)
 	pk := shares.PublicKey
 
-	// Encrypt 10 votes
-	votes := []int64{1, 0, 1, 1, 0, 1, 0, 1, 1, 0} // expected sum = 6
+	votes := []int64{1, 0, 1, 1, 0, 1, 0, 1, 1, 0}
 	var ciphertexts []*big.Int
 	for _, v := range votes {
 		enc, err := pk.Encrypt(big.NewInt(v))
@@ -88,10 +102,8 @@ func TestThresholdHomomorphicTally(t *testing.T) {
 		ciphertexts = append(ciphertexts, enc)
 	}
 
-	// Homomorphic tally
 	tally := pk.AddMultiple(ciphertexts)
 
-	// Threshold decrypt with trustees 2, 3, 4
 	partials := make([]*ThresholdPartialDecryption, 3)
 	for i := 0; i < 3; i++ {
 		pd, err := shares.Shares[i+1].PartialDecrypt(
@@ -113,10 +125,7 @@ func TestThresholdHomomorphicTally(t *testing.T) {
 }
 
 func TestThresholdInsufficientShares(t *testing.T) {
-	shares, err := GenerateThresholdKey(2048, 5, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	shares := getSharedThresholdShares(t)
 	pk := shares.PublicKey
 
 	ciphertext, err := pk.Encrypt(big.NewInt(1))
@@ -124,7 +133,6 @@ func TestThresholdInsufficientShares(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Only 2 partial decryptions (need 3)
 	partials := make([]*ThresholdPartialDecryption, 2)
 	for i := 0; i < 2; i++ {
 		pd, err := shares.Shares[i].PartialDecrypt(
@@ -142,10 +150,7 @@ func TestThresholdInsufficientShares(t *testing.T) {
 }
 
 func TestThresholdPartialDecryptionVerification(t *testing.T) {
-	shares, err := GenerateThresholdKey(2048, 5, 3)
-	if err != nil {
-		t.Fatal(err)
-	}
+	shares := getSharedThresholdShares(t)
 	pk := shares.PublicKey
 
 	ciphertext, err := pk.Encrypt(big.NewInt(7))
@@ -153,20 +158,17 @@ func TestThresholdPartialDecryptionVerification(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	// Get a valid partial decryption
 	pd, err := shares.Shares[0].PartialDecrypt(
 		ciphertext, pk, shares.Params, shares.VerifyKeys[0], shares.V)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	// Verify the ZK proof
 	valid := VerifyPartialDecryption(pd, ciphertext, pk, shares.VerifyKeys[0], shares.V)
 	if !valid {
 		t.Fatal("valid partial decryption should verify")
 	}
 
-	// Tamper with the partial decryption
 	tamperedCi := new(big.Int).Add(pd.Ci, big.NewInt(1))
 	tampered := &ThresholdPartialDecryption{
 		Index: pd.Index,

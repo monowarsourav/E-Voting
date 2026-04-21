@@ -205,11 +205,7 @@ func (pp *PedersenParams) VerifyBinary(C *big.Int, proof *BinaryProof) bool {
 	check1 := new(big.Int).Mul(g1, hf1)
 	check1.Mul(check1, CdivGNegD1)
 	check1.Mod(check1, pp.P)
-	if check1.Cmp(proof.A1) != 0 {
-		return false
-	}
-
-	return true
+	return check1.Cmp(proof.A1) == 0
 }
 
 // ProveSumOne proves that commitments sum to 1
