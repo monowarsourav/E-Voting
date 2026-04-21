@@ -6,9 +6,9 @@
 *.dll
 *.so
 *.dylib
-covertvote-api
-aggregator-a
-aggregator-b
+/covertvote-api
+/aggregator-a
+/aggregator-b
 
 # Test binary
 *.test
