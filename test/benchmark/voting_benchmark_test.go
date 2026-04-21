@@ -26,7 +26,13 @@ func TestScalabilityBenchmark(t *testing.T) {
 		t.Skip("Skipping scalability benchmark in short mode")
 	}
 
+	// In CI or when CI=true env is set, use smaller voter counts to fit
+	// time budgets. Local full benchmarks can use the full range by
+	// unsetting CI and running: go test ./test/benchmark/ -run TestScalabilityBenchmark
 	voterCounts := []int{100, 1000, 10000}
+	if os.Getenv("CI") == "true" {
+		voterCounts = []int{100, 500}
+	}
 
 	results := make([]BenchmarkResult, 0)
 

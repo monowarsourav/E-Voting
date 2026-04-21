@@ -1,0 +1,28 @@
+name: Benchmark
+
+on:
+  workflow_dispatch:  # Manual trigger only
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday midnight UTC
+
+env:
+  GO_VERSION: "1.24"
+
+jobs:
+  benchmark:
+    name: Run benchmarks
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: ${{ env.GO_VERSION }}
+          cache: true
+      - name: Run scalability benchmarks
+        run: go test -v -timeout 50m ./test/benchmark/...
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: test/benchmark/results/
