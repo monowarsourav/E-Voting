@@ -84,8 +84,8 @@ go build -o bin/covertvote-api cmd/api-server/main.go
 go build -o bin/aggregator-a cmd/aggregator-a/main.go
 go build -o bin/aggregator-b cmd/aggregator-b/main.go
 
-# Docker deployment (SA2 servers on separate containers)
-docker-compose -f docker-compose-sa2.yml up
+# Docker deployment
+docker-compose up
 ```
 
 ## Benchmarks
@@ -140,10 +140,13 @@ E-voting/
 │   ├── middleware/                # Auth, rate limiting, CORS
 │   └── routes/                   # Route definitions
 ├── chaincode/                    # Hyperledger Fabric chaincode
-├── test/benchmark/               # Performance benchmarks
-│   └── results/                  # Benchmark results for paper
-├── docker-compose-sa2.yml        # SA2 isolated deployment
-└── Thesis/                       # Paper and thesis documents
+├── test/                         # Tests
+│   ├── benchmark/                # Performance benchmarks (with paper results)
+│   └── integration/              # End-to-end integration tests
+├── migrations/                   # SQLite schema migrations
+├── proverif/                     # Formal verification models
+├── scripts/                      # Deployment and tooling scripts
+└── docker-compose.yml            # Container deployment
 ```
 
 ## Testing
@@ -170,7 +173,7 @@ go tool cover -func=coverage.out
 
 Copy `.env.example` to `.env` and update all placeholder values. See the file for all available options.
 
-**Critical:** SA2 Leader and Helper servers must run on separate machines/containers with independent API keys. See [`docker-compose-sa2.yml`](docker-compose-sa2.yml).
+**Critical:** SA2 Leader and Helper servers must run on separate machines/containers with independent API keys. See [`docker-compose.yml`](docker-compose.yml).
 
 ## Documentation
 

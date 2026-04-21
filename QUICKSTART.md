@@ -340,9 +340,9 @@ fmt.Printf("Key size: %d bits\n", cfg.Crypto.PaillierKeySize)
 ## 📖 Documentation
 
 - `README.md` - Project overview
-- `PROJECT_STATUS.md` - Initial implementation status
-- `IMPLEMENTATION_COMPLETE.md` - Complete feature list
-- `QUICKSTART.md` - This guide
+- `API_DOCUMENTATION.md` - REST API reference
+- `SECURITY.md` - Security policy
+- `internal/crypto/SECURITY.md` - Cryptographic security properties
 - Inline documentation in all source files
 
 ## 🐛 Troubleshooting
@@ -384,7 +384,7 @@ go test -bench=. ./internal/crypto/
 
 - Check inline documentation in source files
 - Review test files for usage examples
-- See `IMPLEMENTATION_COMPLETE.md` for full feature list
+- See `README.md` for full feature list
 
 ## 🎉 You're Ready!
 
