@@ -10,7 +10,16 @@ import (
 
 // TestSaveCirclTestVectors saves test vectors BEFORE circl upgrade.
 // Run this ONCE with circl v1.6.2, then upgrade to v1.6.3 and run TestCirclUpgradeCompatibility.
+//
+// This test is skipped in normal runs because it overwrites committed KAT vectors
+// with fresh random keys. Enable explicitly:
+//
+//	SAVE_KAT_VECTORS=1 go test ./test/integration/... -run TestSaveCirclTestVectors
 func TestSaveCirclTestVectors(t *testing.T) {
+	if os.Getenv("SAVE_KAT_VECTORS") != "1" {
+		t.Skip("skipped: set SAVE_KAT_VECTORS=1 to regenerate testdata vectors")
+	}
+
 	// Generate Kyber keypair with current circl version
 	keyPair, err := pq.GenerateKyberKeyPair()
 	if err != nil {
