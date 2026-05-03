@@ -24,7 +24,7 @@ blockchain:
   enabled: false  # Set to true when Hyperledger Fabric is integrated
 
 sa2:
-  server_a_url: "http://localhosgit t:8081"
+  server_a_url: "http://localhost:8081"
   server_b_url: "http://localhost:8082"
   threshold: 2  # 2-out-of-2 threshold
 
