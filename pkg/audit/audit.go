@@ -38,6 +38,13 @@ const (
 	EventRateLimitHit      AuditEventType = "rate_limit_hit"
 	EventInvalidRequest    AuditEventType = "invalid_request"
 	EventDoubleVoteAttempt AuditEventType = "double_vote_attempt"
+
+	// Coercion-resistance events
+	// EventDuressSignalMismatch is written when a voter submits a behavioral
+	// signal that does not match their registered duress signal during vote
+	// casting. The vote weight is silently zeroed; this event allows post-hoc
+	// forensic analysis without leaking the outcome to the voter's session.
+	EventDuressSignalMismatch AuditEventType = "duress_signal_mismatch"
 )
 
 // AuditEvent represents an audit log entry
@@ -182,6 +189,22 @@ func (al *AuditLogger) LogDoubleVoteAttempt(electionID string, voterID string, i
 		Action:     "attempted_double_vote",
 		Result:     "failure",
 		ErrorMsg:   "Voter has already cast a vote",
+	})
+}
+
+// LogDuressSignalMismatch records a coerced-vote event. It is called inside
+// CastVote when the voter's submitted behavioral signal does not match the
+// registered duress signal. The caller continues normally — this is a silent
+// audit trail only; the coercer must not be able to observe the event.
+func (al *AuditLogger) LogDuressSignalMismatch(voterID, electionID, ipAddress string) error {
+	return al.Log(&AuditEvent{
+		EventType:  EventDuressSignalMismatch,
+		UserID:     voterID,
+		ElectionID: electionID,
+		IPAddress:  ipAddress,
+		Action:     "cast_vote_duress",
+		Result:     "suppressed",
+		ErrorMsg:   "behavioral signal mismatch — vote weight zeroed silently",
 	})
 }
 

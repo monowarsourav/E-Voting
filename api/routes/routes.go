@@ -55,6 +55,7 @@ func SetupRoutes(router *gin.Engine, deps Dependencies) {
 			// Behavioral duress signal — coercion-resistance feature.
 			if deps.Duress != nil {
 				authenticated.POST("/voters/:voterID/duress-signal", deps.Duress.SetSignal)
+				authenticated.DELETE("/voters/:voterID/duress-signal", deps.Duress.RemoveSignal)
 			}
 		}
 

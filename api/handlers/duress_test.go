@@ -141,3 +141,91 @@ func TestSetupDuressEndpoint_Replace(t *testing.T) {
 		t.Error("signal_id should change after replacing the duress signal")
 	}
 }
+
+// TestSetupDuressEndpoint_RateLimit verifies that after 5 SetSignal calls for
+// the same voter within an hour, the 6th call is rejected with 429.
+func TestSetupDuressEndpoint_RateLimit(t *testing.T) {
+	_, _, router := setupDuressTest(t)
+
+	// 5 allowed calls.
+	for i := 0; i < 5; i++ {
+		w := postDuressSignal(router, "alice", "blink_count", "2")
+		if w.Code != http.StatusOK {
+			t.Fatalf("call %d: expected 200, got %d: %s", i+1, w.Code, w.Body.String())
+		}
+	}
+
+	// 6th call must be rate-limited.
+	w := postDuressSignal(router, "alice", "blink_count", "2")
+	if w.Code != http.StatusTooManyRequests {
+		t.Errorf("6th call: expected 429, got %d: %s", w.Code, w.Body.String())
+	}
+}
+
+// TestSetupDuressEndpoint_RateLimit_PerVoter verifies that the rate limit is
+// per-voter: one voter exhausting their budget does not affect another voter.
+func TestSetupDuressEndpoint_RateLimit_PerVoter(t *testing.T) {
+	_, rs, router := setupDuressTest(t)
+
+	// Register a second voter.
+	if _, err := rs.RegisterVoterWithPassword("bob", []byte("pw")); err != nil {
+		t.Fatalf("register bob: %v", err)
+	}
+
+	// Exhaust alice's budget.
+	for i := 0; i < 5; i++ {
+		postDuressSignal(router, "alice", "blink_count", "2")
+	}
+
+	// bob's budget is unaffected.
+	w := postDuressSignal(router, "bob", "blink_count", "3")
+	if w.Code != http.StatusOK {
+		t.Errorf("bob call after alice exhausted: expected 200, got %d", w.Code)
+	}
+}
+
+// TestRemoveSignal_Success verifies the DELETE endpoint removes the signal.
+func TestRemoveSignal_Success(t *testing.T) {
+	handler, _, router := setupDuressTest(t)
+	router.DELETE("/api/v1/voters/:voterID/duress-signal", handler.RemoveSignal)
+
+	// Set then remove.
+	postDuressSignal(router, "alice", "blink_count", "2")
+	if !handler.Detector.HasSignal("alice") {
+		t.Fatal("signal should exist before removal")
+	}
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/voters/alice/duress-signal", nil)
+	// Stub auth: the handler checks voter_id from context; set it via a sub-router.
+	routerWithAuth := gin.New()
+	routerWithAuth.Use(func(c *gin.Context) { c.Set("voter_id", "alice"); c.Next() })
+	routerWithAuth.DELETE("/api/v1/voters/:voterID/duress-signal", handler.RemoveSignal)
+
+	w := httptest.NewRecorder()
+	routerWithAuth.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("RemoveSignal: expected 204, got %d: %s", w.Code, w.Body.String())
+	}
+	if handler.Detector.HasSignal("alice") {
+		t.Error("signal should be removed after DELETE")
+	}
+}
+
+// TestRemoveSignal_NoSignalSet verifies idempotency: DELETE returns 204 even
+// when the voter has no registered signal.
+func TestRemoveSignal_NoSignalSet(t *testing.T) {
+	handler, _, _ := setupDuressTest(t)
+
+	routerWithAuth := gin.New()
+	routerWithAuth.Use(func(c *gin.Context) { c.Set("voter_id", "alice"); c.Next() })
+	routerWithAuth.DELETE("/api/v1/voters/:voterID/duress-signal", handler.RemoveSignal)
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/v1/voters/alice/duress-signal", nil)
+	w := httptest.NewRecorder()
+	routerWithAuth.ServeHTTP(w, req)
+
+	if w.Code != http.StatusNoContent {
+		t.Fatalf("RemoveSignal (no signal): expected 204, got %d", w.Code)
+	}
+}

@@ -184,6 +184,7 @@ func run() error {
 		election,
 		voting.WithKeyImageStore(keyImageStore),
 		voting.WithDuressDetector(duressDetector),
+		voting.WithAuditor(auditLogger),
 	)
 
 	counter := tally.NewCounter(paillierSK.PublicKey, paillierSK)

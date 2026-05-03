@@ -266,6 +266,11 @@ func (c *Config) Validate() error {
 	}
 
 	if c.IsProduction() {
+		// Predictable HMAC key would let an attacker pre-compute valid duress
+		// hashes and bypass coercion-resistance for all voters.
+		if c.Crypto.DuressHMACKey == "" {
+			return errors.New("DURESS_HMAC_KEY is required when ENVIRONMENT=production")
+		}
 		if len(c.Auth.AdminTokens) == 0 {
 			return errors.New("admin_token must be set in production")
 		}

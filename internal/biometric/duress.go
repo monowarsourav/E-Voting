@@ -47,13 +47,12 @@ var ErrInvalidSignalType = errors.New("invalid signal type")
 var ErrInvalidSignalValue = errors.New("invalid signal value")
 
 // DuressSignal holds the registered duress signal for a single voter.
-// The raw SignalValue is stored only for diagnostic purposes on the server;
-// only the HMAC Hash is used for verification comparisons.
+// Only the HMAC Hash is stored — the raw signal value is never persisted so
+// that a server compromise cannot reveal voters' secret behavioral patterns.
 type DuressSignal struct {
-	SignalType  string
-	SignalValue string
-	Hash        []byte // HMAC-SHA256(serverKey, signalType+":"+signalValue)
-	Timestamp   int64  // Unix seconds when the signal was registered
+	SignalType string
+	Hash       []byte // HMAC-SHA256(serverKey, signalType+":"+signalValue)
+	Timestamp  int64  // Unix seconds when the signal was registered
 }
 
 // DetectedSignal carries the client-reported behavioral signal submitted with
@@ -80,6 +79,10 @@ type DuressDetector interface {
 
 	// HasSignal reports whether voterID currently has a registered duress signal.
 	HasSignal(voterID string) bool
+
+	// RemoveSignal deletes the duress signal for voterID. Idempotent: returns
+	// nil even when no signal was registered.
+	RemoveSignal(voterID string) error
 }
 
 // InMemoryDuressDetector is the default DuressDetector implementation backed
@@ -122,10 +125,9 @@ func (d *InMemoryDuressDetector) SetSignal(voterID, signalType, signalValue stri
 
 	d.mu.Lock()
 	d.signals[voterID] = &DuressSignal{
-		SignalType:  signalType,
-		SignalValue: signalValue,
-		Hash:        hash,
-		Timestamp:   time.Now().Unix(),
+		SignalType: signalType,
+		Hash:       hash,
+		Timestamp:  time.Now().Unix(),
 	}
 	d.mu.Unlock()
 
@@ -157,6 +159,14 @@ func (d *InMemoryDuressDetector) HasSignal(voterID string) bool {
 	_, ok := d.signals[voterID]
 	d.mu.RUnlock()
 	return ok
+}
+
+// RemoveSignal deletes the duress signal for voterID. Idempotent.
+func (d *InMemoryDuressDetector) RemoveSignal(voterID string) error {
+	d.mu.Lock()
+	delete(d.signals, voterID)
+	d.mu.Unlock()
+	return nil
 }
 
 // computeHMAC returns HMAC-SHA256(serverKey, signalType+":"+signalValue).

@@ -4,6 +4,7 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
+	"sync"
 	"time"
 
 	"github.com/covertvote/e-voting/api/models"
@@ -12,14 +13,61 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// duressRateLimiter enforces a per-voter ceiling on SetSignal calls using a
+// sliding-window counter. This guards against signal-spam that could DoS the
+// system or flood the audit log. The limit (5 calls/hour per voter) is tight
+// enough to stop abuse while allowing a voter to update their pattern several
+// times during a single session.
+type duressRateLimiter struct {
+	mu      sync.Mutex
+	buckets map[string][]time.Time // voter ID → timestamps of recent calls
+	window  time.Duration
+	max     int
+}
+
+func newDuressRateLimiter() *duressRateLimiter {
+	return &duressRateLimiter{
+		buckets: make(map[string][]time.Time),
+		window:  time.Hour,
+		max:     5,
+	}
+}
+
+// allow returns true when voterID has not exceeded the call budget. Stale
+// entries outside the sliding window are pruned on each check.
+func (r *duressRateLimiter) allow(voterID string) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	now := time.Now()
+	cutoff := now.Add(-r.window)
+
+	times := r.buckets[voterID]
+	// Drop entries outside the window.
+	valid := times[:0]
+	for _, t := range times {
+		if t.After(cutoff) {
+			valid = append(valid, t)
+		}
+	}
+	r.buckets[voterID] = valid
+
+	if len(valid) >= r.max {
+		return false
+	}
+	r.buckets[voterID] = append(r.buckets[voterID], now)
+	return true
+}
+
 // DuressHandler handles behavioral duress signal registration for voters.
-// It exposes a single endpoint that lets an authenticated voter store a
+// It exposes endpoints that let an authenticated voter store or remove a
 // secret behavioral pattern (e.g. "2 blinks"). During vote casting the
 // vote caster verifies the pattern; a mismatch silently zeros the vote weight
 // so a coercer cannot distinguish a coerced vote from a genuine one.
 type DuressHandler struct {
 	Detector           biometric.DuressDetector
 	RegistrationSystem *voter.RegistrationSystem
+	rateLimiter        *duressRateLimiter
 }
 
 // NewDuressHandler creates a new DuressHandler.
@@ -27,6 +75,7 @@ func NewDuressHandler(d biometric.DuressDetector, rs *voter.RegistrationSystem) 
 	return &DuressHandler{
 		Detector:           d,
 		RegistrationSystem: rs,
+		rateLimiter:        newDuressRateLimiter(),
 	}
 }
 
@@ -44,7 +93,9 @@ func NewDuressHandler(d biometric.DuressDetector, rs *voter.RegistrationSystem) 
 // @Param        body     body      models.SetDuressSignalRequest   true  "Signal details"
 // @Success      200      {object}  models.SetDuressSignalResponse
 // @Failure      400      {object}  models.ErrorResponse
+// @Failure      403      {object}  models.ErrorResponse
 // @Failure      404      {object}  models.ErrorResponse
+// @Failure      429      {object}  models.ErrorResponse
 // @Security     BearerAuth
 // @Router       /voters/{voterID}/duress-signal [post]
 func (h *DuressHandler) SetSignal(c *gin.Context) {
@@ -57,6 +108,18 @@ func (h *DuressHandler) SetSignal(c *gin.Context) {
 			Error:   "forbidden",
 			Code:    http.StatusForbidden,
 			Message: "voter ID mismatch",
+		})
+		return
+	}
+
+	// Per-voter rate limit: 5 SetSignal calls per hour.
+	// This is tighter than the global StrictLimiter and keyed on voter ID
+	// (not IP) so a NAT'd coercer cannot exhaust a victim's budget.
+	if !h.rateLimiter.allow(voterID) {
+		c.JSON(http.StatusTooManyRequests, models.ErrorResponse{
+			Error:   "rate_limit_exceeded",
+			Code:    http.StatusTooManyRequests,
+			Message: "too many signal updates — try again later",
 		})
 		return
 	}
@@ -101,4 +164,40 @@ func (h *DuressHandler) SetSignal(c *gin.Context) {
 		SignalID: signalID,
 		SetAt:    time.Now().Unix(),
 	})
+}
+
+// RemoveSignal handles DELETE /api/v1/voters/:voterID/duress-signal
+//
+// @Summary      Remove a behavioral duress signal
+// @Description  Clears the voter's registered duress signal. Idempotent:
+//               returns 204 even when no signal was registered.
+// @Tags         Voters
+// @Produce      json
+// @Param        voterID  path  string  true  "Voter ID"
+// @Success      204
+// @Failure      403  {object}  models.ErrorResponse
+// @Security     BearerAuth
+// @Router       /voters/{voterID}/duress-signal [delete]
+func (h *DuressHandler) RemoveSignal(c *gin.Context) {
+	voterID := c.Param("voterID")
+
+	if authedID, exists := c.Get("voter_id"); exists && authedID != voterID {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Error:   "forbidden",
+			Code:    http.StatusForbidden,
+			Message: "voter ID mismatch",
+		})
+		return
+	}
+
+	if err := h.Detector.RemoveSignal(voterID); err != nil {
+		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
+			Error:   "internal_error",
+			Code:    http.StatusInternalServerError,
+			Message: "failed to remove signal",
+		})
+		return
+	}
+
+	c.Status(http.StatusNoContent)
 }

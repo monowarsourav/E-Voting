@@ -592,6 +592,12 @@ func (a *inMemoryDetectorAdapter) HasSignal(voterID string) bool {
 	return ok
 }
 
+func (a *inMemoryDetectorAdapter) RemoveSignal(voterID string) error {
+	a.init()
+	delete(a.signals, voterID)
+	return nil
+}
+
 func TestCastVote_WithMatchingSignal_VoteCounts(t *testing.T) {
 	vc, _, _ := setupDuressVoteCaster(t)
 
@@ -664,5 +670,48 @@ func TestCastVote_CoercerCannotDetectMismatch(t *testing.T) {
 	// Receipt structure is the same type regardless of duress outcome.
 	if coercedReceipt.VoterID != "voter-duress-0" {
 		t.Errorf("coerced receipt has wrong voter ID: %s", coercedReceipt.VoterID)
+	}
+}
+
+// TestCastVote_CoercedVote_AllowsRetry verifies the iteration-attack fix:
+// a coerced vote (weight=0) must NOT consume the voter's slot, so they can
+// re-vote with the correct signal after the coercer leaves.
+//
+//  1. Register signal "2" for voter-duress-0.
+//  2. Cast with wrong signal "3" (coerced) → receipt returned, vote NOT counted.
+//  3. Cast again with correct signal "2" (genuine) → succeeds, vote IS counted.
+//  4. GetVoteCount() == 1 (only the genuine vote is stored).
+func TestCastVote_CoercedVote_AllowsRetry(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	const voterID = "voter-duress-0"
+	_, _ = vc.DuressDetector.SetSignal(voterID, "blink_count", "2")
+
+	// Step 2: coerced vote — wrong signal.
+	wrongDetected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "3"}
+	coercedReceipt, err := vc.CastVote(voterID, 1, 0, wrongDetected)
+	if err != nil {
+		t.Fatalf("coerced CastVote must not error: %v", err)
+	}
+	if coercedReceipt == nil {
+		t.Fatal("coerced receipt must not be nil (coercer must see success)")
+	}
+	if vc.GetVoteCount() != 0 {
+		t.Errorf("vote count after coerced cast: want 0, got %d", vc.GetVoteCount())
+	}
+
+	// Step 3: genuine re-vote — correct signal.
+	realDetected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "2"}
+	realReceipt, err := vc.CastVote(voterID, 1, 0, realDetected)
+	if err != nil {
+		t.Fatalf("genuine CastVote after coerced attempt failed: %v", err)
+	}
+	if realReceipt == nil {
+		t.Fatal("genuine receipt must not be nil")
+	}
+
+	// Step 4: only the genuine vote should be counted.
+	if vc.GetVoteCount() != 1 {
+		t.Errorf("vote count after genuine cast: want 1, got %d", vc.GetVoteCount())
 	}
 }

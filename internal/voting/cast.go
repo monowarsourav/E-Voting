@@ -11,7 +11,6 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
-	"log"
 	"math/big"
 	"sync"
 	"time"
@@ -20,6 +19,7 @@ import (
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/sa2"
 	"github.com/covertvote/e-voting/internal/voter"
+	"github.com/covertvote/e-voting/pkg/audit"
 )
 
 // KeyImageStore provides persistent storage for key images.
@@ -46,8 +46,9 @@ type VoteCaster struct {
 	RingParams         *crypto.RingParams
 	RegistrationSystem *voter.RegistrationSystem
 	Election           *Election
-	KeyImageStore      KeyImageStore          // persistent key-image storage (may be nil for legacy/test usage)
+	KeyImageStore      KeyImageStore            // persistent key-image storage (may be nil for legacy/test usage)
 	DuressDetector     biometric.DuressDetector // optional; nil = no behavioral duress check
+	Auditor            *audit.AuditLogger       // optional; nil = no structured audit logging
 
 	mu            sync.RWMutex
 	castVotes     map[string]*CastVote // voterID -> CastVote
@@ -96,6 +97,15 @@ func WithKeyImageStore(store KeyImageStore) VoteCasterOption {
 func WithDuressDetector(d biometric.DuressDetector) VoteCasterOption {
 	return func(vc *VoteCaster) {
 		vc.DuressDetector = d
+	}
+}
+
+// WithAuditor attaches a structured audit logger. When set, security events
+// (e.g. duress signal mismatches) are persisted via the audit subsystem
+// instead of going to stdout.
+func WithAuditor(a *audit.AuditLogger) VoteCasterOption {
+	return func(vc *VoteCaster) {
+		vc.Auditor = a
 	}
 }
 
@@ -174,8 +184,8 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 		detected != nil {
 		ok, err := vc.DuressDetector.VerifySignal(voterID, detected.SignalType, detected.SignalValue)
 		if err != nil || !ok {
-			// Audit log only — do NOT surface this to the caller.
-			log.Printf("[AUDIT] duress signal mismatch for voter %s — behavioral weight set to 0", voterID)
+			// Weight zeroed — the audit event is emitted later at the
+			// short-circuit point where finalWeight is confirmed to be 0.
 			behaviorWeight = big.NewInt(0)
 		}
 	}
@@ -262,6 +272,27 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 		VoteShares:       voteShares,
 		MerkleProof:      merkleProof,
 		PublicCredential: voterRecord.SMDCCredential.GetPublicCredential(),
+	}
+
+	// ---- Coerced-vote short-circuit (Issue 6: iteration attack) ----
+	// When behaviorWeight == 0, the voter is under coercion and intentionally
+	// submitted the wrong behavioral signal. We must NOT persist the key image
+	// or record the voter as having voted — doing so would prevent them from
+	// casting a genuine vote once the coercer is gone. A plausible receipt is
+	// returned so the coercer cannot distinguish this path from a genuine vote.
+	//
+	// We key on behaviorWeight (not finalWeight) because finalWeight=0 can also
+	// arise from an SMDC decoy slot, which is a legitimate privacy mechanism
+	// and should still be recorded as a cast vote to prevent double-voting.
+	//
+	// SECURITY NOTE: The ciphertext produced for behaviorWeight=0 is
+	// E(vote)^0 = E(0), computationally indistinguishable under DCRA.
+	// All expensive crypto (ring sig, SA² split) is completed before this
+	// branch so timing is not observable by the caller.
+	if behaviorWeight.Sign() == 0 {
+		_ = vc.Auditor.LogDuressSignalMismatch(voterID, vc.Election.ElectionID, "")
+		receipt := vc.generateReceipt(voterID, ringSignature.KeyImage)
+		return receipt, nil
 	}
 
 	// ---- Persist key image OUTSIDE the mutex ----
