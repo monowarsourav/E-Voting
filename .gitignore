@@ -1,14 +1,21 @@
 # .gitignore
 
-# Binaries
+# Compiled binaries (actual go build output names)
+/api-server
+/aggregator-a
+/aggregator-b
+/cli
+/covertvote-api
 *.exe
 *.exe~
 *.dll
 *.so
 *.dylib
-/covertvote-api
-/aggregator-a
-/aggregator-b
+
+# Build outputs
+/build/
+/dist/
+/bin/
 
 # Test binary
 *.test
