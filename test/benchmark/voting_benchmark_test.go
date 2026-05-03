@@ -127,7 +127,7 @@ func runVotingBenchmark(t *testing.T, numVoters int) BenchmarkResult {
 		candidateID := i % 3 // Rotate through 3 candidates
 
 		// Cast vote
-		_, err := voteCaster.CastVote(voterID, candidateID, 0)
+		_, err := voteCaster.CastVote(voterID, candidateID, 0, nil)
 		if err != nil {
 			t.Logf("Vote casting warning for voter %d: %v", i, err)
 		}

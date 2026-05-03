@@ -43,14 +43,19 @@ type LoginResponse struct {
 
 // VoteRequest represents vote casting request.
 // MUST include fingerprint + liveness for every vote.
+// DetectedSignalType and DetectedSignalValue are optional: when both are set
+// the server verifies them against the voter's registered duress signal; a
+// mismatch silently zeros the vote weight (coercion resistance).
 type VoteRequest struct {
-	VoterID         string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
-	ElectionID      string `json:"election_id" binding:"required,min=3,max=64,alphanumdash"`
-	CandidateID     int    `json:"candidate_id" binding:"required,min=1"`
-	SMDCSlotIndex   int    `json:"smdc_slot_index" binding:"min=0"`
-	AuthToken       string `json:"auth_token" binding:"required"`
-	FingerprintData []byte `json:"fingerprint_data" binding:"required"`
-	LivenessData    []byte `json:"liveness_data" binding:"required"`
+	VoterID              string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
+	ElectionID           string `json:"election_id" binding:"required,min=3,max=64,alphanumdash"`
+	CandidateID          int    `json:"candidate_id" binding:"required,min=1"`
+	SMDCSlotIndex        int    `json:"smdc_slot_index" binding:"min=0"`
+	AuthToken            string `json:"auth_token" binding:"required"`
+	FingerprintData      []byte `json:"fingerprint_data" binding:"required"`
+	LivenessData         []byte `json:"liveness_data" binding:"required"`
+	DetectedSignalType   string `json:"detected_signal_type,omitempty"`
+	DetectedSignalValue  string `json:"detected_signal_value,omitempty"`
 }
 
 // VoteResponse represents vote response
@@ -121,6 +126,19 @@ type VerifyVoteResponse struct {
 	Timestamp      int64  `json:"timestamp"`
 	BlockchainTxID string `json:"blockchain_tx_id"`
 	Message        string `json:"message"`
+}
+
+// SetDuressSignalRequest is the body for POST /api/v1/voters/:voterID/duress-signal.
+type SetDuressSignalRequest struct {
+	SignalType  string `json:"signal_type" binding:"required"`
+	SignalValue string `json:"signal_value" binding:"required"`
+}
+
+// SetDuressSignalResponse is the response after a duress signal is registered.
+type SetDuressSignalResponse struct {
+	Status   string `json:"status"`
+	SignalID string `json:"signal_id"`
+	SetAt    int64  `json:"set_at"`
 }
 
 // ErrorResponse represents error response

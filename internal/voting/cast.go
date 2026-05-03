@@ -11,10 +11,12 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"log"
 	"math/big"
 	"sync"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/sa2"
 	"github.com/covertvote/e-voting/internal/voter"
@@ -44,7 +46,8 @@ type VoteCaster struct {
 	RingParams         *crypto.RingParams
 	RegistrationSystem *voter.RegistrationSystem
 	Election           *Election
-	KeyImageStore      KeyImageStore // persistent key-image storage (may be nil for legacy/test usage)
+	KeyImageStore      KeyImageStore          // persistent key-image storage (may be nil for legacy/test usage)
+	DuressDetector     biometric.DuressDetector // optional; nil = no behavioral duress check
 
 	mu            sync.RWMutex
 	castVotes     map[string]*CastVote // voterID -> CastVote
@@ -86,7 +89,26 @@ func WithKeyImageStore(store KeyImageStore) VoteCasterOption {
 	}
 }
 
+// WithDuressDetector attaches a behavioral duress detector. When set, CastVote
+// will check the submitted detected signal against the voter's registered
+// duress signal and zero the behavioral weight on a mismatch — silently, so
+// that a coercer cannot distinguish coerced from genuine votes.
+func WithDuressDetector(d biometric.DuressDetector) VoteCasterOption {
+	return func(vc *VoteCaster) {
+		vc.DuressDetector = d
+	}
+}
+
 // CastVote handles the complete vote casting process.
+//
+// detected carries the optional behavioral duress signal submitted with the
+// vote. When non-nil and the voter has a registered duress signal, the HMAC
+// of detected is compared to the stored hash:
+//   - match  → behaviorWeight = 1 (genuine vote)
+//   - mismatch → behaviorWeight = 0 (coerced vote — silently discarded)
+//
+// The response is identical in both cases; the coercer cannot detect
+// whether the vote was counted. An audit log entry is written on mismatch.
 //
 // Concurrency strategy (double-checked locking):
 //  1. Acquire RLock and check in-memory maps (fast path).
@@ -96,7 +118,7 @@ func WithKeyImageStore(store KeyImageStore) VoteCasterOption {
 //     is the authoritative guard against races; if two goroutines pass
 //     the in-memory check concurrently, only one will succeed at the DB.
 //  4. Acquire full Lock and update the in-memory maps.
-func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex int) (*VoteReceipt, error) {
+func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex int, detected *biometric.DetectedSignal) (*VoteReceipt, error) {
 	// Step 1: Verify election is active
 	if !vc.Election.IsActive {
 		return nil, errors.New("election is not active")
@@ -138,9 +160,30 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 		return nil, err
 	}
 
-	// Step 7: Apply SMDC weight to encrypted vote
-	// E(vote)^weight = E(vote × weight)
-	weightedEncryptedVote := vc.BallotCreator.ApplyWeight(ballot.EncryptedVote, slot.Weight)
+	// Step 7: Compute final weight = smdcWeight × behaviorWeight.
+	//
+	// Behavioral duress signal check:
+	// If the voter registered a secret behavioral pattern (e.g. "2 blinks"),
+	// the client must include the matching detected_signal_* fields. A mismatch
+	// zeros behaviorWeight so the encrypted vote is multiplied by 0 — the vote
+	// is silently not counted. The response to the voter is identical to a
+	// normal successful vote, so a coercer cannot detect the discard.
+	behaviorWeight := big.NewInt(1)
+	if vc.DuressDetector != nil &&
+		vc.DuressDetector.HasSignal(voterID) &&
+		detected != nil {
+		ok, err := vc.DuressDetector.VerifySignal(voterID, detected.SignalType, detected.SignalValue)
+		if err != nil || !ok {
+			// Audit log only — do NOT surface this to the caller.
+			log.Printf("[AUDIT] duress signal mismatch for voter %s — behavioral weight set to 0", voterID)
+			behaviorWeight = big.NewInt(0)
+		}
+	}
+
+	// finalWeight = smdcWeight × behaviorWeight (both are 0 or 1).
+	// E(vote)^finalWeight = E(vote × finalWeight) via Paillier homomorphism.
+	finalWeight := new(big.Int).Mul(slot.Weight, behaviorWeight)
+	weightedEncryptedVote := vc.BallotCreator.ApplyWeight(ballot.EncryptedVote, finalWeight)
 
 	// Step 8: Create ring signature with FIXED ring size
 	// Get all registered public keys

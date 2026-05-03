@@ -144,6 +144,14 @@ func run() error {
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
 	livenessDetector := biometric.NewLivenessDetector(0.5)
 
+	// Behavioral duress detector — coercion resistance via secret behavioral signal.
+	// The HMAC key is loaded from DURESS_HMAC_KEY; a dev fallback is used when absent.
+	duressHMACKey := []byte(cfg.Crypto.DuressHMACKey)
+	if len(duressHMACKey) == 0 {
+		log.Warn("DURESS_HMAC_KEY not set — using insecure dev fallback; set in production")
+	}
+	duressDetector := biometric.NewInMemoryDuressDetector(duressHMACKey)
+
 	eligibleVoters := make([]string, 0, 105)
 	for i := 1; i <= 100; i++ {
 		eligibleVoters = append(eligibleVoters, fmt.Sprintf("voter%03d", i))
@@ -173,6 +181,7 @@ func run() error {
 		registrationSystem,
 		election,
 		voting.WithKeyImageStore(keyImageStore),
+		voting.WithDuressDetector(duressDetector),
 	)
 
 	counter := tally.NewCounter(paillierSK.PublicKey, paillierSK)
@@ -189,12 +198,14 @@ func run() error {
 	votingHandler.Elections[election.ElectionID] = election
 	tallyHandler := handlers.NewTallyHandler(counter, voteCaster, votingHandler.Elections)
 	healthHandler := handlers.NewHealthHandler(version, db.DB)
+	duressHandler := handlers.NewDuressHandler(duressDetector, registrationSystem)
 
 	routes.SetupRoutes(router, routes.Dependencies{
 		Registration:    registrationHandler,
 		Voting:          votingHandler,
 		Tally:           tallyHandler,
 		Health:          healthHandler,
+		Duress:          duressHandler,
 		StandardLimiter: standardLimiter,
 		StrictLimiter:   strictLimiter,
 	})

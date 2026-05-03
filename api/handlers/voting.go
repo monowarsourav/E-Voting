@@ -163,10 +163,20 @@ func (h *VotingHandler) CastVote(c *gin.Context) {
 		}
 	}
 
-	// Step 5: All biometric checks passed, cast the vote
-	// Lock the mutex to protect concurrent vote casting
+	// Step 5: All biometric checks passed, cast the vote.
+	// Extract optional behavioral duress signal from the request.
+	// When both fields are present the vote caster will verify them against
+	// the voter's registered duress signal; absence means no duress check.
+	var detected *biometric.DetectedSignal
+	if req.DetectedSignalType != "" {
+		detected = &biometric.DetectedSignal{
+			SignalType:  req.DetectedSignalType,
+			SignalValue: req.DetectedSignalValue,
+		}
+	}
+
 	h.mu.Lock()
-	receipt, err := h.VoteCaster.CastVote(req.VoterID, req.CandidateID, req.SMDCSlotIndex)
+	receipt, err := h.VoteCaster.CastVote(req.VoterID, req.CandidateID, req.SMDCSlotIndex, detected)
 	h.mu.Unlock()
 	if err != nil {
 		if errors.Is(err, voting.ErrKeyImageAlreadyUsed) {

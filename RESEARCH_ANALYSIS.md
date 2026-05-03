@@ -590,3 +590,12 @@ Agora (Secret Sharing)
 ### Biometric Authentication
 23. [Comparative E-Voting Security Evaluation: Multi-Modal Biometric (HAL 2024)](https://hal.science/hal-04650059v1/document)
 24. [Fingerprint-Authenticated Blockchain E-Voting (ResearchGate 2025)](https://www.researchgate.net/publication/393633419_Fingerprint-Authenticated_Blockchain_E-Voting_A_Secure_Digital_Election_Framework)
+
+
+Paillier Encryption
+Pedersen Commitment
+Zero Knowledge
+Proof
+Ring Signature
+SA² Aggregation
+Kyber768

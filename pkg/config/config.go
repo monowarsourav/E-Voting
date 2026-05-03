@@ -44,6 +44,10 @@ type CryptoConfig struct {
 	PedersenKeySize int
 	RingKeySize     int
 	SMDCSlots       int
+	// DuressHMACKey is the server-side secret for HMAC-SHA256 of behavioral
+	// duress signals. Loaded from DURESS_HMAC_KEY env var. When empty a
+	// hard-coded dev fallback is used and a warning should be logged.
+	DuressHMACKey string
 }
 
 // ElectionConfig holds election parameters.
@@ -188,6 +192,7 @@ func LoadConfig() (*Config, error) {
 	} else if ok {
 		cfg.Crypto.SMDCSlots = v
 	}
+	cfg.Crypto.DuressHMACKey = os.Getenv("DURESS_HMAC_KEY")
 
 	// SA² URLs
 	if v := os.Getenv("SA2_SERVER_A_URL"); v != "" {
