@@ -145,12 +145,14 @@ func run() error {
 	livenessDetector := biometric.NewLivenessDetector(0.5)
 
 	// Behavioral duress detector — coercion resistance via secret behavioral signal.
+	// SQLite-backed so signals survive server restarts; the DB columns were added
+	// by migration 008_add_duress_signal.sql.
 	// The HMAC key is loaded from DURESS_HMAC_KEY; a dev fallback is used when absent.
 	duressHMACKey := []byte(cfg.Crypto.DuressHMACKey)
 	if len(duressHMACKey) == 0 {
 		log.Warn("DURESS_HMAC_KEY not set — using insecure dev fallback; set in production")
 	}
-	duressDetector := biometric.NewInMemoryDuressDetector(duressHMACKey)
+	duressDetector := biometric.NewSQLiteDuressDetector(db.DB, duressHMACKey)
 
 	eligibleVoters := make([]string, 0, 105)
 	for i := 1; i <= 100; i++ {
