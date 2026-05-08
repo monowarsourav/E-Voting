@@ -1,0 +1,123 @@
+\documentclass[12pt,a4paper,openright]{report} %twoside
+%-----------------------------------------------------------------
+% LaTeX template for a Bachelor Thesis Book (CSE 400) 
+% of the Department of Computer Science and Engineering  at the 
+% Green University of Bangladesh (GUB)
+%-----------------------------------------------------------
+\usepackage{gubcse400}
+
+
+% ===================== All Necessary Packages =====================
+
+\usepackage{algorithm}          % For creating algorithm environments
+\usepackage{listings}           % For including code blocks with syntax highlighting
+\usepackage{graphicx}           % For inserting and managing images
+\usepackage{booktabs}           % For professional-looking tables
+\usepackage{xcolor}             % For colored text and code highlighting
+\usepackage{algpseudocode}      % For writing pseudocode within algorithm environment
+\usepackage{amsmath}            % For advanced mathematical symbols and environments
+\definecolor{codegreen}{rgb}{0,0.6,0} % Define custom color for code elements
+\usepackage[a4paper, left=2.5cm, right=2cm, top=2.5cm, bottom=2cm]{geometry} % Page layout settings
+
+\usepackage{rotating}           % For rotating figures, tables, or text
+\usepackage[utf8]{inputenc}     % For UTF-8 character encoding support
+\usepackage{pifont}             % For special symbols (e.g., checkmarks, crosses)
+\usepackage{array}              % For extended table features
+\usepackage{cases}              % For the 'cases' environment in math equations
+\usepackage{float}              % To control figure/table placement precisely
+\usepackage{longtable}          % For multipage tables
+\usepackage{makecell}           % For customized cell formatting in tables
+\geometry{margin=1in}           % Adjust page margins (alternative geometry setting)
+\renewcommand{\arraystretch}{1.3} % Increases row spacing in tables for better readability
+
+% ===================== Additional Packages for Our Thesis =====================
+\usepackage{amssymb}            % For mathematical symbols
+\usepackage{mathtools}          % For mathematical tools
+\usepackage{subcaption}         % For subfigures
+\usepackage{multirow}           % For multirow tables
+
+% Custom commands
+\newcommand{\cmark}{\ding{51}}  % Checkmark
+\newcommand{\xmark}{\ding{55}}  % Cross mark
+
+
+% Change the name and designation of Chairperson of dept. as required
+\def\HodName{Name of the Chairperson\xspace}
+\def\HodPosition{Chairperson\xspace}
+%
+%-----------------------------------------------------------
+% Set your report/thesis particulars 
+%-----------------------------------------------------------
+%
+\def\RoportType{Thesis\xspace} 
+%
+\def\ReportTitle{A Coercion-Resistant Blockchain E-Voting Framework with Multi-Protocol Cryptography and Post-Quantum Security\xspace}
+\def\Supervisor{Jannathul Moawa Hasi\xspace} 
+\def\SupervisorPosition{Lecturer\xspace}
+\def\secondSupervisor{N/A\xspace} 
+\def\secondSupervisorPosition{N/A\xspace}
+%
+%
+%\def\reportSubmissionDate{\today}
+\def\reportSubmissionDate{May 2026}
+\def\reportSubmissionTerm{Spring 2026}
+
+
+%-----------------------------------------------------------
+% Set your group members' particulars 
+%-----------------------------------------------------------
+%
+\def\numberOfAuthors{3} % 3 authors
+%
+\def\firstAuthor{Monowar Hossen Sourav\xspace} 
+\def\firstAuthorID{221002578\xspace}
+\def\firstAuthorDedication{ Dedicated to Almighty Allah —
+\\ \textit{All praise to Him for His endless mercy and guidance.\\
+Dedicated to my beloved parents for their love and support, and to all who inspired and encouraged me along the way.}}
+%
+\def\secondAuthor{Md. Sajeeb Mia\xspace} 
+\def\secondAuthorID{221002251\xspace} 
+\def\secondAuthorDedication{Dedicated to Almighty Allah —
+\\ \textit{All praise to Him for His endless mercy and guidance.\\
+Dedicated to my beloved parents for their love and support.}}
+%
+\def\thirdAuthor{Md. Naim Ahammed\xspace} 
+\def\thirdAuthorID{221002599\xspace} 
+\def\thirdAuthorDedication{Dedicated to Almighty Allah —
+\\ \textit{All praise to Him for His endless mercy and guidance.\\
+Dedicated to my beloved parents for their love and support.}}
+%
+%-----------------------------------------------------------
+% Set Board members' particulars 
+%-----------------------------------------------------------
+%
+\def\BoardNumber{1} % board number
+%
+\def\BoardChair{Board Chair's Name\xspace} 
+\def\BoardChairPosition{Board Chair's Position\xspace}
+%
+\def\BoardMember{Board Member's Name\xspace} 
+\def\BoardMemberPosition{Board Member's Position\xspace} 
+%
+\def\BoardExternalMember{External Member's Name\xspace} 
+\def\BoardExternalMemberPosition{External Member's Position\xspace} 
+\def\BoardExternalMemberAffiliation{External Member's Affiliation\xspace}
+%
+%-----------------------------------------------------------
+\begin{document}
+\input{./Setup/front}
+\input{./back/acronyms}
+%-----------------------------------------------------------
+% Include Chapters 
+%-----------------------------------------------------------
+ \include{./Chapters/chapter1}
+ \include{./Chapters/chapter2}
+ \include{./Chapters/chapter3}
+ \include{./Chapters/chapter4}
+ \include{./Chapters/chapter5}
+  \input{./Setup/rear}  %include Reference Section
+
+  \coverpage{\numberOfAuthors}
+%-----------------------------------------------------------
+
+\end{document}

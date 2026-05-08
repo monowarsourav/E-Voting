@@ -1,0 +1,454 @@
+\chapter{Implementation, Results and Discussion}
+\label{ch:results}
+
+\section{Introduction}
+\label{sec:res-intro}
+
+This chapter presents the implementation details, detailed performance evaluation, and in-depth discussion of the proposed system. Section~\ref{sec:impl-env} describes the implementation environment and technology stack. Section~\ref{sec:perf-metrics} defines the performance metrics used for evaluation. Section~\ref{sec:results} presents the experimental results including cryptographic micro-benchmarks, pipeline performance, scalability validation, and blockchain throughput measurements. Section~\ref{sec:discussion} provides analysis and discussion of the results. Section~\ref{sec:test-coverage} analyzes the test coverage. Section~\ref{sec:proverif} presents formal verification of three security properties using ProVerif. Section~\ref{sec:comparative} provides a comparative analysis with existing systems. Section~\ref{sec:res-conclusion} concludes the chapter.
+
+\section{Implementation Environment}
+\label{sec:impl-env}
+
+The proposed system is implemented in Go 1.24 and deployed on Hyperledger Fabric v2.5.12. Table~\ref{tab:impl-env} summarizes the implementation environment.
+
+\begin{table}[H]
+\centering
+\caption{Implementation Environment}
+\label{tab:impl-env}
+\begin{tabular}{|l|l|}
+\hline
+\textbf{Component} & \textbf{Specification} \\
+\hline
+CPU & AMD Ryzen 5 7530U (12 threads) \\
+\hline
+Architecture & x86\_64 (amd64) \\
+\hline
+RAM & 30 GiB \\
+\hline
+OS & Linux (Ubuntu) \\
+\hline
+Language & Go 1.24 \\
+\hline
+Web Framework & Gin v1.11 \\
+\hline
+Blockchain & Hyperledger Fabric v2.5.12 (LTS) \\
+\hline
+SDK & fabric-gateway v1.10.1 (gRPC/TLS) \\
+\hline
+Consensus & Raft (single orderer) \\
+\hline
+Peers & 2 (Org1 + Org2), CouchDB state \\
+\hline
+Chaincode & covertvote\_2.0 (Go) \\
+\hline
+Benchmark Tool & Hyperledger Caliper v0.6.0~\cite{caliper} \\
+\hline
+PQ Library & Kyber768 (CIRCL by Cloudflare)~\cite{circl} \\
+\hline
+\end{tabular}
+\end{table}
+
+The system architecture follows a layered design with separate packages for each cryptographic protocol (\texttt{internal/crypto}, \texttt{internal/smdc}, \texttt{internal/sa2}, \texttt{internal/pq}, \texttt{internal/tally}), API handlers (\texttt{api/handlers}), blockchain integration (\texttt{internal/blockchain}), and smart contract logic (\texttt{chaincode/covertvote}). The total codebase consists of approximately 5,000 lines of Go code across 35 source files.
+
+\section{Performance Metrics}
+\label{sec:perf-metrics}
+
+The following metrics are used to evaluate the proposed framework's performance:
+
+\begin{itemize}
+    \item \textbf{Per-Operation Latency}: Time to execute individual cryptographic operations (encryption, commitment, proof generation, signing), measured in microseconds ($\mu$s) or milliseconds (ms).
+    
+    \item \textbf{Pipeline Throughput}: End-to-end time for the complete 17-step vote casting pipeline, measured in milliseconds per vote.
+    
+    \item \textbf{Tally Complexity}: Per-vote homomorphic addition time as voter count scales from 100 to 100,000, validating the $O(n)$ complexity claim.
+    
+    \item \textbf{Blockchain Throughput}: Transactions per second (TPS) sustained on the Hyperledger Fabric network, measured using Hyperledger Caliper with 10 concurrent workers.
+    
+    \item \textbf{Blockchain Latency}: Average, minimum, and maximum transaction confirmation time on the Fabric network.
+    
+    \item \textbf{Test Coverage}: Percentage of code exercised by the test suite for each package.
+\end{itemize}
+
+\section{Experimental Results}
+\label{sec:results}
+
+\subsection{Cryptographic Micro-Benchmarks}
+\label{subsec:micro}
+
+Table~\ref{tab:micro} presents the micro-benchmark results for individual cryptographic operations. Each measurement is the mean of three independent runs.
+
+\begin{table}[H]
+\centering
+\caption{Cryptographic Micro-Benchmark Results}
+\label{tab:micro}
+\small
+\begin{tabular}{|l|r|r|r|}
+\hline
+\textbf{Operation} & \textbf{Mean Time} & \textbf{Memory (B/op)} & \textbf{Allocs/op} \\
+\hline
+Paillier Encrypt (2048-bit) & 8.69 ms & 26,210 & 31 \\
+\hline
+Pedersen Commit (512-bit) & 0.08 ms & 3,962 & 31 \\
+\hline
+ZKP Binary Prove & 0.245 ms & 12,542 & 102 \\
+\hline
+ZKP Binary Verify & 0.329 ms & 16,392 & 123 \\
+\hline
+ZKP Sum-One Prove & 0.084 ms & 5,770 & 53 \\
+\hline
+ZKP Sum-One Verify & 0.161 ms & 10,037 & 82 \\
+\hline
+Kyber768 KeyGen & 0.026 ms & 8,304 & 6 \\
+\hline
+Kyber768 Encapsulate & 0.029 ms & 1,232 & 3 \\
+\hline
+Hybrid Encrypt (Kyber+Paillier) & 14.04 ms & 33,306 & 50 \\
+\hline
+Hybrid Decrypt (Kyber+Paillier) & 11.60 ms & 27,090 & 38 \\
+\hline
+Threshold Partial Decrypt & 35.52 ms & 52,500 & 67 \\
+\hline
+Threshold Combine (3-of-5) & 0.261 ms & 46,600 & 104 \\
+\hline
+\end{tabular}
+\end{table}
+
+The results show that Pedersen commitments and ZK proofs are computationally inexpensive (sub-millisecond), while Paillier encryption (8.69 ms) and ring signatures dominate the per-vote cost. Kyber768 operations add negligible overhead ($\sim$26 $\mu$s) compared to Paillier, confirming that post-quantum protection comes at minimal computational cost.
+
+\subsection{End-to-End Pipeline Benchmark}
+\label{subsec:pipeline-bench}
+
+Table~\ref{tab:pipeline} presents the per-phase breakdown of the complete vote casting pipeline. The full pipeline processes a single vote in approximately \textbf{70.5 ms}.
+
+\begin{table}[H]
+\centering
+\caption{Vote Casting Pipeline: Per-Phase Breakdown}
+\label{tab:pipeline}
+\begin{tabular}{|c|l|r|r|}
+\hline
+\textbf{Phase} & \textbf{Operation} & \textbf{Time (ms)} & \textbf{\% of Total} \\
+\hline
+1 & Paillier Encrypt (2048-bit) & 8.69 & 12.0\% \\
+\hline
+2 & Pedersen Commit (512-bit) & 0.08 & 0.1\% \\
+\hline
+3 & ZKP Binary Prove & 0.24 & 0.3\% \\
+\hline
+4 & SMDC Generate ($k=5$) & 1.73 & 2.4\% \\
+\hline
+5 & Ring Sign ($n=100$) & 27.06 & 37.3\% \\
+\hline
+6 & SA\textsuperscript{2} Split & 35.34 & 48.8\% \\
+\hline
+\multicolumn{2}{|l|}{\textbf{Total Pipeline}} & \textbf{70.5} & \textbf{100\%} \\
+\hline
+\end{tabular}
+\end{table}
+
+The SA\textsuperscript{2} vote splitting operation (48.8\%) and ring signature generation (37.3\%) are the primary bottlenecks, together accounting for 86.1\% of the pipeline time. The SA\textsuperscript{2} cost is dominated by Paillier re-encryption for mask generation, while ring signatures scale linearly with ring size at $\sim$0.24 ms per member. Both operations scale linearly, preserving the $O(n)$ overall complexity.
+
+\subsection{Scalability Validation}
+\label{subsec:scalability}
+
+\subsubsection{Homomorphic Tally Scalability}
+\label{subsubsec:tally-scale}
+
+To validate the $O(n)$ tally complexity, we measure the homomorphic addition time as the number of voters scales from 100 to 100,000. Table~\ref{tab:tally-scale} presents the results.
+
+\begin{table}[H]
+\centering
+\caption{Homomorphic Tally Scalability Results}
+\label{tab:tally-scale}
+\begin{tabular}{|r|r|r|}
+\hline
+\textbf{Voters} & \textbf{Tally Time (ms)} & \textbf{Per-Vote ($\mu$s)} \\
+\hline
+100 & 0.6 & 6.23 \\
+\hline
+500 & 3.0 & 6.01 \\
+\hline
+1,000 & 6.3 & 6.28 \\
+\hline
+5,000 & 29.0 & 6.00 \\
+\hline
+10,000 & 59.0 & 6.00 \\
+\hline
+50,000 & 308.0 & 6.18 \\
+\hline
+100,000 & 628.0 & 6.29 \\
+\hline
+\end{tabular}
+\end{table}
+
+The per-vote tally cost remains constant at approximately \textbf{6.1 $\mu$s} across all tested scales, confirming the $O(n)$ complexity. The tally time grows linearly from 0.6 ms (100 voters) to 628 ms (100,000 voters). Figure~\ref{fig:tally-scale} visualizes this linear relationship.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{Images/tally_scalability.png}
+\caption{Homomorphic Tally Scalability --- $O(n)$ Verification}
+\label{fig:tally-scale}
+\end{figure}
+
+Linear extrapolation projects the tally time for national-scale elections: approximately 6.1 seconds for 1 million voters and 5.1 minutes for 50 million voters.
+
+\subsubsection{Candidate-Independent Scaling}
+\label{subsubsec:candidate-scale}
+
+To demonstrate the proposed framework's advantage over ISE-Voting's $O(n \times m^2)$ complexity, we fix $n = 1{,}000$ voters and vary the number of candidates $m$. Table~\ref{tab:candidate-scale} shows the results.
+
+\begin{table}[H]
+\centering
+\caption{Candidate-Independent Tally Scaling ($n = 1{,}000$)}
+\label{tab:candidate-scale}
+\begin{tabular}{|r|r|r|}
+\hline
+\textbf{Candidates ($m$)} & \textbf{Total Tally (ms)} & \textbf{Per-Candidate (ms)} \\
+\hline
+2 & 12.0 & 6.00 \\
+\hline
+5 & 28.0 & 5.60 \\
+\hline
+10 & 58.0 & 5.80 \\
+\hline
+20 & 113.0 & 5.65 \\
+\hline
+50 & 288.0 & 5.76 \\
+\hline
+\end{tabular}
+\end{table}
+
+The per-candidate tally time remains constant at $\sim$5.76 ms regardless of the number of candidates, confirming that the proposed framework achieves $O(n)$ per candidate. In contrast, ISE-Voting's per-candidate time would grow proportionally with $m$, as its complexity is $O(n \times m)$ per candidate.
+
+\subsubsection{Ring Signature Scalability}
+\label{subsubsec:ring-scale}
+
+Table~\ref{tab:ring-scale} shows that ring signature operations scale linearly with ring size.
+
+\begin{table}[H]
+\centering
+\caption{Ring Signature Scalability}
+\label{tab:ring-scale}
+\begin{tabular}{|r|r|r|}
+\hline
+\textbf{Ring Size} & \textbf{Sign Time (ms)} & \textbf{Verify Time (ms)} \\
+\hline
+10 & 2.2 & 2.2 \\
+\hline
+25 & 6.0 & 5.8 \\
+\hline
+50 & 12.0 & 12.0 \\
+\hline
+100 & 24.0 & 24.2 \\
+\hline
+200 & 47.5 & 48.5 \\
+\hline
+500 & 120.5 & 120.5 \\
+\hline
+\end{tabular}
+\end{table}
+
+Both signing and verification scale linearly at approximately 0.24 ms per ring member. The default ring size of 100 provides strong anonymity with a per-vote cost of $\sim$24 ms.
+
+\subsection{Blockchain Performance}
+\label{subsec:blockchain-perf}
+
+The blockchain performance is evaluated using Hyperledger Caliper v0.6.0 with 10 concurrent workers submitting \texttt{CastVote} transactions to the Fabric network. Table~\ref{tab:caliper} presents the results across four test rounds.
+
+\begin{table}[H]
+\centering
+\caption{Hyperledger Caliper Blockchain Benchmark Results}
+\label{tab:caliper}
+\small
+\begin{tabular}{|l|r|r|r|r|r|r|}
+\hline
+\textbf{Round} & \textbf{TX} & \textbf{Success} & \textbf{Fail} & \textbf{TPS} & \textbf{Avg Lat. (s)} & \textbf{Max Lat. (s)} \\
+\hline
+10K & 10,000 & 10,000 & 0 & 199.9 & 0.11 & 0.56 \\
+\hline
+25K & 25,000 & 14,803 & 10,197 & 279.3 & 2.96 & 5.76 \\
+\hline
+50K & 50,000 & 36,417 & 13,583 & 227.8 & 3.70 & 9.87 \\
+\hline
+100K & 100,000 & 83,803 & 16,197 & 216.4 & 3.98 & 14.60 \\
+\hline
+\end{tabular}
+\end{table}
+
+The 10K round achieves \textbf{100\% success rate} with zero failures, sustaining \textbf{199.9 TPS} with an average latency of 0.11 seconds. Figure~\ref{fig:blockchain-perf} visualizes the throughput and latency relationship across all test rounds.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.75\textwidth]{Images/blockchain_perf.png}
+\caption{Blockchain Performance --- Hyperledger Caliper Benchmarks}
+\label{fig:blockchain-perf}
+\end{figure}
+
+This demonstrates that the system is stable under sustained load of approximately 200 TPS. Failures at 25K+ transactions are caused by the Fabric Gateway's default concurrency limit (500 connections), not chaincode logic errors. This limit is configurable in production deployments through connection pool tuning.
+
+The consistent throughput of 200--280 TPS across all load levels demonstrates good horizontal scaling characteristics. The latency degradation from 0.11s to 3.98s at higher loads follows expected queuing theory patterns. For a constituency-level election with 100,000 voters over an 8-hour window, the required sustained throughput is only $\sim$3.5 TPS, well within the demonstrated capacity.
+
+\section{Discussion}
+\label{sec:discussion}
+
+This section provides an in-depth analysis of the experimental results, examining the significance of each finding and its implications for practical deployment.
+
+\subsection{Pipeline Bottleneck Analysis}
+\label{subsec:bottleneck}
+
+The end-to-end pipeline benchmark reveals that SA\textsuperscript{2} vote splitting (48.8\%) and ring signature generation (37.3\%) together consume 86.1\% of the total pipeline time. This concentration is attributable to the underlying cryptographic operations:
+
+\begin{itemize}
+    \item \textbf{SA\textsuperscript{2} Dominance}: The SA\textsuperscript{2} share splitting requires Paillier re-encryption to generate the random mask $E(\text{mask})$, which involves a modular exponentiation on the 2048-bit modulus --- the same expensive operation as the initial vote encryption. This effectively doubles the Paillier computation cost per vote. The dominance of SA\textsuperscript{2} reflects a fundamental trade-off: the two-server privacy model provides strong aggregation privacy guarantees but requires additional homomorphic operations that scale linearly with the number of voters.
+    
+    \item \textbf{Ring Signature Cost}: Ring signatures scale at $\sim$0.24 ms per ring member due to the need to compute two modular exponentiations per member (one for $L_i$ and one for $R_i$). The default ring size of 100 provides strong anonymity ($\leq 1\%$ identification probability per Theorem 3) but represents a configurable parameter: deployments requiring lower latency could reduce the ring size to 50 ($\sim$12 ms) at the cost of reduced anonymity ($\leq 2\%$ identification probability).
+    
+    \item \textbf{Negligible PQ Overhead}: The Kyber768 operations contribute only $\sim$55 $\mu$s ($<$0.1\% of pipeline) to the total cost, confirming that post-quantum protection is essentially ``free'' in the context of the overall pipeline. This finding has significant practical implications, as it demonstrates that quantum resistance can be added to existing voting systems without meaningful performance degradation.
+\end{itemize}
+
+\subsection{Scalability Significance}
+\label{subsec:scale-significance}
+
+The constant per-vote tally cost of $\sim$6.1 $\mu$s across four orders of magnitude (100 to 100,000 voters) empirically validates the $O(n)$ theoretical complexity. This result has three important implications:
+
+\begin{enumerate}
+    \item \textbf{National-Scale Feasibility}: Linear extrapolation projects a tally time of approximately 6.1 seconds for 1 million voters and 5.1 minutes for 50 million voters. In contrast, ISE-Voting's $O(n \times m^2)$ complexity would require approximately $10^8$ operations for the same scale with 10 candidates, rendering it impractical for large constituencies.
+    
+    \item \textbf{Candidate Independence}: The per-candidate tally time of $\sim$5.76 ms remains constant regardless of whether there are 2 or 50 candidates. This is a direct consequence of Paillier's additive homomorphism: each candidate's tally is computed independently through ciphertext multiplication, without any cross-candidate computation.
+    
+    \item \textbf{Predictable Resource Requirements}: The linear scaling enables accurate resource planning for election administrators. For any target voter count $N$, the required tally time is approximately $6.1N$ $\mu$s per candidate, allowing precise capacity provisioning.
+\end{enumerate}
+
+\subsection{Blockchain Performance Analysis}
+\label{subsec:blockchain-discussion}
+
+The Hyperledger Caliper results reveal an important performance profile with practical deployment implications:
+
+\begin{itemize}
+    \item \textbf{Optimal Operating Point}: The 10K round achieves 100\% success rate at 199.9 TPS, establishing this as the optimal sustained throughput for the current configuration. This throughput is consistent with optimized Hyperledger Fabric deployments using Go chaincode and LevelDB/CouchDB state databases~\cite{caliper}. For a constituency of 100,000 voters over an 8-hour voting window, the required sustained throughput is only $\sim$3.5 TPS --- less than 2\% of the demonstrated capacity.
+    
+    \item \textbf{Failure Analysis}: The failures observed at 25K+ transactions (10,197 to 16,197 failures) are not caused by chaincode logic errors but by the Fabric Gateway's default concurrency limit of 500 simultaneous connections. This is a configurable infrastructure parameter, not a fundamental limitation. In production deployments, connection pool tuning, load balancing, and horizontal scaling of peer nodes would eliminate these failures.
+    
+    \item \textbf{Latency-Throughput Trade-off}: The latency increase from 0.11s (10K) to 3.98s (100K) follows the expected queuing theory pattern: as the system approaches saturation, the average waiting time increases non-linearly. For voting applications, where the 8-hour voting window provides ample time, the average latency of 0.11s at nominal load is well within acceptable bounds.
+\end{itemize}
+
+\subsection{Practical Deployment Considerations}
+\label{subsec:deployment}
+
+The combined benchmark results suggest that the proposed framework is deployable for constituency-level elections (up to 100,000 voters) on modest hardware (AMD Ryzen 5, 30 GiB RAM) without optimization. Key observations for practical deployment include:
+
+\begin{itemize}
+    \item A single vote takes 70.5 ms to process through the complete seven-protocol pipeline, meaning a single server can theoretically process $\sim$14 votes per second. For peak-hour voting with 10\% of voters casting within a single hour, this translates to a capacity of approximately 50,000 votes/hour --- sufficient for medium-scale elections.
+    
+    \item The tally computation for 100,000 voters completes in $\sim$628 ms, enabling near-real-time result announcement after polls close.
+    
+    \item The hybrid Kyber768 encryption adds only 5.35 ms to the pipeline (the difference between hybrid encrypt at 14.04 ms and standard Paillier encrypt at 8.69 ms), providing post-quantum protection at minimal cost.
+\end{itemize}
+
+
+
+\section{Test Coverage Analysis}
+\label{sec:test-coverage}
+
+Table~\ref{tab:coverage} presents the test coverage for each package. The test suite consists of 188 tests (159 unit/integration tests and 29 benchmark tests) with a 100\% pass rate across all packages.
+
+\begin{table}[H]
+\centering
+\caption{Test Coverage by Package}
+\label{tab:coverage}
+\begin{tabular}{|l|r|}
+\hline
+\textbf{Package} & \textbf{Coverage (\%)} \\
+\hline
+internal/tally & 91.6 \\
+\hline
+internal/smdc & 83.3 \\
+\hline
+internal/biometric & 82.1 \\
+\hline
+internal/pq & 82.1 \\
+\hline
+internal/sa2 & 81.2 \\
+\hline
+internal/crypto & 78.2 \\
+\hline
+internal/voting & 77.9 \\
+\hline
+api/handlers & 46.7 \\
+\hline
+internal/blockchain & 34.2 \\
+\hline
+\end{tabular}
+\end{table}
+
+Core cryptographic packages achieve 78--92\% coverage. The blockchain package has lower coverage (34.2\%) because integration tests require a live Fabric network. The API handlers package (46.7\%) requires HTTP test infrastructure for full coverage.
+
+\section{Formal Verification with ProVerif}
+\label{sec:proverif}
+
+To complement the empirical testing, three core security properties of the proposed framework are formally verified using ProVerif 2.05~\cite{blanchet2016}, an automated cryptographic protocol verifier based on the applied pi-calculus. Table~\ref{tab:proverif} summarizes the verification results.
+
+\begin{table}[H]
+\centering
+\caption{ProVerif Formal Verification Results}
+\label{tab:proverif}
+\begin{tabular}{|l|l|l|}
+\hline
+\textbf{Security Property} & \textbf{Verification Method} & \textbf{Result} \\
+\hline
+Vote Privacy & Observational equivalence & \textbf{TRUE} \\
+\hline
+Individual Verifiability & Injective correspondence & \textbf{TRUE} \\
+\hline
+Voter Eligibility & Causal reasoning & \textbf{TRUE} \\
+\hline
+\end{tabular}
+\end{table}
+
+\textbf{Vote Privacy} is verified via observational equivalence: an adversary controlling the network cannot distinguish between two honest voters swapping their ballots. \textbf{Individual Verifiability} is verified via injective correspondence: every recorded ballot on the blockchain corresponds to an authentic cast event by a registered voter (\texttt{BallotRecorded} $\Longrightarrow$ \texttt{VoterCastBallot}). \textbf{Voter Eligibility} is verified via causal reasoning: every valid ballot cast was preceded by a legitimate registration (\texttt{ValidBallotCast} $\Longrightarrow$ \texttt{VoterRegistered}). All three properties return \textbf{TRUE} under the symbolic (Dolev-Yao~\cite{dolev1983}) adversary model, confirming that the protocol design is sound against network-level attacks including eavesdropping, replay, and man-in-the-middle.
+
+\section{Comparative Analysis}
+
+\label{sec:comparative}
+
+Table~\ref{tab:comparative} compares the proposed framework's empirical performance against the reported metrics of existing systems.
+
+\begin{table}[H]
+\centering
+\caption{Performance Comparison with Existing Systems}
+\label{tab:comparative}
+\small
+\begin{tabular}{|p{2.2cm}|p{1.7cm}|p{1.5cm}|p{1.4cm}|p{1.4cm}|p{1.4cm}|p{1.4cm}|}
+\hline
+\textbf{Metric} & \textbf{Ours} & \textbf{ISE} \cite{ise_voting} & \textbf{BP-Vot} \cite{bp_vot} & \textbf{Faruk} \cite{faruk2024} & \textbf{Yuan} \cite{paillier_timed} & \textbf{Yin} \cite{yin_tdsc} \\
+\hline
+Tally Complexity & $O(n)$ & $O(nm^2)$ & $O(n)$ & $O(n)$ & $O(n)$ & $O(n)$ \\
+\hline
+Per-Vote Tally & 6.1 $\mu$s & N/R & N/R & N/R & N/R & N/R \\
+\hline
+Pipeline Time & 70.5 ms & N/R & $\sim$1000 ms & N/R & N/R & N/R \\
+\hline
+Blockchain TPS & $\sim$200 & N/R & $\sim$0.8 & N/R & N/R & N/R \\
+\hline
+Tally Accuracy & 100\% & 100\% & $\geq$98\% & 100\% & 100\% & 100\% \\
+\hline
+Protocols & \textbf{7} & 2 & 2 & 1 & 2 & 2 \\
+\hline
+PQ Security & \cmark & Partial & \xmark & \xmark & \xmark & \xmark \\
+\hline
+Coercion Resist. & \cmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
+\hline
+Formal Proofs & \cmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
+\hline
+Threshold Dec. & \cmark & \xmark & \xmark & \xmark & \xmark & \xmark \\
+\hline
+\end{tabular}
+\\[4pt]
+\footnotesize{N/R = Not Reported in the original paper.}
+\end{table}
+
+the proposed framework shows clear advantages in multiple dimensions. The per-vote pipeline time of 70.5 ms is substantially faster than BP-Vot's $\sim$1 second per transaction. The blockchain throughput of $\sim$200 TPS far exceeds BP-Vot's reported $\sim$0.8 TPS on Hyperledger Besu. The proposed framework provides 100\% exact tallying compared to BP-Vot's $\geq$98\% differential privacy approximation. The tally complexity of $O(n)$ per candidate is a clear improvement over ISE-Voting's $O(n \times m^2)$ total complexity. While Yin et al.~\cite{yin_tdsc} provide coercion resistance with formal game-based proofs and $O(n)$ complexity, their system lacks homomorphic tallying, post-quantum security, threshold decryption, and production blockchain deployment --- all of which The proposed framework integrates. Yuan et al.'s timed-release scheme implements Paillier encryption but lacks anonymity, coercion resistance, and post-quantum protection. the proposed framework is the only system that integrates seven cryptographic protocols while achieving these performance metrics and providing full empirical benchmarks on a production Hyperledger Fabric network.
+
+\section{Conclusion}
+\label{sec:res-conclusion}
+
+This chapter presented a full-scale implementation, performance evaluation, and discussion of the proposed system. The experimental results confirm that the system achieves $O(n)$ tally complexity with a constant per-vote cost of $\sim$6.1 $\mu$s, processes the complete seven-protocol pipeline in 70.5 ms per vote, and sustains $\sim$200 TPS on a production Hyperledger Fabric network with 100\% success rate at 10,000 transactions. Post-quantum protection via Kyber768 adds negligible overhead ($\sim$26 $\mu$s). Our analysis shows that SA\textsuperscript{2} share splitting and ring signatures are the primary computational bottlenecks (86\% of pipeline time), both scaling linearly, and that the system is deployable for constituency-level elections on modest hardware without optimization. The test suite of 188 tests (159 unit/integration + 29 benchmarks) achieves 78--92\% coverage on core cryptographic packages with a 100\% pass rate. Comparative analysis against five state-of-the-art systems shows that the proposed framework delivers strong performance while offering broader security coverage than any existing system.

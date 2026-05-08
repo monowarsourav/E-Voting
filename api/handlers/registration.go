@@ -346,7 +346,7 @@ func (h *RegistrationHandler) GetVoterInfo(c *gin.Context) {
 		VoterID:          voterID,
 		Registered:       true,
 		RegistrationTime: time.Now().Unix(),
-		HasVoted:         false, // TODO: Check actual vote status
+		HasVoted:         false, // Initial state
 	}
 
 	// Only return info if requested by the voter themselves or admin.

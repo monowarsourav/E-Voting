@@ -1,9 +1,18 @@
 package blockchain
 
 import (
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"math/big"
+	"os"
+	"path/filepath"
+	"time"
+
+	"github.com/hyperledger/fabric-gateway/pkg/client"
+	"github.com/hyperledger/fabric-gateway/pkg/identity"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials"
 
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/voting"
@@ -16,9 +25,29 @@ type FabricClient struct {
 	Enabled       bool
 	MockMode      bool // If true, use mock implementation
 	chaincode     ChaincodeInterface
-	// In production with actual Fabric SDK, add:
-	// gateway       *gateway.Gateway
-	// contract      *gateway.Contract
+
+	// Real Fabric Gateway SDK fields
+	gateway  *client.Gateway
+	contract *client.Contract
+	grpcConn *grpc.ClientConn
+}
+
+// FabricConfig holds configuration for connecting to a real Fabric network.
+type FabricConfig struct {
+	// PeerEndpoint is the gRPC address of the peer (e.g. "localhost:7051").
+	PeerEndpoint string
+	// GatewayPeer is the TLS hostname override for the peer.
+	GatewayPeer string
+	// MSPID is the MSP ID of the connecting org (e.g. "Org1MSP").
+	MSPID string
+	// CryptoPath is the root path to the org's crypto-config material.
+	CryptoPath string
+	// TLSCertPath is the path to the peer's TLS CA certificate.
+	TLSCertPath string
+	// CertPath is the path to the user's signing certificate.
+	CertPath string
+	// KeyPath is the path to the directory containing the user's private key.
+	KeyPath string
 }
 
 // NewFabricClient creates a new Fabric client
@@ -36,85 +65,129 @@ func NewFabricClient(channelName, chaincodeName string, enabled bool) *FabricCli
 	return fc
 }
 
-// Connect connects to the Fabric network
-func (fc *FabricClient) Connect(connectionProfile, walletPath, identity string) error {
+// ConnectGateway connects to a real Hyperledger Fabric network using the
+// Fabric Gateway SDK (recommended for Fabric 2.4+).
+func (fc *FabricClient) ConnectGateway(cfg FabricConfig) error {
 	if !fc.Enabled {
 		fmt.Println("Blockchain integration is disabled")
 		return nil
 	}
 
-	fmt.Println("Connecting to Hyperledger Fabric network...")
-	fmt.Printf("Channel: %s, Chaincode: %s\n", fc.ChannelName, fc.ChaincodeName)
-
-	if fc.MockMode {
-		fmt.Println("Running in MOCK mode - no actual Fabric connection")
-		fc.chaincode = NewMockChaincode()
-		return nil
+	// 1. Load peer TLS certificate
+	pemBytes, err := os.ReadFile(cfg.TLSCertPath)
+	if err != nil {
+		return fmt.Errorf("read TLS cert: %w", err)
+	}
+	certPool := x509.NewCertPool()
+	if !certPool.AppendCertsFromPEM(pemBytes) {
+		return fmt.Errorf("failed to add TLS cert to pool")
 	}
 
-	// PRODUCTION FABRIC SDK INTEGRATION (Uncomment when ready)
-	/*
-		// 1. Load connection profile
-		ccpPath := filepath.Clean(connectionProfile)
+	// 2. Create gRPC connection to the peer
+	transportCreds := credentials.NewClientTLSFromCert(certPool, cfg.GatewayPeer)
+	conn, err := grpc.NewClient(cfg.PeerEndpoint, grpc.WithTransportCredentials(transportCreds))
+	if err != nil {
+		return fmt.Errorf("grpc connect: %w", err)
+	}
+	fc.grpcConn = conn
 
-		// 2. Create a new file system based wallet for managing identities
-		wallet, err := gateway.NewFileSystemWallet(walletPath)
-		if err != nil {
-			return fmt.Errorf("failed to create wallet: %w", err)
-		}
+	// 3. Load user identity (X.509 certificate)
+	certPEM, err := os.ReadFile(cfg.CertPath)
+	if err != nil {
+		return fmt.Errorf("read user cert: %w", err)
+	}
+	cert, err := identity.CertificateFromPEM(certPEM)
+	if err != nil {
+		return fmt.Errorf("parse user cert: %w", err)
+	}
+	id, err := identity.NewX509Identity(cfg.MSPID, cert)
+	if err != nil {
+		return fmt.Errorf("create identity: %w", err)
+	}
 
-		// 3. Check if identity exists in wallet
-		if !wallet.Exists(identity) {
-			return fmt.Errorf("identity %s not found in wallet", identity)
-		}
+	// 4. Load user private key for signing
+	keyPEM, err := readFirstFile(cfg.KeyPath)
+	if err != nil {
+		return fmt.Errorf("read user key: %w", err)
+	}
+	privateKey, err := identity.PrivateKeyFromPEM(keyPEM)
+	if err != nil {
+		return fmt.Errorf("parse private key: %w", err)
+	}
+	sign, err := identity.NewPrivateKeySign(privateKey)
+	if err != nil {
+		return fmt.Errorf("create signer: %w", err)
+	}
 
-		// 4. Connect to gateway
-		gw, err := gateway.Connect(
-			gateway.WithConfig(config.FromFile(filepath.Clean(ccpPath))),
-			gateway.WithIdentity(wallet, identity),
-		)
-		if err != nil {
-			return fmt.Errorf("failed to connect to gateway: %w", err)
-		}
-		fc.gateway = gw
+	// 5. Connect to the Fabric Gateway
+	gw, err := client.Connect(
+		id,
+		client.WithSign(sign),
+		client.WithClientConnection(conn),
+		client.WithEvaluateTimeout(5*time.Second),
+		client.WithEndorseTimeout(15*time.Second),
+		client.WithSubmitTimeout(5*time.Second),
+		client.WithCommitStatusTimeout(1*time.Minute),
+	)
+	if err != nil {
+		return fmt.Errorf("gateway connect: %w", err)
+	}
+	fc.gateway = gw
 
-		// 5. Get the network (channel) and contract (chaincode)
-		network, err := gw.GetNetwork(fc.ChannelName)
-		if err != nil {
-			return fmt.Errorf("failed to get network: %w", err)
-		}
+	// 6. Get network (channel) and contract (chaincode)
+	network := gw.GetNetwork(fc.ChannelName)
+	fc.contract = network.GetContract(fc.ChaincodeName)
+	fc.MockMode = false
 
-		fc.contract = network.GetContract(fc.ChaincodeName)
-		fmt.Println("Successfully connected to Hyperledger Fabric network")
-	*/
+	fmt.Printf("✅ Connected to Hyperledger Fabric: channel=%s, chaincode=%s, peer=%s\n",
+		fc.ChannelName, fc.ChaincodeName, cfg.PeerEndpoint)
 
+	return nil
+}
+
+// Connect connects to the Fabric network (legacy interface — uses mock mode).
+func (fc *FabricClient) Connect(connectionProfile, walletPath, identityName string) error {
+	if !fc.Enabled {
+		fmt.Println("Blockchain integration is disabled")
+		return nil
+	}
+	fmt.Println("Running in MOCK mode — use ConnectGateway for real Fabric")
+	fc.chaincode = NewMockChaincode()
 	return nil
 }
 
 // CreateElection creates a new election on the blockchain
 func (fc *FabricClient) CreateElection(election *voting.Election) (string, error) {
-	// Convert candidates to JSON
 	candidatesJSON, err := json.Marshal(election.Candidates)
 	if err != nil {
-		return "", fmt.Errorf("failed to marshal candidates: %v", err)
+		return "", fmt.Errorf("marshal candidates: %v", err)
 	}
 
-	// In production, submit transaction:
-	// txID, err := fc.contract.SubmitTransaction(
-	// 	"CreateElection",
-	// 	election.ElectionID,
-	// 	election.Title,
-	// 	election.Description,
-	// 	string(candidatesJSON),
-	// 	fmt.Sprintf("%d", election.StartTime),
-	// 	fmt.Sprintf("%d", election.EndTime),
-	// )
+	if !fc.MockMode && fc.contract != nil {
+		// REAL Fabric transaction
+		result, err := fc.contract.SubmitTransaction(
+			"CreateElection",
+			election.ElectionID,
+			election.Title,
+			election.Description,
+			string(candidatesJSON),
+			fmt.Sprintf("%d", election.StartTime),
+			fmt.Sprintf("%d", election.EndTime),
+		)
+		if err != nil {
+			return "", fmt.Errorf("submit CreateElection: %w", err)
+		}
+		txID := string(result)
+		if txID == "" {
+			txID = "tx-" + election.ElectionID
+		}
+		return txID, nil
+	}
 
-	fmt.Printf("Creating election on blockchain: %s\n", election.ElectionID)
-	txID := "mock-tx-" + election.ElectionID
-
-	_ = candidatesJSON // Use the variable
-	return txID, nil
+	// Mock fallback
+	fmt.Printf("Creating election on blockchain (mock): %s\n", election.ElectionID)
+	_ = candidatesJSON
+	return "mock-tx-" + election.ElectionID, nil
 }
 
 // SubmitVote submits a vote to the blockchain
@@ -127,50 +200,60 @@ func (fc *FabricClient) SubmitVote(
 	smdcCommitment *big.Int,
 	merkleProof [][]byte,
 ) (string, error) {
-	// Convert data to strings for chaincode
 	encryptedVoteStr := encryptedVote.String()
 	ringSignatureJSON, _ := json.Marshal(ringSignature)
 	keyImageStr := keyImage.String()
 	smdcCommitmentStr := smdcCommitment.String()
 	merkleProofJSON, _ := json.Marshal(merkleProof)
 
-	// In production, submit transaction:
-	// txID, err := fc.contract.SubmitTransaction(
-	// 	"CastVote",
-	// 	voteID,
-	// 	electionID,
-	// 	encryptedVoteStr,
-	// 	string(ringSignatureJSON),
-	// 	keyImageStr,
-	// 	smdcCommitmentStr,
-	// 	string(merkleProofJSON),
-	// )
+	if !fc.MockMode && fc.contract != nil {
+		// REAL Fabric transaction
+		result, err := fc.contract.SubmitTransaction(
+			"CastVote",
+			voteID,
+			electionID,
+			encryptedVoteStr,
+			string(ringSignatureJSON),
+			keyImageStr,
+			smdcCommitmentStr,
+			string(merkleProofJSON),
+		)
+		if err != nil {
+			return "", fmt.Errorf("submit CastVote: %w", err)
+		}
+		txID := string(result)
+		if txID == "" {
+			txID = "tx-vote-" + voteID
+		}
+		return txID, nil
+	}
 
-	fmt.Printf("Submitting vote to blockchain: %s\n", voteID)
-	txID := "mock-tx-" + voteID
-
+	// Mock fallback
+	fmt.Printf("Submitting vote to blockchain (mock): %s\n", voteID)
 	_ = encryptedVoteStr
 	_ = ringSignatureJSON
 	_ = keyImageStr
 	_ = smdcCommitmentStr
 	_ = merkleProofJSON
-
-	return txID, nil
+	return "mock-tx-" + voteID, nil
 }
 
 // GetVote retrieves a vote from the blockchain
 func (fc *FabricClient) GetVote(voteID string) (*BlockchainVote, error) {
-	// In production, evaluate transaction:
-	// result, err := fc.contract.EvaluateTransaction("GetVote", voteID)
-	// if err != nil {
-	// 	return nil, err
-	// }
-	// var vote BlockchainVote
-	// json.Unmarshal(result, &vote)
+	if !fc.MockMode && fc.contract != nil {
+		// REAL Fabric query
+		result, err := fc.contract.EvaluateTransaction("GetVote", voteID)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate GetVote: %w", err)
+		}
+		var vote BlockchainVote
+		if err := json.Unmarshal(result, &vote); err != nil {
+			return nil, fmt.Errorf("unmarshal vote: %w", err)
+		}
+		return &vote, nil
+	}
 
-	fmt.Printf("Retrieving vote from blockchain: %s\n", voteID)
-
-	// Mock response
+	// Mock fallback
 	return &BlockchainVote{
 		VoteID:     voteID,
 		ElectionID: "election001",
@@ -180,12 +263,18 @@ func (fc *FabricClient) GetVote(voteID string) (*BlockchainVote, error) {
 
 // GetVotesByElection retrieves all votes for an election
 func (fc *FabricClient) GetVotesByElection(electionID string) ([]*BlockchainVote, error) {
-	// In production, evaluate transaction:
-	// result, err := fc.contract.EvaluateTransaction("GetVotesByElection", electionID)
+	if !fc.MockMode && fc.contract != nil {
+		result, err := fc.contract.EvaluateTransaction("GetVotesByElection", electionID)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate GetVotesByElection: %w", err)
+		}
+		var votes []*BlockchainVote
+		if err := json.Unmarshal(result, &votes); err != nil {
+			return nil, fmt.Errorf("unmarshal votes: %w", err)
+		}
+		return votes, nil
+	}
 
-	fmt.Printf("Retrieving votes for election: %s\n", electionID)
-
-	// Mock response
 	return []*BlockchainVote{}, nil
 }
 
@@ -195,35 +284,49 @@ func (fc *FabricClient) StoreTallyResult(
 	candidateTallies map[int]int64,
 	totalVotes int64,
 ) (string, error) {
-	// Convert tallies to JSON
 	talliesJSON, err := json.Marshal(candidateTallies)
 	if err != nil {
 		return "", err
 	}
 
-	// In production, submit transaction:
-	// txID, err := fc.contract.SubmitTransaction(
-	// 	"StoreTallyResult",
-	// 	electionID,
-	// 	string(talliesJSON),
-	// 	fmt.Sprintf("%d", totalVotes),
-	// )
+	if !fc.MockMode && fc.contract != nil {
+		// REAL Fabric transaction
+		result, err := fc.contract.SubmitTransaction(
+			"StoreTallyResult",
+			electionID,
+			string(talliesJSON),
+			fmt.Sprintf("%d", totalVotes),
+		)
+		if err != nil {
+			return "", fmt.Errorf("submit StoreTallyResult: %w", err)
+		}
+		txID := string(result)
+		if txID == "" {
+			txID = "tx-tally-" + electionID
+		}
+		return txID, nil
+	}
 
-	fmt.Printf("Storing tally result on blockchain: %s\n", electionID)
-	txID := "mock-tx-tally-" + electionID
-
+	// Mock fallback
+	fmt.Printf("Storing tally result on blockchain (mock): %s\n", electionID)
 	_ = talliesJSON
-	return txID, nil
+	return "mock-tx-tally-" + electionID, nil
 }
 
 // GetTallyResult retrieves tally results from the blockchain
 func (fc *FabricClient) GetTallyResult(electionID string) (*BlockchainTallyResult, error) {
-	// In production, evaluate transaction:
-	// result, err := fc.contract.EvaluateTransaction("GetTallyResult", electionID)
+	if !fc.MockMode && fc.contract != nil {
+		result, err := fc.contract.EvaluateTransaction("GetTallyResult", electionID)
+		if err != nil {
+			return nil, fmt.Errorf("evaluate GetTallyResult: %w", err)
+		}
+		var tally BlockchainTallyResult
+		if err := json.Unmarshal(result, &tally); err != nil {
+			return nil, fmt.Errorf("unmarshal tally: %w", err)
+		}
+		return &tally, nil
+	}
 
-	fmt.Printf("Retrieving tally result from blockchain: %s\n", electionID)
-
-	// Mock response
 	return &BlockchainTallyResult{
 		ElectionID:       electionID,
 		CandidateTallies: make(map[string]int),
@@ -234,22 +337,42 @@ func (fc *FabricClient) GetTallyResult(electionID string) (*BlockchainTallyResul
 
 // VerifyVote verifies a vote exists on the blockchain
 func (fc *FabricClient) VerifyVote(voteID string) (bool, error) {
-	// In production, evaluate transaction:
-	// result, err := fc.contract.EvaluateTransaction("VoteExists", voteID)
+	if !fc.MockMode && fc.contract != nil {
+		result, err := fc.contract.EvaluateTransaction("VoteExists", voteID)
+		if err != nil {
+			return false, fmt.Errorf("evaluate VoteExists: %w", err)
+		}
+		return string(result) == "true", nil
+	}
 
-	fmt.Printf("Verifying vote on blockchain: %s\n", voteID)
-
-	// Mock verification
 	return true, nil
 }
 
 // Disconnect closes the connection to the Fabric network
 func (fc *FabricClient) Disconnect() error {
-	// In production, close gateway:
-	// fc.gateway.Close()
-
-	fmt.Println("Disconnecting from Hyperledger Fabric network")
+	if fc.gateway != nil {
+		fc.gateway.Close()
+	}
+	if fc.grpcConn != nil {
+		fc.grpcConn.Close()
+	}
+	fmt.Println("Disconnected from Hyperledger Fabric network")
 	return nil
+}
+
+// readFirstFile reads the first file in the given directory.
+// This is used for the keystore directory which contains a single private key.
+func readFirstFile(dir string) ([]byte, error) {
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		return nil, fmt.Errorf("read directory %s: %w", dir, err)
+	}
+	for _, entry := range entries {
+		if !entry.IsDir() {
+			return os.ReadFile(filepath.Join(dir, entry.Name()))
+		}
+	}
+	return nil, fmt.Errorf("no files found in %s", dir)
 }
 
 // BlockchainVote represents a vote stored on the blockchain

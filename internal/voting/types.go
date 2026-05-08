@@ -42,7 +42,7 @@ type VoteReceipt struct {
 	VoterID        string
 	ReceiptID      string
 	Timestamp      int64
-	BlockchainTxID string   // Hyperledger transaction ID (TODO)
+	BlockchainTxID string   // Hyperledger Fabric transaction ID
 	KeyImage       *big.Int // For double-vote detection
 }
 

@@ -325,6 +325,7 @@ func init() {
 }
 
 func TestXOREncryptDecrypt(t *testing.T) {
+	// Deprecated: XOR is kept for backward compatibility
 	message := []byte("Hello CovertVote! This is a test message.")
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -339,6 +340,68 @@ func TestXOREncryptDecrypt(t *testing.T) {
 	decrypted := XORDecrypt(encrypted, key)
 	if string(decrypted) != string(message) {
 		t.Errorf("Decrypted mismatch: got %s", string(decrypted))
+	}
+}
+
+func TestAESGCMEncryptDecrypt(t *testing.T) {
+	message := []byte("Hello CovertVote! AES-256-GCM authenticated encryption.")
+	key := make([]byte, 32) // AES-256 key
+	_, _ = rand.Read(key)
+
+	// Encrypt
+	ciphertext, err := AESGCMEncrypt(message, key)
+	if err != nil {
+		t.Fatalf("AES-GCM encrypt failed: %v", err)
+	}
+
+	// Ciphertext should differ from plaintext
+	if string(ciphertext) == string(message) {
+		t.Error("Ciphertext should differ from plaintext")
+	}
+
+	// Ciphertext should be longer (nonce + tag overhead)
+	if len(ciphertext) <= len(message) {
+		t.Error("AES-GCM ciphertext should be longer than plaintext (nonce+tag)")
+	}
+
+	// Decrypt
+	decrypted, err := AESGCMDecrypt(ciphertext, key)
+	if err != nil {
+		t.Fatalf("AES-GCM decrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(message) {
+		t.Errorf("AES-GCM roundtrip failed: got %s", string(decrypted))
+	}
+}
+
+func TestAESGCMTamperDetection(t *testing.T) {
+	message := []byte("Tamper detection test")
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	ciphertext, err := AESGCMEncrypt(message, key)
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	// Tamper with ciphertext
+	tampered := make([]byte, len(ciphertext))
+	copy(tampered, ciphertext)
+	tampered[len(tampered)-1] ^= 0xFF // Flip last byte
+
+	// Decryption of tampered ciphertext should fail
+	_, err = AESGCMDecrypt(tampered, key)
+	if err == nil {
+		t.Error("AES-GCM should detect tampering and fail")
+	}
+
+	// Wrong key should also fail
+	wrongKey := make([]byte, 32)
+	_, _ = rand.Read(wrongKey)
+	_, err = AESGCMDecrypt(ciphertext, wrongKey)
+	if err == nil {
+		t.Error("AES-GCM should fail with wrong key")
 	}
 }
 

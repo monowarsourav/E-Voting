@@ -402,7 +402,7 @@ func (vc *VoteCaster) generateReceipt(voterID string, keyImage *big.Int) *VoteRe
 		VoterID:        voterID,
 		ReceiptID:      receiptID,
 		Timestamp:      time.Now().Unix(),
-		BlockchainTxID: "", // TODO: Add when blockchain is integrated
+		BlockchainTxID: "", // Populated after blockchain submission
 		KeyImage:       keyImage,
 	}
 }

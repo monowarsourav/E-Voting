@@ -1,0 +1,58 @@
+\chapter{Conclusion and Future Work}
+\label{ch:conclusion}
+
+\section{Introduction}
+\label{sec:conc-intro}
+
+In this chapter, we present our concluding thoughts on the proposed framework. We also address the constraints encountered during our work and highlight future directions for further exploration in this area of research.
+
+\section{Summary of the Study}
+\label{sec:summary}
+
+Our thesis introduced a blockchain-based electronic voting system that integrates seven cryptographic protocols into a unified voting pipeline to provide broad security coverage. The proposed framework addresses key gaps in existing e-voting research by simultaneously achieving ballot privacy, vote validity, voter anonymity, coercion resistance, privacy-preserving aggregation, post-quantum security, and production blockchain integration.
+
+Our framework combines Paillier homomorphic encryption for encrypted tallying, Pedersen commitments with zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir) for vote validity verification, linkable ring signatures for anonymous ballot submission with double-vote detection, SMDC deniable credentials for coercion resistance, SA\textsuperscript{2} samplable anonymous aggregation for two-server vote privacy, Kyber768 hybrid encryption for post-quantum protection, and Damg\aa rd-Jurik-Nielsen threshold decryption for distributed key management. To the best of our knowledge, no existing system integrates this many cryptographic protocols in a single, functional voting pipeline.
+
+We implemented the system in Go and deployed it on a production Hyperledger Fabric v2.5 blockchain network. Performance evaluation confirmed that the proposed framework achieves $O(n)$ tally complexity with a constant per-vote cost of approximately 6.1 $\mu$s, verified empirically from 100 to 100,000 voters. The complete seven-protocol vote casting pipeline processes a single vote in 70.5 ms. The Hyperledger Fabric network sustains approximately 200 TPS with 100\% success rate at 10,000 transactions, as measured by Hyperledger Caliper benchmarks. Post-quantum protection via Kyber768 adds only 26 $\mu$s of overhead, showing that quantum-resistant security is achievable at negligible computational cost.
+
+Our novel SMDC coercion resistance mechanism, with $k = 5$ credential slots (1 real and 4 fake), provides computationally indistinguishable real and fake credentials through Pedersen's hiding property. Under coercion, voters can present fake credentials that produce valid-looking but silently discarded votes, while the real slot index is deterministically re-derivable only by the legitimate voter through HMAC-SHA256. This is the first complete implementation of deniable credentials in a blockchain e-voting context.
+
+Our comparative analysis with state-of-the-art systems confirmed that the proposed framework delivers strong performance while offering broader security coverage. The $O(n)$ tally complexity is a clear improvement over ISE-Voting's $O(n \times m^2)$, and the 100\% exact tallying contrasts with BP-Vot's $\geq$98\% differential privacy approximation. Linear extrapolation of our tally benchmarks projects feasibility for national-scale elections with 50 million voters in approximately 5.1 minutes.
+
+\section{Limitations and Future Work}
+\label{sec:limitations}
+
+Although our proposed framework has shown notable progress in e-voting security, there are some limitations that can be improved in future work.
+
+\begin{itemize}
+    \item \textbf{Universally Composable Security Proofs}: While our ProVerif verification confirms security under the symbolic (Dolev-Yao) model, game-based or universally composable (UC) proofs~\cite{ecclesia2025} would provide stronger guarantees that security properties are preserved under arbitrary protocol composition. Future work should formalize the 17-step pipeline in the UC framework, following recent advances such as E-cclesia's UC-secure self-tallying approach, and verify that ballot privacy, coercion resistance, and verifiability hold simultaneously against computational adversaries.
+    
+    \item \textbf{Lattice-Based Ring Signatures}: Our current linkable ring signatures are based on the discrete logarithm assumption, which is vulnerable to quantum attacks via Shor's algorithm~\cite{shor1997}. While Kyber768 protects the encryption layer, the ring signature scheme should be replaced with a lattice-based alternative (e.g., based on Module-SIS, the hardness assumption underlying NIST FIPS 204 ML-DSA~\cite{nist_mldsa}) to achieve full post-quantum security across all protocol components.
+    
+    \item \textbf{Single Orderer Limitation}: Our current deployment uses a single Raft orderer node, which provides crash fault tolerance but not Byzantine fault tolerance. For high-stakes elections where orderer nodes may be adversarial, migrating to a BFT consensus mechanism (e.g., SmartBFT in Fabric v3.x) would strengthen the system's resilience.
+    
+    \item \textbf{Fixed Ring Size}: The ring size is fixed at $|\mathcal{R}| = 100$ in our implementation. While this provides strong anonymity ($\leq 1\%$ identification probability), a dynamic ring size mechanism that adapts to the voter pool size and latency requirements would provide more flexible deployment options.
+    
+    \item \textbf{Blockchain Scalability at Extreme Load}: Our Hyperledger Caliper benchmarks revealed that the Fabric Gateway's default concurrency limit (500 connections) causes failures at transaction volumes above 25,000. Production deployments for national-scale elections would require careful infrastructure engineering including connection pool tuning, horizontal peer scaling, and load balancing.
+    
+    \item \textbf{Mobile Client Implementation}: Our current implementation provides a server-side API but lacks a dedicated mobile client application. For real-world deployment, a mobile application with on-device biometric authentication, secure enclave key storage, and offline credential management would improve voter accessibility.
+    
+    \item \textbf{Threshold Parameter Optimization}: The current threshold Paillier key generation takes approximately 30 seconds due to safe prime generation for the DJN scheme. For elections with frequent key rotation, exploring alternative threshold schemes (e.g., based on class groups) could reduce setup time.
+    
+    \item \textbf{Large-Scale User Study}: Our system has been evaluated through automated benchmarks and unit tests but has not undergone a large-scale user study with real voters. A deployment trial with hundreds of participants would provide valuable data on usability, biometric enrollment success rates, and voter confidence.
+\end{itemize}
+
+The limitations we identify above and the future work directions suggest a roadmap for advancing our framework toward production-ready deployment. By addressing formal verification, full post-quantum migration, infrastructure scaling, and user experience design, the system can evolve into a practical solution for secure, coercion-resistant democratic elections.
+
+In summary, the proposed framework achieves the following key quantitative results:
+
+\begin{enumerate}
+    \item \textbf{6.1 $\mu$s} per-vote tally cost, constant across 100 to 100,000 voters ($O(n)$ complexity).
+    \item \textbf{70.5 ms} complete seven-protocol pipeline time per vote.
+    \item \textbf{$\sim$200 TPS} sustained blockchain throughput with 100\% success at 10,000 transactions.
+    \item \textbf{26 $\mu$s} Kyber768 overhead for post-quantum protection.
+    \item \textbf{7 cryptographic protocols} integrated in a single pipeline --- more than any existing system.
+    \item \textbf{188 tests} (159 unit/integration + 29 benchmarks) with 100\% pass rate and 78--92\% coverage on core packages.
+\end{enumerate}
+
+In summary, we believe our study presents a promising and rigorous approach to designing next-generation blockchain-based e-voting systems. the proposed framework is, to the best of our knowledge, the first system to simultaneously provide ballot privacy, vote validity, voter anonymity, coercion resistance, privacy-preserving aggregation, a post-quantum encryption layer, and production blockchain integration with thorough empirical validation. While the encryption layer achieves post-quantum protection via Kyber768 (ML-KEM-768, NIST FIPS 203), the ring signature and homomorphic tallying components remain classically secure, with lattice-based replacements identified as future work. We believe that the design principles, cryptographic constructions, and engineering practices presented in this thesis can serve as a foundation for future research in this critical area of democratic technology.
