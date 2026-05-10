@@ -1,0 +1,14 @@
+=== RUN   TestScalabilityRingSize
+
+=== Ring Signature Scalability ===
+Ring Size | Sign Time (ms) | Verify Time (ms)
+----------|----------------|------------------
+       10 |           2.80 |             2.80
+       25 |           6.60 |             6.60
+       50 |          13.80 |            13.60
+      100 |          29.20 |            29.60
+      200 |          55.00 |            55.50
+      500 |         146.00 |           137.00
+--- PASS: TestScalabilityRingSize (2.79s)
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	2.795s

@@ -1,23 +1,23 @@
 # CovertVote Benchmark Results
 
-**Date:** 2026-05-03 11:20:47
+**Date:** 2026-05-09 14:53:43
 **System:** Go E-Voting System
 
 ## Performance Table
 
 | Voters | Total Time | Per Vote | Cred Gen | Vote Cast | Aggregate | Decrypt |
 |--------|------------|----------|----------|-----------|-----------|----------|
-| 100 | 5.925s | 59.254ms | 436ms | 5.472s | 0s | 17.726ms |
-| 1000 | 59.153s | 59.153ms | 3.594s | 55.54s | 0s | 18.866ms |
-| 10000 | 10m22.046s | 62.205ms | 36.978s | 9m45.05s | 0s | 17.677ms |
+| 100 | 6.776s | 67.757ms | 499ms | 6.254s | 0s | 22.9ms |
+| 1000 | 1m7.245s | 67.245ms | 4.104s | 1m3.118s | 0s | 23.248ms |
+| 10000 | 11m53.666s | 71.367ms | 44.815s | 11m8.825s | 0s | 26.272ms |
 
 ## Projections for Large Scale
 
-Based on per-vote time of 62.204571ms:
+Based on per-vote time of 71.366584ms:
 
 | Voters | Projected Time |
 |--------|----------------|
-| 100000 | 1h43m40s |
-| 1000000 | 17h16m45s |
-| 10000000 | 172h47m26s |
-| 50000000 | 863h57m9s |
+| 100000 | 1h58m57s |
+| 1000000 | 19h49m27s |
+| 10000000 | 198h14m26s |
+| 50000000 | 991h12m9s |

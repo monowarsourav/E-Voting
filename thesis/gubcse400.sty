@@ -28,16 +28,26 @@
 \RequirePackage{tcolorbox}
 
 \definecolor{GUBBlue}{RGB}{0,27,84}   
-\definecolor{GUBRed}{RGB}{186,0.23,49} 
+\definecolor{GUBRed}{RGB}{186,23,49} 
 \definecolor{GUBGreen}{RGB}{53,104,89}
 \definecolor{GUBPurple}{RGB}{139, 0, 139}
 \definecolor{YellowOrange}{rgb}{1.0, 0.22, 0.0}
 
 \RequirePackage{tikz}
 \usetikzlibrary{arrows}
+\usetikzlibrary{arrows.meta}
 \usetikzlibrary{shapes.geometric}
+\usetikzlibrary{shapes.symbols}
+\usetikzlibrary{positioning}
+\usetikzlibrary{calc}
+\usetikzlibrary{fit}
+\usetikzlibrary{backgrounds}
+\usetikzlibrary{patterns}
+\RequirePackage{pgfplots}
+\pgfplotsset{compat=1.16}                         % broad-compatibility version
+\usepgfplotslibrary{groupplots}
 \RequirePackage{listings}
-\usepackage{newverbs}
+\RequirePackage{newverbs}
 \newverbcommand{\cverb}{\color{blue}}{}
 \RequirePackage{hyperref}
 \hypersetup{

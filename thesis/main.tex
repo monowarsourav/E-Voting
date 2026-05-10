@@ -8,12 +8,9 @@
 
 
 % ===================== All Necessary Packages =====================
+% NOTE: booktabs, graphicx, amssymb, xcolor, listings are already loaded by gubcse400.sty
 
 \usepackage{algorithm}          % For creating algorithm environments
-\usepackage{listings}           % For including code blocks with syntax highlighting
-\usepackage{graphicx}           % For inserting and managing images
-\usepackage{booktabs}           % For professional-looking tables
-\usepackage{xcolor}             % For colored text and code highlighting
 \usepackage{algpseudocode}      % For writing pseudocode within algorithm environment
 \usepackage{amsmath}            % For advanced mathematical symbols and environments
 \definecolor{codegreen}{rgb}{0,0.6,0} % Define custom color for code elements
@@ -27,18 +24,17 @@
 \usepackage{float}              % To control figure/table placement precisely
 \usepackage{longtable}          % For multipage tables
 \usepackage{makecell}           % For customized cell formatting in tables
-\geometry{margin=1in}           % Adjust page margins (alternative geometry setting)
 \renewcommand{\arraystretch}{1.3} % Increases row spacing in tables for better readability
 
 % ===================== Additional Packages for Our Thesis =====================
-\usepackage{amssymb}            % For mathematical symbols
 \usepackage{mathtools}          % For mathematical tools
 \usepackage{subcaption}         % For subfigures
 \usepackage{multirow}           % For multirow tables
 
-% Custom commands
-\newcommand{\cmark}{\ding{51}}  % Checkmark
-\newcommand{\xmark}{\ding{55}}  % Cross mark
+% Custom comparison-table marks (LaTeX commands; pifont heavy glyphs for clearer print contrast)
+\newcommand{\cmark}{\ding{51}}                                % Full support
+\newcommand{\xmark}{\ding{55}}                                % No support
+\newcommand{\pmark}{\ding{51}\textsuperscript{$\dagger$}}     % Partial support
 
 
 % Change the name and designation of Chairperson of dept. as required

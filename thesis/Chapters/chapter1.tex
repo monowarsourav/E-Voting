@@ -4,7 +4,7 @@
 \section{Background}
 \label{sec:background}
 
-Electronic voting (e-voting) has emerged as a practical approach to modernizing democratic processes by replacing traditional paper-based balloting with digital systems. As nations worldwide seek to improve voter accessibility, reduce administrative costs, and accelerate result tabulation, e-voting systems have gained considerable attention from both the research community and government institutions. However, adopting electronic voting introduces core security challenges that do not exist in conventional voting --- ballot privacy, vote integrity, coercion resistance, and universal verifiability must all be simultaneously guaranteed in a system where digital data can be copied, intercepted, or manipulated.
+Electronic voting (e-voting) has emerged as a practical approach to modernizing democratic processes by replacing traditional paper-based balloting with digital systems. As nations worldwide seek to improve voter accessibility, reduce administrative costs, and accelerate result tabulation, e-voting systems have gained considerable attention from both the research community and government institutions. However, adopting electronic voting introduces core security challenges that do not exist in conventional voting: ballot privacy, vote integrity, coercion resistance, and universal verifiability must all be simultaneously guaranteed in a system where digital data can be copied, intercepted, or manipulated.
 
 The integration of blockchain technology~\cite{nakamoto2008} with advanced cryptographic protocols offers a promising foundation for addressing these challenges. By leveraging the immutability and transparency properties of distributed ledgers alongside homomorphic encryption, zero-knowledge proofs, and anonymous credential schemes, it becomes possible to construct voting systems that provide mathematical guarantees of security rather than relying solely on organizational trust.
 
@@ -20,7 +20,7 @@ The evolution of electronic voting can be traced through several distinct genera
 
 Second-generation systems introduced cryptographic techniques such as mix-nets and blind signatures to provide some degree of voter anonymity. Notable examples include the Helios voting system, which pioneered web-based verifiable elections for organizational contexts. However, these systems relied on trusted third parties for key management and ballot processing, leaving them vulnerable to insider attacks and coercion.
 
-Third-generation systems, emerging from 2018 onward, began integrating blockchain technology to provide immutable vote records and decentralized trust. Systems such as Voatz (used in US military overseas voting) and Agora (deployed as an observer in Sierra Leone's 2018 elections) represented early attempts at blockchain-based voting. However, these systems were criticized for weak cryptographic guarantees --- a 2020 MIT security analysis of Voatz \cite{voatz_mit} revealed critical vulnerabilities including client-side attacks, server compromise possibilities, and vote manipulation risks.
+Third-generation systems, emerging from 2018 onward, began integrating blockchain technology to provide immutable vote records and decentralized trust. Systems such as Voatz (used in US military overseas voting) and Agora (deployed as an observer in Sierra Leone's 2018 elections) represented early attempts at blockchain-based voting. However, these systems were criticized for weak cryptographic guarantees; a 2020 MIT security analysis of Voatz \cite{voatz_mit} revealed critical vulnerabilities including client-side attacks, server compromise possibilities, and vote manipulation risks.
 
 Current e-voting research focuses on combining multiple cryptographic primitives into multi-layered security frameworks. The proposed framework represents this generation by integrating seven distinct cryptographic protocols with a production blockchain infrastructure to simultaneously address privacy, integrity, coercion resistance, and post-quantum security.
 
@@ -42,12 +42,12 @@ A modern e-voting system architecture typically consists of four functional laye
 \subsection{Security Challenges in E-Voting}
 \label{subsec:security-challenges}
 
-The security requirements of electronic voting are considerably more demanding than those of typical information systems. A voting system must simultaneously satisfy properties that are often in tension with one another --- for example, votes must be both secret (unlinked to voters) and verifiable (provably counted correctly).
+The security requirements of electronic voting are considerably more demanding than those of typical information systems. A voting system must simultaneously satisfy properties that are often in tension with one another; for example, votes must be both secret (unlinked to voters) and verifiable (provably counted correctly).
 
 \subsubsection{Traditional security approaches}
 \label{subsubsec:traditional-security}
 
-Traditional approaches to e-voting security relied primarily on organizational controls and access restrictions. Votes were encrypted using standard symmetric or asymmetric algorithms (e.g., AES-256, RSA), and system integrity depended on the trustworthiness of election authorities who held the decryption keys. This model suffers from several critical weaknesses: a compromised authority can decrypt and read individual votes, the tallying process is opaque to outside observers, and there is no mechanism to prove that votes were counted correctly without revealing them.
+Traditional approaches to e-voting security relied primarily on organizational controls and access restrictions. Votes were encrypted using standard symmetric or asymmetric algorithms (e.g., AES-256~\cite{nist_aes}, RSA~\cite{rivest1978rsa}), and system integrity depended on the trustworthiness of election authorities who held the decryption keys. This model suffers from several critical weaknesses: a compromised authority can decrypt and read individual votes, the tallying process is opaque to outside observers, and there is no mechanism to prove that votes were counted correctly without revealing them.
 
 Beyond the tallying problem, traditional systems provide no protection against voter coercion. If a coercer can observe a voter's actions or demand proof of how they voted, the voter has no way to cast a free vote while appearing to comply with the coercer's demands. This vulnerability is particularly acute in remote voting scenarios where the voter is not protected by the secrecy of a polling booth.
 
@@ -68,21 +68,21 @@ The key distinction between traditional and blockchain-based e-voting lies in th
 
 In traditional e-voting, a central election authority controls the encryption keys, manages the vote database, and performs the tally. Voters must trust that this authority will not manipulate votes, leak individual ballots, or selectively exclude certain votes from the count. The verification process, if any, is typically limited to auditing by authorized observers who must again be trusted.
 
-Blockchain-based e-voting fundamentally alters this trust model. Votes are recorded on a distributed ledger that is maintained by multiple independent parties. The immutability property of the blockchain ensures that once a vote is recorded, it cannot be modified or deleted without detection. Smart contracts can enforce voting rules automatically, removing the need to trust election officials to follow procedures correctly. Cryptographic proofs attached to each vote enable universal verifiability --- any observer can verify that all recorded votes are well-formed and correctly tallied.
+Blockchain-based e-voting fundamentally alters this trust model. Votes are recorded on a distributed ledger that is maintained by multiple independent parties. The immutability property of the blockchain ensures that once a vote is recorded, it cannot be modified or deleted without detection. Smart contracts can enforce voting rules automatically, removing the need to trust election officials to follow procedures correctly. Cryptographic proofs attached to each vote enable universal verifiability: any observer can verify that all recorded votes are well-formed and correctly tallied.
 
 \subsubsection{Advantages of blockchain-based approach}
 \label{subsubsec:blockchain-advantages}
 
-Several advantages of blockchain-based e-voting are worth highlighting. First, the decentralized nature of the blockchain eliminates single points of failure --- no single entity can compromise the entire election. Second, the immutable ledger provides an auditable trail that persists indefinitely, enabling post-election verification at any time. Third, smart contracts ensure consistent enforcement of election rules without human intervention. Fourth, blockchain transparency enables end-to-end verifiability, where voters can verify that their votes were recorded and counted correctly.
+Several advantages of blockchain-based e-voting are worth highlighting. First, the decentralized nature of the blockchain eliminates single points of failure: no single entity can compromise the entire election. Second, the immutable ledger provides an auditable trail that persists indefinitely, enabling post-election verification at any time. Third, smart contracts ensure consistent enforcement of election rules without human intervention. Fourth, blockchain transparency enables end-to-end verifiability, where voters can verify that their votes were recorded and counted correctly.
 
 These properties are particularly relevant in contexts where institutional trust is low, such as elections in developing nations, organizational governance, or scenarios where election manipulation is a concern.
 
 \subsection{Blockchain Technology in E-Voting}
 \label{subsec:blockchain-tech}
 
-Blockchain platforms used for e-voting fall into two broad categories: public blockchains (e.g., Ethereum) and permissioned blockchains (e.g., Hyperledger Fabric). Public blockchains offer maximum decentralization but suffer from scalability limitations, high transaction costs, and energy consumption concerns. Permissioned blockchains provide controlled access, higher throughput, and configurable privacy, making them more suitable for election systems where the set of validating nodes is known and controlled by election authorities.
+Blockchain platforms used for e-voting fall into two broad categories: public blockchains (e.g., Ethereum~\cite{wood2014ethereum}) and permissioned blockchains (e.g., Hyperledger Fabric~\cite{androulaki2018}). Public blockchains offer maximum decentralization but suffer from scalability limitations, high transaction costs, and energy consumption concerns. Permissioned blockchains provide controlled access, higher throughput, and configurable privacy, making them more suitable for election systems where the set of validating nodes is known and controlled by election authorities.
 
-Our framework employs Hyperledger Fabric v2.5~\cite{androulaki2018}, a permissioned blockchain framework maintained by the Linux Foundation. Fabric's modular architecture supports pluggable consensus mechanisms, channel-based data isolation, and chaincode (smart contracts) written in general-purpose languages such as Go. The Fabric Gateway SDK enables application-level interaction with the blockchain through gRPC, providing secure, authenticated communication between the voting application and the distributed ledger. Recent empirical studies~\cite{fabric_perf} have demonstrated that Fabric achieves substantially higher throughput and lower latency than public blockchain alternatives for enterprise applications.
+Our framework employs Hyperledger Fabric v2.5~\cite{androulaki2018}, a permissioned blockchain framework maintained by the Linux Foundation. Fabric's modular architecture supports pluggable consensus mechanisms, channel-based data isolation, and chaincode (smart contracts) written in general-purpose languages such as Go. The Fabric Gateway SDK enables application-level interaction with the blockchain over gRPC channels secured with TLS, providing authenticated communication between the voting application and the distributed ledger. Recent empirical studies~\cite{fabric_perf} have demonstrated that Fabric achieves substantially higher throughput and lower latency than public blockchain alternatives for enterprise applications.
 
 \subsection{Cryptographic Protocols for E-Voting}
 \label{subsec:crypto-protocols}
@@ -90,7 +90,7 @@ Our framework employs Hyperledger Fabric v2.5~\cite{androulaki2018}, a permissio
 The security of the proposed framework rests on seven cryptographic protocols, each providing a specific security guarantee:
 
 \begin{itemize}
-    \item \textbf{Paillier Homomorphic Encryption}: Enables encrypted vote tallying without decryption. Based on the Decisional Composite Residuosity Assumption (DCRA), Paillier's additive homomorphism allows the election result to be computed directly from encrypted ballots: $E(a) \times E(b) = E(a + b)$.
+    \item \textbf{Paillier Homomorphic Encryption}~\cite{paillier1999}: Enables encrypted vote tallying without decryption. Based on the Decisional Composite Residuosity Assumption (DCRA)~\cite{paillier1999}, Paillier's additive homomorphism allows the election result to be computed directly from encrypted ballots: $E(a) \times E(b) = E(a + b)$.
     
     \item \textbf{Pedersen Commitments}: Provide computationally hiding and perfectly binding commitments to vote values. Used as the foundation for zero-knowledge proofs that verify vote validity.
     
@@ -108,22 +108,14 @@ The security of the proposed framework rests on seven cryptographic protocols, e
 \subsection{State of the Art in the Modern Context}
 \label{subsec:state-of-art}
 
-The field of blockchain-based e-voting has seen rapid development in recent years. Zhang et al. proposed ISE-Voting \cite{ise_voting} (IEEE IoT Journal 2025), which uses identity-based ring signatures on Ethereum with a ballot cutting algorithm for tallying. However, ISE-Voting's tally complexity is $O(n \times m^2)$, where $n$ is the number of voters and $m$ is the number of candidates, making it impractical for large-scale elections. The scheme also lacks any coercion resistance mechanism.
-
-Baniata and Caluna introduced BP-Vot \cite{bp_vot} (IEEE Access 2025), which employs differential privacy and self-sovereign identities on Hyperledger Besu. While innovative, BP-Vot's differential privacy approach adds noise to the tally, resulting in approximate rather than exact vote counts --- an unacceptable trade-off in close elections. BP-Vot also lacks coercion resistance.
-
-Faruk et al. \cite{faruk2024} (Cluster Computing 2024) presented a biometric-authenticated blockchain voting system with fingerprint and face verification, tested with 100 participants. However, the system uses only basic cryptographic primitives (AES, SHA) without homomorphic encryption or zero-knowledge proofs, providing weak privacy guarantees.
-
-In the coercion resistance domain, zkVoting \cite{zkvoting} (ePrint 2024) uses zk-SNARKs for anonymous voting but incurs high gas costs on Ethereum. LOKI Vote \cite{lokivote} employs modified ElGamal with BBS Group Signatures but has not been fully implemented. The JCJ/Civitas protocol provides theoretical coercion resistance through fake credentials but has proven difficult to implement efficiently.
-
-Despite significant progress, no existing system simultaneously provides all of the following: homomorphic tallying for exact results, formal zero-knowledge proofs for vote validity, linkable ring signatures for anonymity with double-vote detection, deniable credentials for coercion resistance, two-server anonymous aggregation, post-quantum security, and production blockchain integration with empirical performance data. The proposed framework addresses this gap.
+Recent blockchain e-voting research has produced systems that each strengthen one or two security properties but none that simultaneously achieve all of: homomorphic tallying for exact results, formal zero-knowledge proofs for vote validity, linkable ring signatures for anonymity with double-vote detection, deniable credentials for coercion resistance, two-server anonymous aggregation, post-quantum security, and production-grade blockchain deployment with empirical performance data. Recurring shortcomings across the surveyed work include super-linear tally complexity, reliance on trusted counting authorities or differential-privacy approximations, weak symmetric-only privacy, and the absence of a coercion-resistance mechanism that survives a coercer who can demand proof of how the voter cast a ballot. A detailed analysis of representative works, their reported performance, and the precise gaps they leave open is presented in Chapter~\ref{ch:literature-review}. The proposed framework directly addresses these gaps and is positioned in detail against the cited systems in Section~\ref{sec:comparative} of Chapter~\ref{ch:results}.
 
 \subsection{Importance and Relevance of the Topic}
 \label{subsec:importance}
 
-Secure electronic voting matters beyond technical innovation --- it touches on democratic principles directly. In many developing nations, voter intimidation and coercion remain serious obstacles to free elections. International election observers frequently report incidents of vote buying, family voting, and employer pressure on voting choices. A voting system that provides mathematical guarantees of coercion resistance --- not just procedural safeguards --- would mark a genuine step forward for democratic integrity.
+Secure electronic voting matters beyond technical innovation; it touches on democratic principles directly. In many developing nations, voter intimidation and coercion remain serious obstacles to free elections. International election observers frequently report incidents of vote buying, family voting, and employer pressure on voting choices. A voting system that provides mathematical guarantees of coercion resistance, not just procedural safeguards, would mark a genuine step forward for democratic integrity.
 
-On a related note, the emergence of quantum computing poses a long-term threat to current cryptographic systems~\cite{shor1997}. Elections may produce records that must remain confidential for decades. A vote encrypted today with RSA or ECC could potentially be decrypted by a future quantum computer running Shor's algorithm~\cite{shor1997}, retroactively compromising voter privacy. Post-quantum cryptographic protection is therefore not merely a theoretical concern but a practical necessity for long-term ballot secrecy.
+On a related note, the emergence of quantum computing poses a long-term threat to current cryptographic systems~\cite{shor1997}. Elections may produce records that must remain confidential for decades. A vote encrypted today with RSA, ECC, or any scheme whose security reduces to integer factorisation or discrete logarithms could potentially be decrypted by a future quantum computer running Shor's algorithm~\cite{shor1997}, retroactively compromising voter privacy. This \emph{harvest-now-decrypt-later} threat model has motivated the U.S. National Institute of Standards and Technology to standardise lattice-based replacements, including ML-KEM (FIPS~203~\cite{nist_kyber}) for key encapsulation and ML-DSA (FIPS~204~\cite{nist_mldsa}) for digital signatures, both finalised in 2024. Post-quantum cryptographic protection is therefore not merely a theoretical concern but a practical and standards-aligned necessity for long-term ballot secrecy.
 
 From a scalability perspective, nations with large populations require voting systems that can process votes efficiently without per-vote costs growing quadratically with the number of candidates. the proposed framework's $O(n)$ tally complexity, confirmed through empirical benchmarks, demonstrates feasibility for national-scale deployments.
 
@@ -137,7 +129,7 @@ The development of the proposed framework is motivated by several critical gaps 
 
 First, existing systems generally provide only a subset of the required security properties. Systems with strong privacy guarantees (e.g., homomorphic encryption) typically lack coercion resistance mechanisms. Conversely, systems that address coercion resistance (e.g., JCJ~\cite{jcj2005} and Civitas~\cite{civitas2008}) rely on theoretical credential management schemes that have not been practically implemented in blockchain contexts. No existing system integrates a comprehensive cryptographic stack that addresses privacy, validity, anonymity, coercion resistance, and post-quantum security simultaneously.
 
-Second, the computational complexity of existing tallying mechanisms limits their scalability. ISE-Voting's $O(n \times m^2)$ complexity means that for an election with 1 million voters and 10 candidates, the tally requires approximately $10^8$ operations --- making it impractical for large constituencies. A linear-time tallying approach is needed for real-world deployment.
+Second, the computational complexity of existing tallying mechanisms limits their scalability. ISE-Voting's $O(n \times m^2)$ complexity means that for an election with 1 million voters and 10 candidates, the tally requires approximately $10^8$ operations, making it impractical for large constituencies. A linear-time tallying approach is needed for real-world deployment.
 
 Third, most blockchain-based e-voting research provides only theoretical designs or simulations without production-grade blockchain integration. Performance claims are rarely validated against real blockchain networks with empirical throughput and latency measurements. The gap between theoretical protocol design and production system implementation remains largely unaddressed.
 
@@ -153,11 +145,11 @@ This thesis focuses on the cryptographic protocol design, implementation, and pe
 
 \subsection{In Scope}
 \begin{itemize}
-    \item Design and implementation of seven cryptographic protocols (Paillier, Pedersen, ZKP, Ring Signatures, SMDC, SA\textsuperscript{2}, Kyber768) in Go 1.24.
-    \item Integration with Hyperledger Fabric v2.5 as a production blockchain infrastructure.
+    \item Design and implementation of seven cryptographic protocols (Paillier homomorphic encryption~\cite{paillier1999}, Pedersen commitments~\cite{pedersen1991}, zero-knowledge $\Sigma$-proofs with Strong Fiat-Shamir~\cite{bernhard2012}, linkable ring signatures~\cite{liu2004}, the proposed SMDC deniable credentials, two-server SA\textsuperscript{2} aggregation~\cite{sa2_apple}, and Kyber-768 ML-KEM~\cite{nist_kyber}) in Go~1.24.
+    \item Integration with Hyperledger Fabric~v2.5~\cite{androulaki2018} as a production blockchain infrastructure.
     \item Empirical performance evaluation including crypto micro-benchmarks, pipeline analysis, scalability testing (100 to 100,000 voters), and Caliper blockchain benchmarks (10,000 to 100,000 transactions).
     \item Security analysis with formal theorem statements, proof sketches for six security properties, and ProVerif formal verification of three core properties.
-    \item Comparative analysis with five state-of-the-art blockchain e-voting systems from Q1/Q2 journals.
+    \item Comparative analysis with five state-of-the-art blockchain e-voting systems.
 \end{itemize}
 
 \subsection{Out of Scope}
@@ -179,11 +171,11 @@ These out-of-scope items are discussed as future work directions in Chapter~\ref
 Despite the advances in blockchain-based e-voting, significant challenges remain in building a system that provides comprehensive security guarantees while maintaining practical performance. The core problems addressed by this thesis are as follows:
 
 \begin{itemize}
-    \item How can multiple cryptographic protocols --- homomorphic encryption, zero-knowledge proofs, ring signatures, deniable credentials, anonymous aggregation, and post-quantum key encapsulation --- be securely composed into a unified voting pipeline that preserves the individual security properties of each protocol under composition?
+    \item How can multiple cryptographic protocols (homomorphic encryption, zero-knowledge proofs, ring signatures, deniable credentials, anonymous aggregation, and post-quantum key encapsulation) be securely composed into a unified voting pipeline that preserves the individual security properties of each protocol under composition?
     
     \item How can coercion resistance be practically implemented in a blockchain e-voting context, such that a coerced voter can present plausible fake credentials to a coercer without the coercer being able to distinguish real from fake votes, while ensuring that only real votes are counted in the final tally?
     
-    \item How can the vote tallying process achieve $O(n)$ computational complexity --- linear in the number of voters and independent of the number of candidates --- while preserving the exact correctness of results without introducing noise or approximation?
+    \item How can the vote tallying process achieve $O(n)$ computational complexity (linear in the number of voters and independent of the number of candidates) while preserving the exact correctness of results without introducing noise or approximation?
     
     \item How can a production-ready blockchain infrastructure (Hyperledger Fabric) be integrated with the cryptographic voting pipeline to provide immutable vote records and chaincode-level verification, and what throughput and latency characteristics does this integration achieve under realistic load conditions?
 \end{itemize}
@@ -211,19 +203,19 @@ The primary goal of this research is to design, implement, and empirically evalu
 This thesis makes the following key contributions to the field of blockchain-based electronic voting:
 
 \begin{enumerate}
-    \item \textbf{Seven-Protocol Cryptographic Stack}: This work presents the first complete implementation of a voting system integrating seven distinct cryptographic protocols --- Paillier homomorphic encryption, Pedersen commitments, zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir), linkable ring signatures, SMDC deniable credentials, SA\textsuperscript{2} anonymous aggregation, and Kyber768 post-quantum hybrid encryption. No existing system combines this many protocols in a single, functional voting pipeline.
+    \item \textbf{Seven-Protocol Cryptographic Stack}: This work presents the first complete implementation of a voting system integrating seven distinct cryptographic protocols: Paillier homomorphic encryption, Pedersen commitments, zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir), linkable ring signatures, SMDC deniable credentials, SA\textsuperscript{2} anonymous aggregation, and Kyber768 post-quantum hybrid encryption. No existing system combines this many protocols in a single, functional voting pipeline.
     
     \item \textbf{SMDC Coercion Resistance}: The thesis introduces Self-Masking Deniable Credentials (SMDC), a practical coercion resistance mechanism where voters receive $k=5$ credential slots with 1 real and 4 fake. The real slot index is derived via HMAC-SHA256 and never stored, making it re-derivable only by the legitimate voter. This is the first complete implementation of deniable credentials in a blockchain e-voting context.
     
     \item \textbf{Behavioral Duress Detection}: A novel behavioral coercion detection system is presented, using HMAC-SHA256 hashing of biometric signals (blink count, head tilt, long press, time delay, voice command) with constant-time verification. When duress is detected, the system silently discards the coerced vote while returning an identical-looking receipt to the voter.
     
-    \item \textbf{O(n) Tally Complexity}: Through Paillier's additive homomorphism, the tally achieves $O(n)$ complexity per candidate --- confirmed empirically at approximately 6~$\mu$s per vote from 100 to 100,000 voters. This represents a significant improvement over ISE-Voting's $O(n \times m^2)$.
+    \item \textbf{O(n) Tally Complexity}: Through Paillier's additive homomorphism, the tally achieves $O(n)$ complexity per candidate, confirmed empirically at approximately 6~$\mu$s per vote from 100 to 100,000 voters. This represents a significant improvement over ISE-Voting's $O(n \times m^2)$.
     
     \item \textbf{Production Blockchain Integration}: The system is fully integrated with Hyperledger Fabric v2.5 via the Fabric Gateway SDK (fabric-gateway v1.10.1), with empirical Caliper benchmarks demonstrating approximately 200 TPS throughput with 100\% success rate at 10,000 transactions.
     
     \item \textbf{SA\textsuperscript{2} Voting Adaptation}: Apple's Samplable Anonymous Aggregation (SA\textsuperscript{2}) protocol, originally designed for federated data analysis, is adapted for voting. The two-server non-colluding model ensures vote privacy as long as one server remains honest.
     
-    \item \textbf{Threshold Paillier Decryption}: A complete Damg\aa rd-Jurik-Nielsen (DJN) threshold decryption scheme is implemented with Shamir's Secret Sharing, ZK proofs for partial decryption, and Lagrange interpolation for combining --- ensuring no single entity can decrypt the election result alone.
+    \item \textbf{Threshold Paillier Decryption}: A complete Damg\aa rd-Jurik-Nielsen (DJN) threshold decryption scheme~\cite{damgard2010} is implemented with Shamir's Secret Sharing~\cite{shamir1979}, ZK proofs for partial decryption, and Lagrange interpolation for combining, ensuring no single entity can decrypt the election result alone.
 \end{enumerate}
 
 % ============================================================
@@ -246,4 +238,4 @@ The remainder of this thesis is organized as follows:
 \section{Conclusion}
 \label{sec:intro-conclusion}
 
-This chapter has provided the background, motivation, and problem statement for this research. The fundamental security challenges in electronic voting --- ballot privacy, vote integrity, coercion resistance, and post-quantum security --- were identified, along with the limitations of existing blockchain-based solutions. The research objectives were defined to address these gaps through a seven-protocol cryptographic stack deployed on production blockchain infrastructure. The next chapter reviews the existing literature in detail, analyzing the methodology, contributions, and limitations of state-of-the-art blockchain e-voting systems.
+This chapter has provided the background, motivation, and problem statement for this research. The fundamental security challenges in electronic voting (ballot privacy, vote integrity, coercion resistance, and post-quantum security) were identified, along with the limitations of existing blockchain-based solutions. The research objectives were defined to address these gaps through a seven-protocol cryptographic stack deployed on production blockchain infrastructure. The next chapter reviews the existing literature in detail, analyzing the methodology, contributions, and limitations of state-of-the-art blockchain e-voting systems.

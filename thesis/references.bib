@@ -29,15 +29,15 @@
   doi       = {10.1007/3-540-46766-1_9}
 }
 
-@inproceedings{damgard2010,
-  author    = {Damg{\aa}rd, Ivan and Jurik, Mads and Nielsen, Jesper Buus},
-  title     = {A Generalization of {Paillier}'s Public-Key System with Applications to Electronic Voting},
-  booktitle = {International Journal of Information Security},
-  volume    = {9},
-  number    = {6},
-  pages     = {371--385},
-  year      = {2010},
-  doi       = {10.1007/s10207-010-0119-9}
+@article{damgard2010,
+  author  = {Damg{\aa}rd, Ivan and Jurik, Mads and Nielsen, Jesper Buus},
+  title   = {A Generalization of {Paillier}'s Public-Key System with Applications to Electronic Voting},
+  journal = {International Journal of Information Security},
+  volume  = {9},
+  number  = {6},
+  pages   = {371--385},
+  year    = {2010},
+  doi     = {10.1007/s10207-010-0119-9}
 }
 
 @article{shor1997,
@@ -381,4 +381,120 @@
   year         = {2025},
   howpublished = {IACR Cryptology ePrint Archive},
   note         = {ETH Z{\"u}rich}
+}
+
+% ============================================================
+% ADDITIONAL FOUNDATIONAL REFERENCES (Phase 2 audit)
+% ============================================================
+
+% Schnorr signature / proof of knowledge of discrete log
+@article{schnorr1991,
+  author  = {Schnorr, Claus-Peter},
+  title   = {Efficient Signature Generation by Smart Cards},
+  journal = {Journal of Cryptology},
+  volume  = {4},
+  number  = {3},
+  pages   = {161--174},
+  year    = {1991},
+  doi     = {10.1007/BF00196725}
+}
+
+% Fiat-Shamir transformation
+@inproceedings{fiat_shamir1986,
+  author    = {Fiat, Amos and Shamir, Adi},
+  title     = {How to Prove Yourself: Practical Solutions to Identification and Signature Problems},
+  booktitle = {Advances in Cryptology --- CRYPTO '86},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {263},
+  pages     = {186--194},
+  publisher = {Springer},
+  year      = {1986},
+  doi       = {10.1007/3-540-47721-7_12}
+}
+
+% Original ring signature construction
+@inproceedings{rivest2001ring,
+  author    = {Rivest, Ronald L. and Shamir, Adi and Tauman, Yael},
+  title     = {How to Leak a Secret},
+  booktitle = {Advances in Cryptology --- ASIACRYPT 2001},
+  series    = {Lecture Notes in Computer Science},
+  volume    = {2248},
+  pages     = {552--565},
+  publisher = {Springer},
+  year      = {2001},
+  doi       = {10.1007/3-540-45682-1_32}
+}
+
+% HMAC — RFC specification
+@misc{rfc2104,
+  author       = {Krawczyk, Hugo and Bellare, Mihir and Canetti, Ran},
+  title        = {{HMAC}: Keyed-Hashing for Message Authentication},
+  year         = {1997},
+  howpublished = {RFC 2104, Internet Engineering Task Force},
+  doi          = {10.17487/RFC2104}
+}
+
+% HMAC — NIST FIPS 198-1
+@techreport{nist_fips198,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {The Keyed-Hash Message Authentication Code ({HMAC})},
+  institution = {National Institute of Standards and Technology},
+  number      = {FIPS PUB 198-1},
+  year        = {2008},
+  doi         = {10.6028/NIST.FIPS.198-1}
+}
+
+% SHA-2 family standard
+@techreport{nist_fips180_4,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {Secure Hash Standard ({SHS})},
+  institution = {National Institute of Standards and Technology},
+  number      = {FIPS PUB 180-4},
+  year        = {2015},
+  doi         = {10.6028/NIST.FIPS.180-4}
+}
+
+% SHA-3 / Keccak standard
+@techreport{nist_fips202,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {{SHA-3} Standard: Permutation-Based Hash and Extendable-Output Functions},
+  institution = {National Institute of Standards and Technology},
+  number      = {FIPS PUB 202},
+  year        = {2015},
+  doi         = {10.6028/NIST.FIPS.202}
+}
+
+@techreport{nist_aes,
+  author      = {{National Institute of Standards and Technology}},
+  title       = {{Advanced Encryption Standard (AES)}},
+  institution = {NIST},
+  number      = {FIPS PUB 197},
+  year        = {2001},
+  doi         = {10.6028/NIST.FIPS.197}
+}
+
+@article{rivest1978rsa,
+  author  = {Rivest, Ronald L. and Shamir, Adi and Adleman, Leonard},
+  title   = {{A Method for Obtaining Digital Signatures and Public-Key Cryptosystems}},
+  journal = {Communications of the ACM},
+  volume  = {21},
+  number  = {2},
+  pages   = {120--126},
+  year    = {1978},
+  doi     = {10.1145/359340.359342}
+}
+
+@misc{wood2014ethereum,
+  author = {Wood, Gavin},
+  title  = {{Ethereum: A Secure Decentralised Generalised Transaction Ledger}},
+  year   = {2014},
+  note   = {Ethereum Project Yellow Paper}
+}
+
+@inproceedings{ongaro2014raft,
+  author    = {Ongaro, Diego and Ousterhout, John},
+  title     = {{In Search of an Understandable Consensus Algorithm (Raft)}},
+  booktitle = {USENIX Annual Technical Conference (ATC)},
+  pages     = {305--319},
+  year      = {2014}
 }

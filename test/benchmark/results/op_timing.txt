@@ -1,0 +1,20 @@
+=== RUN   TestIndividualOperationTiming
+    voting_benchmark_test.go:379: 
+        ========== INDIVIDUAL OPERATION TIMING ==========
+    voting_benchmark_test.go:380: Paillier KeyGen (2048-bit): 139.638143ms
+    voting_benchmark_test.go:381: Paillier Encrypt:           10.983401ms
+    voting_benchmark_test.go:382: Paillier Decrypt:           12.839116ms
+    voting_benchmark_test.go:383: Pedersen Commit:            190.514µs
+    voting_benchmark_test.go:384: SMDC Generate (k=5):        2.829227ms
+    voting_benchmark_test.go:385: =================================================
+    voting_benchmark_test.go:389: 
+        Estimated Total Per Vote: 13.812628ms
+    voting_benchmark_test.go:392: 
+        ========== PROJECTIONS ==========
+    voting_benchmark_test.go:395: 1000 voters: 13.812628s
+    voting_benchmark_test.go:395: 10000 voters: 2m18.12628s
+    voting_benchmark_test.go:395: 100000 voters: 23m1.2628s
+    voting_benchmark_test.go:395: 1000000 voters: 3h50m12.628s
+--- PASS: TestIndividualOperationTiming (17.30s)
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	17.304s
