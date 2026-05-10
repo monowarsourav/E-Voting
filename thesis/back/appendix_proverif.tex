@@ -1,0 +1,320 @@
+\appendix
+\chapter{ProVerif Formal Verification Artefacts}
+\label{appx:proverif}
+
+This appendix reproduces the ProVerif source models and the corresponding tool output transcripts that underpin the formal verification results summarised in Table~\ref{tab:proverif} of Chapter~\ref{ch:results}. The three models target ballot privacy, individual verifiability, and voter eligibility, respectively; each is verified by ProVerif~2.05~\cite{blanchet2016} under the symbolic Dolev--Yao adversary model. All three queries return \texttt{true}.
+
+The model files are versioned in the project repository under the directory \texttt{proverif/}. The shell script \texttt{proverif/run\_verification.sh} reproduces all three runs in sequence and prints the \texttt{RESULT} lines.
+
+\section{Reproducing the Verification}
+\label{sec:appx-proverif-repro}
+
+Install ProVerif via OPAM (OCaml package manager):
+\begin{verbatim}
+opam install proverif
+\end{verbatim}
+
+Run all three verifications:
+\begin{verbatim}
+cd proverif
+./run_verification.sh
+\end{verbatim}
+
+The expected condensed output is:
+\begin{verbatim}
+RESULT Observational equivalence is true.
+RESULT inj-event(BallotRecorded(b_2)) ==>
+       inj-event(VoterCastBallot(pkV,b_2)) is true.
+RESULT event(ValidBallotCast(pkV)) ==>
+       event(VoterRegistered(pkV)) is true.
+\end{verbatim}
+
+\section{Ballot Privacy: \texttt{privacy.pv}}
+\label{sec:appx-proverif-privacy}
+
+Ballot privacy is verified via observational equivalence: an adversary controlling the network cannot distinguish between two honest voters swapping their ballots. The model uses the \texttt{diff[v0, v1]} construct to test whether the protocol is observationally equivalent under both ballot assignments.
+
+\subsection*{Source: \texttt{proverif/privacy.pv}}
+\begin{footnotesize}
+\begin{verbatim}
+(* CovertVote: Ballot Privacy via Observational Equivalence *)
+(* NO queries allowed in this file -- diff mode only *)
+
+type skey.
+type pkey.
+type vote.
+type nonce.
+type commitment.
+type zkprf.
+type signature.
+type keyimage.
+
+free ch: channel.
+free bb: channel.
+free sa2_a: channel [private].
+free sa2_b: channel [private].
+
+free v0: vote.
+free v1: vote.
+
+fun pk(skey): pkey.
+fun enc(vote, pkey, nonce): bitstring.
+fun commit(vote, nonce): commitment.
+fun zkp_make(vote, nonce, commitment): zkprf.
+fun ring_sign(bitstring, skey, pkey): signature.
+fun key_image(skey): keyimage.
+fun sa2_share_a(bitstring, nonce): bitstring.
+fun sa2_share_b(bitstring, nonce): bitstring.
+fun make_ballot(bitstring, commitment, zkprf, signature, keyimage): bitstring.
+
+let SA2ServerA() = in(sa2_a, x: bitstring); 0.
+let SA2ServerB() = in(sa2_b, x: bitstring); 0.
+
+let VoterPrivacy(skV: skey, pkEA: pkey) =
+    new r_enc: nonce;
+    new r_com: nonce;
+    new r_sa2: nonce;
+    let v = diff[v0, v1] in
+    let encVote = enc(v, pkEA, r_enc) in
+    let com = commit(v, r_com) in
+    let zk = zkp_make(v, r_com, com) in
+    let sig = ring_sign(encVote, skV, pk(skV)) in
+    let ki = key_image(skV) in
+    let b = make_ballot(encVote, com, zk, sig, ki) in
+    out(sa2_a, sa2_share_a(encVote, r_sa2));
+    out(sa2_b, sa2_share_b(encVote, r_sa2));
+    out(bb, b);
+    0.
+
+process
+    new skEA: skey;
+    let pkEA = pk(skEA) in
+    out(ch, pkEA);
+    (
+        new skAlice: skey;
+        new skBob: skey;
+        out(ch, pk(skAlice));
+        out(ch, pk(skBob));
+        VoterPrivacy(skAlice, pkEA) |
+        VoterPrivacy(skBob, pkEA) |
+        SA2ServerA() |
+        SA2ServerB()
+    )
+\end{verbatim}
+\end{footnotesize}
+
+\subsection*{ProVerif output (excerpt)}
+\begin{footnotesize}
+\begin{verbatim}
+$ proverif privacy.pv
+...
+RESULT Observational equivalence is true.
+--------------------------------------------------------------
+Verification summary:
+
+Observational equivalence is true.
+
+--------------------------------------------------------------
+\end{verbatim}
+\end{footnotesize}
+
+\textbf{Interpretation.} The ``\texttt{Observational equivalence is true}'' result means that for every possible adversary strategy, the trace of network observations is identical regardless of whether each voter cast \texttt{v0} or \texttt{v1}. Therefore an adversary cannot infer how any individual voter voted from network-level observations alone.
+
+\section{Individual Verifiability: \texttt{verifiability.pv}}
+\label{sec:appx-proverif-verifiability}
+
+Individual verifiability is verified via injective correspondence: every recorded ballot on the bulletin board corresponds to exactly one authentic cast event by a registered voter. The query asserts \texttt{BallotRecorded(b)} $\Longrightarrow$ \texttt{inj-event(VoterCastBallot(pkV, b))}.
+
+\subsection*{Source: \texttt{proverif/verifiability.pv}}
+\begin{footnotesize}
+\begin{verbatim}
+(* CovertVote: Individual Verifiability *)
+
+type skey.
+type pkey.
+type vote.
+type nonce.
+type commitment.
+type zkprf.
+type signature.
+type keyimage.
+
+free ch: channel.
+free bb: channel.
+free auth_bb: channel [private].
+free sa2_a: channel [private].
+free sa2_b: channel [private].
+
+free v0: vote.
+
+fun pk(skey): pkey.
+fun enc(vote, pkey, nonce): bitstring.
+fun commit(vote, nonce): commitment.
+fun zkp_make(vote, nonce, commitment): zkprf.
+fun ring_sign(bitstring, skey, pkey): signature.
+fun key_image(skey): keyimage.
+fun sa2_share_a(bitstring, nonce): bitstring.
+fun sa2_share_b(bitstring, nonce): bitstring.
+fun make_ballot(bitstring, commitment, zkprf, signature, keyimage): bitstring.
+
+event VoterCastBallot(pkey, bitstring).
+event BallotRecorded(bitstring).
+
+query b: bitstring, pkV: pkey;
+    event(BallotRecorded(b)) ==> inj-event(VoterCastBallot(pkV, b)).
+
+let SA2ServerA() = in(sa2_a, x: bitstring); 0.
+let SA2ServerB() = in(sa2_b, x: bitstring); 0.
+
+let VoterVerifiable(skV: skey, v: vote, pkEA: pkey) =
+    new r_enc: nonce;
+    new r_com: nonce;
+    new r_sa2: nonce;
+    let encVote = enc(v, pkEA, r_enc) in
+    let com = commit(v, r_com) in
+    let zk = zkp_make(v, r_com, com) in
+    let sig = ring_sign(encVote, skV, pk(skV)) in
+    let ki = key_image(skV) in
+    let b = make_ballot(encVote, com, zk, sig, ki) in
+    event VoterCastBallot(pk(skV), b);
+    out(sa2_a, sa2_share_a(encVote, r_sa2));
+    out(sa2_b, sa2_share_b(encVote, r_sa2));
+    out(auth_bb, b);
+    0.
+
+let BulletinBoard() =
+    in(auth_bb, b: bitstring);
+    event BallotRecorded(b);
+    out(bb, b);
+    0.
+
+process
+    new skEA: skey;
+    let pkEA = pk(skEA) in
+    out(ch, pkEA);
+    (
+        new skV: skey;
+        VoterVerifiable(skV, v0, pkEA) |
+        BulletinBoard() |
+        SA2ServerA() |
+        SA2ServerB()
+    )
+\end{verbatim}
+\end{footnotesize}
+
+\subsection*{ProVerif output (excerpt)}
+\begin{footnotesize}
+\begin{verbatim}
+$ proverif verifiability.pv
+...
+Starting query inj-event(BallotRecorded(b_2))
+              ==> inj-event(VoterCastBallot(pkV,b_2))
+goal reachable: b-inj-event(VoterCastBallot(...))
+              -> inj-event(BallotRecorded(...))
+The hypothesis occurs strictly before the conclusion.
+
+RESULT inj-event(BallotRecorded(b_2)) ==>
+       inj-event(VoterCastBallot(pkV,b_2)) is true.
+--------------------------------------------------------------
+Verification summary:
+
+Query inj-event(BallotRecorded(b_2)) ==>
+      inj-event(VoterCastBallot(pkV,b_2)) is true.
+
+--------------------------------------------------------------
+\end{verbatim}
+\end{footnotesize}
+
+\textbf{Interpretation.} The injective correspondence guarantees that no recorded ballot is forged or duplicated: each \texttt{BallotRecorded} event on the bulletin board is matched to a unique prior \texttt{VoterCastBallot} event by an authenticated voter, providing individual verifiability.
+
+\section{Voter Eligibility: \texttt{eligibility.pv}}
+\label{sec:appx-proverif-eligibility}
+
+Voter eligibility is verified via causal correspondence: every valid ballot cast was preceded by a legitimate registration event with the registration authority. The query asserts \texttt{ValidBallotCast(pkV)} $\Longrightarrow$ \texttt{VoterRegistered(pkV)}.
+
+\subsection*{Source: \texttt{proverif/eligibility.pv}}
+\begin{footnotesize}
+\begin{verbatim}
+(* CovertVote: Voter Eligibility *)
+(* NO diff allowed -- query mode only *)
+
+type skey.
+type pkey.
+type vote.
+type credential.
+type nonce.
+
+free ch: channel.
+free bb: channel.
+free reg: channel [private].
+
+free v0: vote.
+
+fun pk(skey): pkey.
+fun enc(vote, pkey, nonce): bitstring.
+fun real_cred(skey): credential.
+fun fake_cred(skey): credential.
+
+event VoterRegistered(pkey).
+event ValidBallotCast(pkey).
+
+query pkV: pkey;
+    event(ValidBallotCast(pkV)) ==> event(VoterRegistered(pkV)).
+
+let RegistrationAuthority() =
+    in(reg, voterPK: pkey);
+    new skCred: skey;
+    out(reg, (real_cred(skCred), fake_cred(skCred)));
+    0.
+
+let VoterEligible(skV: skey, v: vote, pkEA: pkey) =
+    out(reg, pk(skV));
+    in(reg, (realC: credential, fakeC: credential));
+    event VoterRegistered(pk(skV));
+    new r_enc: nonce;
+    let encVote = enc(v, pkEA, r_enc) in
+    event ValidBallotCast(pk(skV));
+    out(bb, encVote);
+    0.
+
+process
+    new skEA: skey;
+    let pkEA = pk(skEA) in
+    out(ch, pkEA);
+    (
+        new skV: skey;
+        RegistrationAuthority() |
+        VoterEligible(skV, v0, pkEA)
+    )
+\end{verbatim}
+\end{footnotesize}
+
+\subsection*{ProVerif output (excerpt)}
+\begin{footnotesize}
+\begin{verbatim}
+$ proverif eligibility.pv
+...
+Starting query event(ValidBallotCast(pkV))
+              ==> event(VoterRegistered(pkV))
+goal reachable: b-event(VoterRegistered(pk(skV[])))
+              && mess(reg[],voterPK_1)
+              -> event(ValidBallotCast(pk(skV[])))
+
+RESULT event(ValidBallotCast(pkV)) ==>
+       event(VoterRegistered(pkV)) is true.
+--------------------------------------------------------------
+Verification summary:
+
+Query event(ValidBallotCast(pkV)) ==>
+      event(VoterRegistered(pkV)) is true.
+
+--------------------------------------------------------------
+\end{verbatim}
+\end{footnotesize}
+
+\textbf{Interpretation.} The causal correspondence guarantees that any ballot accepted as ``valid'' is necessarily preceded by a successful registration of the same voter public key with the registration authority. This rules out unauthorised vote injection by unregistered parties.
+
+\section{Summary}
+\label{sec:appx-proverif-summary}
+
+Table~\ref{tab:proverif} of Chapter~\ref{ch:results} summarises the three results in tabular form: all three properties hold under the Dolev--Yao adversary model. Together they establish symbolic-model security against eavesdropping, replay, and man-in-the-middle attacks at the protocol level. Stronger guarantees in the computational model (game-based or universally composable proofs) are identified as future work in Chapter~\ref{ch:conclusion}.

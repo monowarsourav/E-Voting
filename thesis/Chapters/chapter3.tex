@@ -14,7 +14,7 @@ The proposed framework consists of four architectural layers that interact to pr
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/architecture.tex}}
-\caption{End-to-end system architecture of the proposed framework. The diagram traces the full path from voter authentication through the cryptographic pipeline, the two non-colluding SA\textsuperscript{2} aggregators, the Hyperledger Fabric storage layer, and the threshold tally service to the published result. All shapes and line styles are distinguishable in greyscale.}
+\caption[Proposed System Architecture Overview]{End-to-end system architecture of the proposed framework. The diagram traces the full path from voter authentication through the cryptographic pipeline, the two non-colluding SA\textsuperscript{2} aggregators, the Hyperledger Fabric storage layer, and the threshold tally service to the published result. All shapes and line styles are distinguishable in greyscale.}
 \label{fig:architecture}
 \end{figure}
 
@@ -153,7 +153,7 @@ The Paillier cryptosystem supports the following homomorphic operations~\cite{pa
     \label{eq:homo-add}
 \end{equation}
 
-This property is the foundation of the proposed framework's $O(n)$ tally. Given $n$ encrypted votes $\{E(v_1), E(v_2), \ldots, E(v_n)\}$ for a single candidate, the encrypted tally is:
+This property is the foundation of the proposed framework's $O(n)$-per-candidate (and $O(n \cdot m)$ total over $m$ candidates) tally. Given $n$ encrypted votes $\{E(v_1), E(v_2), \ldots, E(v_n)\}$ for a single candidate, the encrypted tally is:
 \begin{equation}
     E\left(\sum_{i=1}^{n} v_i\right) = \prod_{i=1}^{n} E(v_i) \bmod n^2
     \label{eq:tally}
@@ -353,7 +353,7 @@ Due to Pedersen's \textbf{computational hiding} property, the coercer cannot det
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/smdc.tex}}
-\caption{SMDC deniable credential structure with $k=5$ slots. The real slot is distinguishable only via the cross-hatched fill in this diagram; cryptographically, the Pedersen hiding property renders the real and fake slots computationally indistinguishable to a coercer.}
+\caption[SMDC Deniable Credential Slot Structure]{SMDC deniable credential structure with $k=5$ slots. The real slot is distinguishable only via the cross-hatched fill in this diagram; cryptographically, the Pedersen hiding property renders the real and fake slots computationally indistinguishable to a coercer.}
 \label{fig:smdc}
 \end{figure}
 
@@ -369,7 +369,7 @@ The election system verifies credentials without learning the real index:
 \subsection{SA\textsuperscript{2}: Samplable Anonymous Aggregation}
 \label{subsec:sa2}
 
-\emph{The adaptation of SA\textsuperscript{2} from federated data analysis to encrypted voting is a contribution of this thesis.} The underlying two-server aggregation primitive is due to Apple Machine Learning Research~\cite{sa2_apple}, building on the secure aggregation construction of Bonawitz et al.~\cite{bonawitz2017}. The novelty here lies in pairing the additive Paillier ciphertext $E(v)$ with mask cancellation across the two non-colluding aggregators in equations~\eqref{eq:sa2-share-a}--\eqref{eq:sa2-reconstruct}, so that mask homomorphism (rather than secret sharing of plaintexts as in the original federated-learning setting) suffices to reconstruct the encrypted tally.
+This subsection describes the integration of the existing SA\textsuperscript{2} primitive of Apple Machine Learning Research~\cite{sa2_apple}---which itself builds on the secure aggregation construction of Bonawitz et al.~\cite{bonawitz2017}---into the proposed voting pipeline. \emph{The two-server, non-colluding mask-cancellation construction of SA\textsuperscript{2} is not a contribution of this thesis; it is invoked as an existing primitive.} The integration choice made here is to pair Paillier additive ciphertexts $E(v)$ with the SA\textsuperscript{2} mask-cancellation across the two aggregators in equations~\eqref{eq:sa2-share-a}--\eqref{eq:sa2-reconstruct}, so that the encrypted tally is reconstructed via mask homomorphism rather than via plaintext secret sharing (the original federated-learning setting).
 
 \subsubsection{Vote Splitting}
 \label{subsubsec:sa2-split}
@@ -479,21 +479,21 @@ Figure~\ref{fig:pipeline} illustrates the four-phase pipeline, and Algorithm~\re
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/pipeline.tex}}
-\caption{The proposed 17-step vote-casting pipeline, organised into four phases. Hatched boxes denote novel contributions of this thesis (duress detection, coercion short-circuit). The diamond marks the duress decision branch leading to either persistent submission or silent discard with a plausible receipt.}
+\caption[Seventeen-Step Vote Casting Pipeline]{The proposed 17-step vote-casting pipeline, organised into four phases. Hatched boxes denote novel contributions of this thesis (duress detection, coercion short-circuit). The diamond marks the duress decision branch leading to either persistent submission or silent discard with a plausible receipt.}
 \label{fig:pipeline}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/workflow.tex}}
-\caption{Voter activity diagram covering the registration phase (left swimlane) and the vote-casting phase (right swimlane). Decision diamonds carry both the genuine and the coerced execution paths; reject paths terminate at the bullseye end nodes.}
+\caption[Voter Registration and Casting Activity]{Voter activity diagram covering the registration phase (left swimlane) and the vote-casting phase (right swimlane). Decision diamonds carry both the genuine and the coerced execution paths; reject paths terminate at the bullseye end nodes.}
 \label{fig:workflow}
 \end{figure}
 
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/sequence.tex}}
-\caption{Sequence diagram of one full vote-cast interaction. Solid arrows are synchronous request messages; dashed arrows are responses; self-arrows are internal computations. The \textbf{alt} block indicates the coercion short-circuit: when the duress signal does not match, steps 14--16 are skipped and the receipt returned to the voter is identical to a genuine cast.}
+\caption[Vote Casting Sequence Diagram]{Sequence diagram of one full vote-cast interaction. Solid arrows are synchronous request messages; dashed arrows are responses; self-arrows are internal computations. The \textbf{alt} block indicates the coercion short-circuit: when the duress signal does not match, steps 14--16 are skipped and the receipt returned to the voter is identical to a genuine cast.}
 \label{fig:sequence}
 \end{figure}
 
@@ -638,4 +638,4 @@ The output $\text{behaviorWeight}$ is multiplied with the SMDC slot weight in th
 \section{Conclusion}
 \label{sec:meth-conclusion}
 
-This chapter presented the complete system design of the proposed framework, including the mathematical formulation of all seven cryptographic protocols, the 17-step vote casting pipeline, and the blockchain integration architecture. Six formal security theorems were stated with proof sketches, demonstrating that The proposed framework provides ballot privacy (Theorem 1), vote validity (Theorem 2), voter anonymity (Theorem 3), coercion resistance (Theorem 4), aggregation privacy (Theorem 5), and post-quantum security (Theorem 6). The key innovations are the SMDC coercion resistance mechanism with $k = 5$ deniable credential slots, the adaptation of SA\textsuperscript{2} for voting privacy, the behavioral duress detection system, and the Kyber768 hybrid encryption for post-quantum security. The next chapter presents the implementation details and comprehensive performance evaluation of the system.
+This chapter presented the complete system design of the proposed framework, including the mathematical formulation of all seven cryptographic protocols, the 17-step vote casting pipeline, and the blockchain integration architecture. Six formal security theorems were stated with proof sketches, demonstrating that the proposed framework provides ballot privacy (Theorem~1), vote validity (Theorem~2), voter anonymity (Theorem~3), coercion resistance (Theorem~4), aggregation privacy (Theorem~5), and post-quantum security (Theorem~6). The genuinely novel cryptographic constructions of this thesis are: (i)~the SMDC coercion resistance mechanism with $k=5$ deniable credential slots, (ii)~the behavioral duress detection mechanism using HMAC-SHA256 equality compare, and (iii)~the silent-discard coercion short-circuit semantics. The remaining cryptographic primitives in the pipeline---Paillier, Pedersen, $\Sigma$-proofs, linkable ring signatures, SA\textsuperscript{2}, Kyber768, and DJN threshold decryption---are existing constructions whose composition into a unified voting pipeline is the engineering contribution of this work. The next chapter presents the implementation details and comprehensive performance evaluation of the system.

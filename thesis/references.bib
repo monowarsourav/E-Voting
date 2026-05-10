@@ -217,61 +217,18 @@
 }
 
 @inproceedings{sa2_apple,
-  author    = {Boneh, Dan and Bellare, Mihir and others},
+  author    = {Talwar, Kunal and Wang, Shan and McMillan, Audra and Jina, Vojta and Feldman, Vitaly and Basile, Bailey and Cahill, Aine and Chan, Yi Sheng and Chatzidakis, Mike and Chick, Oliver and Chitnis, Mona and Ganta, Suman and Goren, Yusuf and Granqvist, Filip and Guo, Kristine and Jacobs, Frederic and Javidbakht, Omid and Liu, Albert and Low, Richard and Mascenik, Dan and Myers, Steve and Park, David and Park, Wonhee and Parsa, Gianni and Pauly, Tommy and Priebe, Christian and Rishi, Rehan and Rothblum, Guy and Scaria, Michael and Song, Linmao and Song, Congzheng and Tarbe, Karl and Vogt, Sebastian and Winstrom, Luke and Zhou, Shundong},
   title     = {Samplable Anonymous Aggregation for Private Federated Data Analysis},
-  booktitle = {Apple Machine Learning Research},
+  booktitle = {Proceedings of the 2024 ACM SIGSAC Conference on Computer and Communications Security (CCS '24)},
+  publisher = {ACM},
   year      = {2024},
-  note      = {Apple Privacy-Preserving ML framework}
+  doi       = {10.1145/3658644.3690224}
 }
 
-% ePrint / Preprint references
-@misc{zkvoting,
-  author       = {Arfaoui, Ghada and others},
-  title        = {{zkVoting}: Zero-Knowledge Proof Based Coercion-Resistant {E-Voting}},
-  year         = {2024},
-  howpublished = {Cryptology ePrint Archive, Paper 2024/1003},
-  note         = {\url{https://eprint.iacr.org/2024/1003}}
-}
-
-@misc{lokivote,
-  author       = {Garza, Rebekah and others},
-  title        = {{LOKI Vote}: A Blockchain-Based Coercion Resistant {E-Voting} Protocol},
-  year         = {2020},
-  howpublished = {arXiv preprint}
-}
-
-@article{coercion_scalable,
-  author  = {Anonymous},
-  title   = {A Scalable Coercion-Resistant Voting Scheme for Blockchain},
-  year    = {2023},
-  howpublished = {Cryptology ePrint Archive, Paper 2023/1578},
-  note    = {\url{https://eprint.iacr.org/2023/1578}}
-}
-
-@article{pq_evoting,
-  title   = {Post-Quantum Secure {E-Voting} Protocol Using Blockchain and Lattice-Based Cryptography},
-  journal = {Cryptography and Security},
-  year    = {2025}
-}
-
-@article{zkp_evoting_springer,
-  title   = {Zero Knowledge Proof on Top of Blockchain for Anonymous {E-Voting}},
-  journal = {Journal of Information Security and Applications},
-  year    = {2025}
-}
-
-@article{lattice_zkp,
-  title   = {Lattice-Based Zero-Knowledge Proofs: Applications to Electronic Voting},
-  journal = {Journal of Cryptology},
-  year    = {2024}
-}
-
-@article{biometric_evoting,
-  title   = {Fingerprint-Authenticated Blockchain {E-Voting}},
-  year    = {2025}
-}
-
-% Removed evoting_survey_mdpi — merged into evoting_survey_springer (same survey paper)
+% Removed 7 orphan entries (zkvoting, lokivote, coercion_scalable, pq_evoting,
+% zkp_evoting_springer, lattice_zkp, biometric_evoting) — these were placeholder
+% entries with missing/fabricated authors and were never \cite{}-d in the thesis.
+% Removed evoting_survey_mdpi — merged into evoting_survey_springer (same survey paper).
 
 % ============================================================
 % TOOLS AND LIBRARIES
@@ -365,7 +322,7 @@
 
 % Hyperledger Fabric performance analysis
 @article{fabric_perf,
-  author  = {Nadir, Ibrahim and Ahmad, Faizan and Khattak, Hasan Ali and Zaidi, Syed Ali Abbas and Raza, Mohsin and Aloqaily, Moayad and Jararweh, Yaser},
+  author  = {Ucbas, Yagmur and Eleyan, Amna and Hammoudeh, Mohammad and Alohaly, Manar},
   title   = {Performance and Scalability Analysis of {Ethereum} and {Hyperledger Fabric}},
   journal = {IEEE Access},
   volume  = {11},
@@ -375,12 +332,16 @@
 }
 
 % E-cclesia — UC-secure self-tallying voting (state-of-the-art comparison)
-@misc{ecclesia2025,
-  author       = {Haines, Thomas and M{\"u}ller, Johannes and Reljin, Ivana},
-  title        = {E-cclesia: Universally Composable Self-Tallying Elections over Anonymous Broadcasts},
-  year         = {2025},
-  howpublished = {IACR Cryptology ePrint Archive},
-  note         = {ETH Z{\"u}rich}
+@article{ecclesia2025,
+  author    = {Ackermann, L{\'e}o and Arapinis, Myrto and Georgiou, Pavlos and Lamprou, Nikolaos and Marekov{\'a}, Lenka and Zacharias, Thomas},
+  title     = {E-cclesia: Universally Composable Self-Tallying Elections over Anonymous Broadcast},
+  journal   = {IACR Communications in Cryptology},
+  volume    = {2},
+  number    = {3},
+  year      = {2025},
+  month     = oct,
+  url       = {https://cic.iacr.org/p/2/3/8},
+  note      = {Earlier version: IACR ePrint 2020/513}
 }
 
 % ============================================================

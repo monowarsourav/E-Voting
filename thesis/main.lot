@@ -1,0 +1,18 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {2.1}{\ignorespaces Comparison of State-of-the-Art Blockchain E-Voting Approaches}}{24}{table.caption.6}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {3.1}{\ignorespaces Mathematical Notation}}{29}{table.caption.8}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {4.1}{\ignorespaces Implementation Environment}}{50}{table.caption.13}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Cryptographic Micro-Benchmark Results}}{51}{table.caption.14}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Vote Casting Pipeline: Per-Phase Breakdown}}{53}{table.caption.16}%
+\contentsline {table}{\numberline {4.4}{\ignorespaces Homomorphic Tally Scalability Results}}{54}{table.caption.19}%
+\contentsline {table}{\numberline {4.5}{\ignorespaces Candidate-Independent Tally Scaling ($n = 1{,}000$)}}{55}{table.caption.21}%
+\contentsline {table}{\numberline {4.6}{\ignorespaces Ring Signature Scalability}}{56}{table.caption.23}%
+\contentsline {table}{\numberline {4.7}{\ignorespaces Hyperledger Caliper Blockchain Benchmark Results}}{57}{table.caption.25}%
+\contentsline {table}{\numberline {4.8}{\ignorespaces Test Coverage by Package}}{61}{table.caption.27}%
+\contentsline {table}{\numberline {4.9}{\ignorespaces ProVerif Formal Verification Results}}{62}{table.caption.28}%
+\contentsline {table}{\numberline {4.10}{\ignorespaces Comparison of the Proposed Method with Existing Works}}{63}{table.4.10}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }

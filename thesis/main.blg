@@ -1,0 +1,61 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: main.aux
+A level-1 auxiliary file: ./FrontMatter/titlePage3.aux
+A level-1 auxiliary file: ./FrontMatter/copyright3.aux
+A level-1 auxiliary file: ./FrontMatter/declaration3.aux
+A level-1 auxiliary file: ./FrontMatter/endorsement3.aux
+A level-1 auxiliary file: ./FrontMatter/certificate3.aux
+A level-1 auxiliary file: ./FrontMatter/acknowledgements3.aux
+A level-1 auxiliary file: ./FrontMatter/dedication3.aux
+A level-1 auxiliary file: ./abstract.aux
+A level-1 auxiliary file: ./Chapters/chapter1.aux
+A level-1 auxiliary file: ./Chapters/chapter2.aux
+A level-1 auxiliary file: ./Chapters/chapter3.aux
+A level-1 auxiliary file: ./Chapters/chapter4.aux
+A level-1 auxiliary file: ./Chapters/chapter5.aux
+The style file: ieeetr.bst
+A level-1 auxiliary file: ./back/appendix_proverif.aux
+A level-1 auxiliary file: ./CoverPage/cover3.aux
+Database file #1: references.bib
+You've used 40 entries,
+            1876 wiz_defined-function locations,
+            724 strings with 12053 characters,
+and the built_in function-call counts, 11764 in all, are:
+= -- 1133
+> -- 531
+< -- 7
++ -- 196
+- -- 156
+* -- 893
+:= -- 1683
+add.period$ -- 48
+call.type$ -- 40
+change.case$ -- 40
+chr.to.int$ -- 0
+cite$ -- 40
+duplicate$ -- 572
+empty$ -- 1073
+format.name$ -- 156
+if$ -- 2805
+int.to.chr$ -- 0
+int.to.str$ -- 40
+missing$ -- 28
+newline$ -- 131
+num.names$ -- 40
+pop$ -- 139
+preamble$ -- 1
+purify$ -- 0
+quote$ -- 0
+skip$ -- 392
+stack$ -- 0
+substring$ -- 809
+swap$ -- 241
+text.length$ -- 7
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 0
+warning$ -- 0
+while$ -- 112
+width$ -- 42
+write$ -- 409

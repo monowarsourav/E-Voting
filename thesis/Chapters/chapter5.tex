@@ -13,11 +13,11 @@ Our thesis introduced a blockchain-based electronic voting system that integrate
 
 Our framework combines Paillier homomorphic encryption~\cite{paillier1999} for encrypted tallying, Pedersen commitments~\cite{pedersen1991} with zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir~\cite{bernhard2012}) for vote validity verification, linkable ring signatures~\cite{liu2004} for anonymous ballot submission with double-vote detection, SMDC deniable credentials for coercion resistance, SA\textsuperscript{2} samplable anonymous aggregation~\cite{sa2_apple} for two-server vote privacy, Kyber768~\cite{nist_kyber} hybrid encryption for post-quantum protection, and Damg\aa rd-Jurik-Nielsen threshold decryption~\cite{damgard2010} for distributed key management. To the best of our knowledge, no existing system integrates this many cryptographic protocols in a single, functional voting pipeline.
 
-We implemented the system in Go and deployed it on a production Hyperledger Fabric~v2.5~\cite{androulaki2018} blockchain network. Performance evaluation confirmed that the proposed framework achieves $O(n)$ tally complexity with a constant per-vote cost of approximately 6.1 $\mu$s, verified empirically from 100 to 100,000 voters. The complete seven-protocol vote casting pipeline processes a single vote in 70.5 ms. The Hyperledger Fabric network sustains approximately 200 TPS with 100\% success rate at 10,000 transactions, as measured by Hyperledger Caliper benchmarks. Post-quantum protection via Kyber768 adds only 26 $\mu$s of overhead, showing that quantum-resistant security is achievable at negligible computational cost.
+We implemented the system in Go and deployed it on a production Hyperledger Fabric~v2.5~\cite{androulaki2018} blockchain network. Performance evaluation confirmed that the proposed framework achieves $O(n)$-per-candidate tally complexity (and $O(n \cdot m)$ total) with a constant per-vote per-candidate cost of approximately 6.1~$\mu$s, verified empirically from 100 to 100\,000 voters and across $m \in [2, 50]$ candidates. The complete seven-protocol vote casting pipeline processes a single vote in 70.1~ms (per-phase breakdown sums to 70.08~ms; see Table~\ref{tab:pipeline}). The Hyperledger Fabric network sustains approximately 200 TPS with 100\% success rate at 10,000 transactions, as measured by Hyperledger Caliper benchmarks. Post-quantum protection via the Kyber768 hybrid encryption layer adds only 5.35~ms of overhead per vote (approximately 7.6\% of the 70.1~ms pipeline), showing that quantum-resistant security is achievable at modest computational cost.
 
 Our novel SMDC coercion resistance mechanism, with $k = 5$ credential slots (1 real and 4 fake), provides computationally indistinguishable real and fake credentials through Pedersen's hiding property. Under coercion, voters can present fake credentials that produce valid-looking but silently discarded votes, while the real slot index is deterministically re-derivable only by the legitimate voter through HMAC-SHA256. This is the first complete implementation of deniable credentials in a blockchain e-voting context.
 
-Our comparative analysis with state-of-the-art systems confirmed that the proposed framework delivers strong performance while offering broader security coverage. The $O(n)$ tally complexity is a clear improvement over ISE-Voting's $O(n \times m^2)$, and the 100\% exact tallying contrasts with BP-Vot's $\geq$98\% differential privacy approximation. Linear extrapolation of our tally benchmarks projects feasibility for national-scale elections with 50 million voters in approximately 5.1 minutes.
+Our comparative analysis with state-of-the-art systems confirmed that the proposed framework delivers strong performance while offering broader security coverage. The $O(n)$-per-candidate (and $O(n \cdot m)$-total) tally complexity is a factor-$m$ improvement over ISE-Voting's $O(n \cdot m^{2})$, and the 100\% exact tallying contrasts with BP-Vot's $\geq$98\% differential-privacy approximation. Linear extrapolation of our tally benchmarks projects feasibility for national-scale elections: approximately 5.1~minutes per candidate (and approximately 51~minutes total for $m=10$ candidates) to tally 50~million voters.
 
 \section{Limitations and Future Work}
 \label{sec:limitations}
@@ -31,7 +31,7 @@ Although our proposed framework has shown notable progress in e-voting security,
     
     \item \textbf{Single Orderer Limitation}: Our current deployment uses a single Raft orderer node, which provides crash fault tolerance but not Byzantine fault tolerance. For high-stakes elections where orderer nodes may be adversarial, migrating to a BFT consensus mechanism (e.g., SmartBFT in Fabric v3.x) would strengthen the system's resilience.
     
-    \item \textbf{Fixed Ring Size}: The ring size is fixed at $|\mathcal{R}| = 100$ in our implementation. While this provides strong anonymity ($\leq 1\%$ identification probability), a dynamic ring size mechanism that adapts to the voter pool size and latency requirements would provide more flexible deployment options.
+    \item \textbf{Fixed Ring Size}: The ring size is fixed at $|\mathcal{R}| = 100$ in our implementation. While this provides strong anonymity --- the signer is statistically indistinguishable among the 100 ring members under DDH --- a dynamic ring size mechanism that adapts to the voter pool size and latency requirements would provide more flexible deployment options.
     
     \item \textbf{Blockchain Scalability at Extreme Load}: Our Hyperledger Caliper benchmarks revealed that the Fabric Gateway's default concurrency limit (500 connections) causes failures at transaction volumes above 25,000. Production deployments for national-scale elections would require careful infrastructure engineering including connection pool tuning, horizontal peer scaling, and load balancing.
     
@@ -47,10 +47,10 @@ The limitations we identify above and the future work directions suggest a roadm
 In summary, the proposed framework achieves the following key quantitative results:
 
 \begin{enumerate}
-    \item \textbf{6.1 $\mu$s} per-vote tally cost, constant across 100 to 100,000 voters ($O(n)$ complexity).
-    \item \textbf{70.5 ms} complete seven-protocol pipeline time per vote.
+    \item \textbf{6.1~$\mu$s} per-vote per-candidate tally cost, constant across 100 to 100\,000 voters and across $m \in [2,50]$ candidates ($O(n)$ per candidate, $O(n \cdot m)$ total).
+    \item \textbf{70.1 ms} complete seven-protocol pipeline time per vote (sum of per-phase Table~\ref{tab:pipeline}).
     \item \textbf{$\sim$200 TPS} sustained blockchain throughput with 100\% success at 10,000 transactions.
-    \item \textbf{26 $\mu$s} Kyber768 overhead for post-quantum protection.
+    \item \textbf{5.35 ms} Kyber768 hybrid-encryption overhead per vote ($\approx$7.6\% of pipeline) for post-quantum protection.
     \item \textbf{7 cryptographic protocols} integrated in a single pipeline, more than any existing system.
     \item \textbf{188 tests} (159 unit/integration + 29 benchmarks) with 100\% pass rate and 78--92\% coverage on core packages.
 \end{enumerate}

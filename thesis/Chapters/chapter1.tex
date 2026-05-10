@@ -108,7 +108,7 @@ The security of the proposed framework rests on seven cryptographic protocols, e
 \subsection{State of the Art in the Modern Context}
 \label{subsec:state-of-art}
 
-Recent blockchain e-voting research has produced systems that each strengthen one or two security properties but none that simultaneously achieve all of: homomorphic tallying for exact results, formal zero-knowledge proofs for vote validity, linkable ring signatures for anonymity with double-vote detection, deniable credentials for coercion resistance, two-server anonymous aggregation, post-quantum security, and production-grade blockchain deployment with empirical performance data. Recurring shortcomings across the surveyed work include super-linear tally complexity, reliance on trusted counting authorities or differential-privacy approximations, weak symmetric-only privacy, and the absence of a coercion-resistance mechanism that survives a coercer who can demand proof of how the voter cast a ballot. A detailed analysis of representative works, their reported performance, and the precise gaps they leave open is presented in Chapter~\ref{ch:literature-review}. The proposed framework directly addresses these gaps and is positioned in detail against the cited systems in Section~\ref{sec:comparative} of Chapter~\ref{ch:results}.
+Recent blockchain e-voting research has produced systems that each strengthen one or two security properties but none that simultaneously achieve all of: homomorphic tallying for exact results, formal zero-knowledge proofs for vote validity, linkable ring signatures for anonymity with double-vote detection, deniable credentials for coercion resistance, two-server anonymous aggregation, post-quantum security, and production-grade blockchain deployment with empirical performance data. Recurring shortcomings across the surveyed work include super-linear tally complexity, reliance on trusted counting authorities or differential-privacy approximations, weak symmetric-only privacy, and the absence of a coercion-resistance mechanism that survives a coercer who can demand proof of how the voter cast a ballot. A detailed analysis of representative works, their reported performance, and the precise gaps they leave open is presented in Chapter~\ref{ch:related-works}. The proposed framework directly addresses these gaps and is positioned in detail against the cited systems in Section~\ref{sec:comparative} of Chapter~\ref{ch:results}.
 
 \subsection{Importance and Relevance of the Topic}
 \label{subsec:importance}
@@ -117,7 +117,7 @@ Secure electronic voting matters beyond technical innovation; it touches on demo
 
 On a related note, the emergence of quantum computing poses a long-term threat to current cryptographic systems~\cite{shor1997}. Elections may produce records that must remain confidential for decades. A vote encrypted today with RSA, ECC, or any scheme whose security reduces to integer factorisation or discrete logarithms could potentially be decrypted by a future quantum computer running Shor's algorithm~\cite{shor1997}, retroactively compromising voter privacy. This \emph{harvest-now-decrypt-later} threat model has motivated the U.S. National Institute of Standards and Technology to standardise lattice-based replacements, including ML-KEM (FIPS~203~\cite{nist_kyber}) for key encapsulation and ML-DSA (FIPS~204~\cite{nist_mldsa}) for digital signatures, both finalised in 2024. Post-quantum cryptographic protection is therefore not merely a theoretical concern but a practical and standards-aligned necessity for long-term ballot secrecy.
 
-From a scalability perspective, nations with large populations require voting systems that can process votes efficiently without per-vote costs growing quadratically with the number of candidates. the proposed framework's $O(n)$ tally complexity, confirmed through empirical benchmarks, demonstrates feasibility for national-scale deployments.
+From a scalability perspective, nations with large populations require voting systems whose per-candidate tally cost grows only linearly with the number of voters and whose total tally cost grows no worse than linearly with the number of candidates. The proposed framework achieves $O(n)$ per candidate and $O(n \cdot m)$ total tally complexity, confirmed through empirical benchmarks, which is a factor-$m$ improvement over ISE-Voting's $O(n \cdot m^{2})$ and demonstrates feasibility for national-scale deployments.
 
 The intersection of blockchain technology, advanced cryptography, and post-quantum security in the context of electronic voting represents an active and important area of research with direct societal impact.
 
@@ -153,16 +153,7 @@ This thesis focuses on the cryptographic protocol design, implementation, and pe
 \end{itemize}
 
 \subsection{Out of Scope}
-\begin{itemize}
-    \item User interface (UI/UX) design and implementation for the voter-facing application.
-    \item Voter registration infrastructure and national identity integration.
-    \item Formal verification using Tamarin or other automated tools beyond the ProVerif symbolic model.
-    \item Multi-constituency deployment with geographic distribution.
-    \item Mobile client implementation and accessibility testing.
-    \item Real-world election deployment and usability studies with actual voters.
-\end{itemize}
-
-These out-of-scope items are discussed as future work directions in Chapter~\ref{ch:conclusion}.
+The following items fall outside the boundary of the present work: user interface (UI/UX) design and implementation for the voter-facing application, voter registration infrastructure and national identity integration, formal verification using Tamarin or other automated tools beyond the ProVerif symbolic model, multi-constituency deployment with geographic distribution, mobile client implementation and accessibility testing, and real-world election deployment and usability studies with actual voters. These out-of-scope items are discussed as future work directions in Chapter~\ref{ch:conclusion}.
 
 % ============================================================
 \section{Problem Statement}
@@ -175,7 +166,7 @@ Despite the advances in blockchain-based e-voting, significant challenges remain
     
     \item How can coercion resistance be practically implemented in a blockchain e-voting context, such that a coerced voter can present plausible fake credentials to a coercer without the coercer being able to distinguish real from fake votes, while ensuring that only real votes are counted in the final tally?
     
-    \item How can the vote tallying process achieve $O(n)$ computational complexity (linear in the number of voters and independent of the number of candidates) while preserving the exact correctness of results without introducing noise or approximation?
+    \item How can the vote tallying process achieve $O(n)$ computational complexity \emph{per candidate} (linear in the number of voters), with $O(n \cdot m)$ total cost across $m$ candidates, while preserving the exact correctness of results without introducing noise or approximation?
     
     \item How can a production-ready blockchain infrastructure (Hyperledger Fabric) be integrated with the cryptographic voting pipeline to provide immutable vote records and chaincode-level verification, and what throughput and latency characteristics does this integration achieve under realistic load conditions?
 \end{itemize}
@@ -191,7 +182,7 @@ The primary goal of this research is to design, implement, and empirically evalu
     
     \item To develop a novel coercion resistance mechanism (SMDC) based on deniable credentials with $k=5$ slots, integrated with behavioral duress detection, that provides computationally indistinguishable real and fake credentials in a practical blockchain voting context.
     
-    \item To achieve $O(n)$ tally complexity through Paillier's additive homomorphism, enabling linear-time vote counting that is independent of the number of candidates, and to validate this complexity through empirical benchmarks from 100 to 100,000 voters.
+    \item To achieve $O(n)$ per-candidate tally complexity (and $O(n \cdot m)$ total) through Paillier's additive homomorphism, enabling linear-in-voters vote counting that grows only linearly --- not quadratically --- with the number of candidates, and to validate this complexity through empirical benchmarks from 100 to 100,000 voters.
     
     \item To integrate the voting system with a production Hyperledger Fabric v2.5 blockchain network and empirically measure throughput and latency using Hyperledger Caliper benchmarks across transaction volumes from 10,000 to 100,000.
 \end{itemize}
@@ -200,22 +191,22 @@ The primary goal of this research is to design, implement, and empirically evalu
 \section{Research Contributions}
 \label{sec:contributions}
 
-This thesis makes the following key contributions to the field of blockchain-based electronic voting:
+This thesis makes the following contributions to the field of blockchain-based electronic voting. To avoid overstating novelty, the contributions are explicitly grouped into (a) genuinely novel cryptographic constructions, (b) system-integration and engineering contributions, and (c) empirical results.
 
 \begin{enumerate}
-    \item \textbf{Seven-Protocol Cryptographic Stack}: This work presents the first complete implementation of a voting system integrating seven distinct cryptographic protocols: Paillier homomorphic encryption, Pedersen commitments, zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir), linkable ring signatures, SMDC deniable credentials, SA\textsuperscript{2} anonymous aggregation, and Kyber768 post-quantum hybrid encryption. No existing system combines this many protocols in a single, functional voting pipeline.
-    
-    \item \textbf{SMDC Coercion Resistance}: The thesis introduces Self-Masking Deniable Credentials (SMDC), a practical coercion resistance mechanism where voters receive $k=5$ credential slots with 1 real and 4 fake. The real slot index is derived via HMAC-SHA256 and never stored, making it re-derivable only by the legitimate voter. This is the first complete implementation of deniable credentials in a blockchain e-voting context.
-    
-    \item \textbf{Behavioral Duress Detection}: A novel behavioral coercion detection system is presented, using HMAC-SHA256 hashing of biometric signals (blink count, head tilt, long press, time delay, voice command) with constant-time verification. When duress is detected, the system silently discards the coerced vote while returning an identical-looking receipt to the voter.
-    
-    \item \textbf{O(n) Tally Complexity}: Through Paillier's additive homomorphism, the tally achieves $O(n)$ complexity per candidate, confirmed empirically at approximately 6~$\mu$s per vote from 100 to 100,000 voters. This represents a significant improvement over ISE-Voting's $O(n \times m^2)$.
-    
-    \item \textbf{Production Blockchain Integration}: The system is fully integrated with Hyperledger Fabric v2.5 via the Fabric Gateway SDK (fabric-gateway v1.10.1), with empirical Caliper benchmarks demonstrating approximately 200 TPS throughput with 100\% success rate at 10,000 transactions.
-    
-    \item \textbf{SA\textsuperscript{2} Voting Adaptation}: Apple's Samplable Anonymous Aggregation (SA\textsuperscript{2}) protocol, originally designed for federated data analysis, is adapted for voting. The two-server non-colluding model ensures vote privacy as long as one server remains honest.
-    
-    \item \textbf{Threshold Paillier Decryption}: A complete Damg\aa rd-Jurik-Nielsen (DJN) threshold decryption scheme~\cite{damgard2010} is implemented with Shamir's Secret Sharing~\cite{shamir1979}, ZK proofs for partial decryption, and Lagrange interpolation for combining, ensuring no single entity can decrypt the election result alone.
+    \item \textbf{SMDC Coercion Resistance (Novel Construction).} The thesis introduces Self-Masking Deniable Credentials (SMDC), a practical coercion resistance mechanism in which each voter receives $k=5$ credential slots (1 real and 4 fake). The real slot index is derived via HMAC-SHA256 and never stored, making it re-derivable only by the legitimate voter. To the best of our knowledge, this is the first complete implementation of deniable credentials in a blockchain e-voting context.
+
+    \item \textbf{Behavioral Duress Detection (Novel Construction).} A behavioral coercion detection mechanism is presented, using HMAC-SHA256 hashing of biometric signals (blink count, head tilt, long press, time delay, voice command) with constant-time equality verification against a per-voter stored hash. The deterministic per-voter equality check and the silent-substitution semantics are original to this work.
+
+    \item \textbf{Coercion Short-Circuit Semantics (Novel Construction).} The vote-casting pipeline is extended with silent-substitution semantics that interact with SMDC fake-slot detection: under duress, the full ring-signature and SA\textsuperscript{2} share-split steps still execute (preserving timing indistinguishability), but the key-image registration is silently discarded so that the receipt returned to a coerced voter is observationally identical to a genuine cast.
+
+    \item \textbf{Seven-Protocol Pipeline Integration (Engineering Contribution).} This work presents the first complete implementation that composes seven cryptographic primitives---Paillier homomorphic encryption~\cite{paillier1999}, Pedersen commitments~\cite{pedersen1991}, zero-knowledge $\Sigma$-proofs (Strong Fiat-Shamir)~\cite{bernhard2012}, linkable ring signatures~\cite{liu2004}, SA\textsuperscript{2} anonymous aggregation~\cite{sa2_apple}, Kyber768 post-quantum hybrid encryption~\cite{nist_kyber}, and DJN threshold Paillier decryption~\cite{damgard2010}---together with the novel SMDC and duress mechanisms above into a single, functional voting pipeline. The underlying primitives are existing constructions; the contribution lies in their composition, the resolution of inter-protocol parameter compatibility, and the production engineering.
+
+    \item \textbf{SA\textsuperscript{2} Adaptation for Voting (Integration Choice, not Novel).} Apple's Samplable Anonymous Aggregation primitive~\cite{sa2_apple}, originally designed for federated data analysis, is integrated with Paillier additive homomorphism so that the encrypted tally is reconstructed via mask cancellation across two non-colluding aggregators. The SA\textsuperscript{2} construction itself is not a contribution of this thesis; the contribution is its placement in the voting pipeline.
+
+    \item \textbf{Production Hyperledger Fabric Integration (Engineering Contribution).} The system is fully integrated with Hyperledger Fabric~v2.5~\cite{androulaki2018} via the Fabric Gateway SDK (fabric-gateway v1.10.1), with empirical Hyperledger Caliper benchmarks demonstrating approximately 200~TPS throughput and 100\% success rate at 10,000 transactions.
+
+    \item \textbf{$O(n)$-per-Candidate Tally with Empirical Validation (Result).} Through Paillier's additive homomorphism, the tally achieves $O(n)$ complexity per candidate and $O(n \cdot m)$ total complexity, confirmed empirically: the per-vote per-candidate cost is approximately 6.1~$\mu$s across four orders of magnitude (100 to 100{,}000 voters), and the total tally time scales linearly with $m$ (Section~\ref{subsubsec:candidate-scale}). This is a factor-$m$ improvement over ISE-Voting's $O(n \cdot m^{2})$, and the 100\% exact tally contrasts with BP-Vot's $\geq 98\%$ differential-privacy approximation.
 \end{enumerate}
 
 % ============================================================
@@ -225,7 +216,7 @@ This thesis makes the following key contributions to the field of blockchain-bas
 The remainder of this thesis is organized as follows:
 
 \begin{itemize}
-    \item \textbf{Chapter 2, Literature Review}, discusses the existing research on blockchain-based e-voting systems with a focus on security properties, cryptographic techniques, and coercion resistance mechanisms. It reviews six key works in detail, analyzing their methodologies, contributions, and limitations. The chapter concludes with a comprehensive comparison table that positions our framework relative to the state of the art.
+    \item \textbf{Chapter 2, Related Works}, discusses the existing research on blockchain-based e-voting systems with a focus on security properties, cryptographic techniques, and coercion resistance mechanisms. It reviews six key works in detail, analyzing their methodologies, contributions, and limitations. The chapter concludes with a comprehensive comparison table that positions our framework relative to the state of the art.
     
     \item \textbf{Chapter 3, System Design and Cryptographic Protocols}, presents the complete architecture of the proposed system. This chapter includes the detailed mathematical formulation of all seven cryptographic protocols, the 17-step vote casting pipeline, the SMDC credential generation mechanism, the SA\textsuperscript{2} aggregation protocol, and the blockchain integration architecture. Engineering and societal considerations are also addressed.
     

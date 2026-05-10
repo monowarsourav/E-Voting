@@ -1,0 +1,223 @@
+\begin{thebibliography}{10}
+
+\bibitem{androulaki2018}
+E.~Androulaki, A.~Barger, V.~Bortnikov, C.~Cachin, K.~Christidis, A.~De~Caro,
+  D.~Enyeart, C.~Ferris, G.~Laventman, Y.~Manevich, S.~Muralidharan, C.~Murthy,
+  B.~Nguyen, M.~Sethi, G.~Singh, K.~Smith, A.~Sorniotti, C.~Stathakopoulou,
+  M.~Vukoli{\'c}, S.~W. Cocco, and J.~Yellick, ``Hyperledger {Fabric}: A
+  distributed operating system for permissioned blockchains,'' in {\em
+  Proceedings of the Thirteenth EuroSys Conference (EuroSys '18)}, pp.~1--15,
+  ACM, 2018.
+
+\bibitem{nakamoto2008}
+S.~Nakamoto, ``Bitcoin: A peer-to-peer electronic cash system.''
+  \url{https://bitcoin.org/bitcoin.pdf}, 2008.
+\newblock Original blockchain whitepaper.
+
+\bibitem{voatz_mit}
+M.~A. Specter, J.~Koppel, and D.~Weitzner, ``The ballot is busted before the
+  blockchain: A security analysis of {Voatz}, the first internet voting
+  application used in {U.S.} federal elections,'' in {\em 29th USENIX Security
+  Symposium}, pp.~1535--1553, USENIX Association, 2020.
+
+\bibitem{nist_aes}
+{National Institute of Standards and Technology}, ``{Advanced Encryption
+  Standard (AES)},'' Tech. Rep. FIPS PUB 197, NIST, 2001.
+
+\bibitem{rivest1978rsa}
+R.~L. Rivest, A.~Shamir, and L.~Adleman, ``{A Method for Obtaining Digital
+  Signatures and Public-Key Cryptosystems},'' {\em Communications of the ACM},
+  vol.~21, no.~2, pp.~120--126, 1978.
+
+\bibitem{wood2014ethereum}
+G.~Wood, ``{Ethereum: A Secure Decentralised Generalised Transaction Ledger},''
+  2014.
+\newblock Ethereum Project Yellow Paper.
+
+\bibitem{fabric_perf}
+Y.~Ucbas, A.~Eleyan, M.~Hammoudeh, and M.~Alohaly, ``Performance and
+  scalability analysis of {Ethereum} and {Hyperledger Fabric},'' {\em IEEE
+  Access}, vol.~11, pp.~67156--67167, 2023.
+
+\bibitem{paillier1999}
+P.~Paillier, ``Public-key cryptosystems based on composite degree residuosity
+  classes,'' in {\em Advances in Cryptology --- EUROCRYPT '99}, vol.~1592 of
+  {\em Lecture Notes in Computer Science}, pp.~223--238, Springer, 1999.
+
+\bibitem{bernhard2012}
+D.~Bernhard, O.~Pereira, and B.~Warinschi, ``How not to prove yourself:
+  Pitfalls of the {Fiat-Shamir} heuristic and applications to {Helios},'' in
+  {\em Advances in Cryptology --- ASIACRYPT 2012}, vol.~7658 of {\em Lecture
+  Notes in Computer Science}, pp.~626--643, Springer, 2012.
+
+\bibitem{liu2004}
+J.~K. Liu, V.~K. Wei, and D.~S. Wong, ``Linkable spontaneous anonymous group
+  signature for ad hoc groups,'' in {\em Information Security and Privacy ---
+  ACISP 2004}, vol.~3108 of {\em Lecture Notes in Computer Science},
+  pp.~325--335, Springer, 2004.
+
+\bibitem{sa2_apple}
+K.~Talwar, S.~Wang, A.~McMillan, V.~Jina, V.~Feldman, B.~Basile, A.~Cahill,
+  Y.~S. Chan, M.~Chatzidakis, O.~Chick, M.~Chitnis, S.~Ganta, Y.~Goren,
+  F.~Granqvist, K.~Guo, F.~Jacobs, O.~Javidbakht, A.~Liu, R.~Low, D.~Mascenik,
+  S.~Myers, D.~Park, W.~Park, G.~Parsa, T.~Pauly, C.~Priebe, R.~Rishi,
+  G.~Rothblum, M.~Scaria, L.~Song, C.~Song, K.~Tarbe, S.~Vogt, L.~Winstrom, and
+  S.~Zhou, ``Samplable anonymous aggregation for private federated data
+  analysis,'' in {\em Proceedings of the 2024 ACM SIGSAC Conference on Computer
+  and Communications Security (CCS '24)}, ACM, 2024.
+
+\bibitem{nist_kyber}
+{National Institute of Standards and Technology}, ``Module-lattice-based
+  key-encapsulation mechanism standard ({FIPS} 203),'' Tech. Rep. FIPS 203,
+  U.S. Department of Commerce, Aug. 2024.
+\newblock Standardizes ML-KEM (formerly CRYSTALS-Kyber).
+
+\bibitem{shor1997}
+P.~W. Shor, ``Polynomial-time algorithms for prime factorization and discrete
+  logarithms on a quantum computer,'' {\em SIAM Journal on Computing}, vol.~26,
+  no.~5, pp.~1484--1509, 1997.
+
+\bibitem{nist_mldsa}
+{National Institute of Standards and Technology}, ``Module-lattice-based
+  digital signature standard ({FIPS} 204),'' Tech. Rep. FIPS 204, U.S.
+  Department of Commerce, Aug. 2024.
+\newblock Standardizes ML-DSA (formerly CRYSTALS-Dilithium).
+
+\bibitem{jcj2005}
+A.~Juels, D.~Catalano, and M.~Jakobsson, ``Coercion-resistant electronic
+  elections,'' in {\em Proceedings of the 2005 ACM Workshop on Privacy in the
+  Electronic Society (WPES '05)}, pp.~61--70, ACM, 2005.
+
+\bibitem{civitas2008}
+M.~R. Clarkson, S.~Chong, and A.~C. Myers, ``Civitas: Toward a secure voting
+  system,'' in {\em 2008 IEEE Symposium on Security and Privacy}, pp.~354--368,
+  IEEE, 2008.
+
+\bibitem{pedersen1991}
+T.~P. Pedersen, ``Non-interactive and information-theoretic secure verifiable
+  secret sharing,'' in {\em Advances in Cryptology --- CRYPTO '91}, vol.~576 of
+  {\em Lecture Notes in Computer Science}, pp.~129--140, Springer, 1991.
+
+\bibitem{damgard2010}
+I.~Damg{\aa}rd, M.~Jurik, and J.~B. Nielsen, ``A generalization of {Paillier}'s
+  public-key system with applications to electronic voting,'' {\em
+  International Journal of Information Security}, vol.~9, no.~6, pp.~371--385,
+  2010.
+
+\bibitem{ise_voting}
+J.~Zhang, C.~Wu, R.~S. Sherratt, and J.~Wang, ``An improved secure and
+  efficient {E-Voting} scheme based on blockchain systems,'' {\em IEEE Internet
+  of Things Journal}, vol.~12, no.~7, pp.~8628--8640, 2025.
+
+\bibitem{bp_vot}
+H.~Baniata and G.~Caluna, ``{BP-Vot}: Blockchain-based e-voting using smart
+  contracts, differential privacy and self-sovereign identities,'' {\em IEEE
+  Access}, vol.~13, pp.~46106--46123, 2025.
+
+\bibitem{faruk2024}
+M.~J.~H. Faruk, F.~Alam, M.~Islam, and A.~Rahman, ``Transforming online voting:
+  A novel system utilizing blockchain and biometric verification for enhanced
+  security, privacy, and transparency,'' {\em Cluster Computing}, vol.~27,
+  no.~4, pp.~4015--4034, 2024.
+
+\bibitem{paillier_timed}
+K.~Yuan, P.~Sang, J.~Ge, B.~Zhou, and C.~Jia, ``A timed-release {E-Voting}
+  scheme based on {Paillier} homomorphic encryption,'' {\em IEEE Transactions
+  on Sustainable Computing}, vol.~9, no.~5, pp.~740--753, 2024.
+
+\bibitem{yin_tdsc}
+Z.~Yin, B.~Zhang, A.~Nastenko, R.~Oliynykov, and K.~Ren, ``A scalable
+  coercion-resistant voting scheme for blockchain decision-making,'' {\em IEEE
+  Transactions on Dependable and Secure Computing}, 2024.
+\newblock Also available as IACR ePrint 2023/1578.
+
+\bibitem{evoting_survey_springer}
+H.~O. Ohize, A.~J. Onumanyi, B.~U. Umar, L.~A. Ajao, R.~O. Isah, E.~M. Dogo,
+  B.~K. Nuhu, O.~M. Olaniyi, J.~G. Ambafi, V.~B. Sheidu, and M.~M. Ibrahim,
+  ``Blockchain for securing electronic voting systems: A survey of
+  architectures, trends, solutions, and challenges,'' {\em Cluster Computing},
+  2024.
+
+\bibitem{schnorr1991}
+C.-P. Schnorr, ``Efficient signature generation by smart cards,'' {\em Journal
+  of Cryptology}, vol.~4, no.~3, pp.~161--174, 1991.
+
+\bibitem{fiat_shamir1986}
+A.~Fiat and A.~Shamir, ``How to prove yourself: Practical solutions to
+  identification and signature problems,'' in {\em Advances in Cryptology ---
+  CRYPTO '86}, vol.~263 of {\em Lecture Notes in Computer Science},
+  pp.~186--194, Springer, 1986.
+
+\bibitem{rivest2001ring}
+R.~L. Rivest, A.~Shamir, and Y.~Tauman, ``How to leak a secret,'' in {\em
+  Advances in Cryptology --- ASIACRYPT 2001}, vol.~2248 of {\em Lecture Notes
+  in Computer Science}, pp.~552--565, Springer, 2001.
+
+\bibitem{shamir1979}
+A.~Shamir, ``How to share a secret,'' {\em Communications of the ACM}, vol.~22,
+  no.~11, pp.~612--613, 1979.
+
+\bibitem{nist_fips180_4}
+{National Institute of Standards and Technology}, ``Secure hash standard
+  ({SHS}),'' Tech. Rep. FIPS PUB 180-4, National Institute of Standards and
+  Technology, 2015.
+
+\bibitem{nist_fips202}
+{National Institute of Standards and Technology}, ``{SHA-3} standard:
+  Permutation-based hash and extendable-output functions,'' Tech. Rep. FIPS PUB
+  202, National Institute of Standards and Technology, 2015.
+
+\bibitem{rfc2104}
+H.~Krawczyk, M.~Bellare, and R.~Canetti, ``{HMAC}: Keyed-hashing for message
+  authentication.'' RFC 2104, Internet Engineering Task Force, 1997.
+
+\bibitem{nist_fips198}
+{National Institute of Standards and Technology}, ``The keyed-hash message
+  authentication code ({HMAC}),'' Tech. Rep. FIPS PUB 198-1, National Institute
+  of Standards and Technology, 2008.
+
+\bibitem{nist_gcm}
+M.~J. Dworkin, ``Recommendation for block cipher modes of operation:
+  {Galois/Counter Mode (GCM)} and {GMAC},'' Tech. Rep. NIST SP 800-38D,
+  National Institute of Standards and Technology, 2007.
+
+\bibitem{bonawitz2017}
+K.~Bonawitz, V.~Ivanov, B.~Kreuter, A.~Marcedone, H.~B. McMahan, S.~Patel,
+  D.~Ramage, A.~Segal, and K.~Seth, ``Practical secure aggregation for
+  privacy-preserving machine learning,'' in {\em Proceedings of the 2017 ACM
+  SIGSAC Conference on Computer and Communications Security (CCS '17)},
+  pp.~1175--1191, ACM, 2017.
+
+\bibitem{ongaro2014raft}
+D.~Ongaro and J.~Ousterhout, ``{In Search of an Understandable Consensus
+  Algorithm (Raft)},'' in {\em USENIX Annual Technical Conference (ATC)},
+  pp.~305--319, 2014.
+
+\bibitem{caliper}
+{Hyperledger Foundation}, ``{Hyperledger Caliper}: Blockchain performance
+  benchmark framework.'' \url{https://hyperledger.github.io/caliper/}, 2024.
+\newblock v0.6.0.
+
+\bibitem{circl}
+{Cloudflare, Inc.}, ``{CIRCL}: Cloudflare interoperable reusable cryptographic
+  library.'' \url{https://github.com/cloudflare/circl}, 2024.
+\newblock Go library implementing post-quantum cryptographic primitives
+  including ML-KEM (Kyber).
+
+\bibitem{blanchet2016}
+B.~Blanchet, ``Modeling and verifying security protocols with the applied pi
+  calculus and {ProVerif},'' {\em Foundations and Trends in Privacy and
+  Security}, vol.~1, no.~1--2, pp.~1--135, 2016.
+
+\bibitem{dolev1983}
+D.~Dolev and A.~C. Yao, ``On the security of public key protocols,'' {\em IEEE
+  Transactions on Information Theory}, vol.~29, no.~2, pp.~198--208, 1983.
+
+\bibitem{ecclesia2025}
+L.~Ackermann, M.~Arapinis, P.~Georgiou, N.~Lamprou, L.~Marekov{\'a}, and
+  T.~Zacharias, ``E-cclesia: Universally composable self-tallying elections
+  over anonymous broadcast,'' {\em IACR Communications in Cryptology}, vol.~2,
+  Oct. 2025.
+\newblock Earlier version: IACR ePrint 2020/513.
+
+\end{thebibliography}

@@ -25,7 +25,7 @@
                     fill=gray!18, font=\sffamily\bfseries},
   layer/.style    ={rectangle, draw=black, dashed, inner sep=10pt,
                     rounded corners=3pt, fill=gray!3},
-  layertitle/.style={font=\sffamily\bfseries\small, fill=white, inner sep=2pt,
+  layertitle/.style={font=\sffamily\bfseries\small, fill=white, inner sep=3pt,
                     anchor=south west},
   %------ arrow styles ------
   flow/.style     ={->, thick, >={Stealth[length=2.2mm,width=1.6mm]}},
@@ -71,7 +71,7 @@
 \begin{scope}[on background layer]
   \node[layer,fit=(paill)(thr)(fp)(audit)] (cryptolayer) {};
 \end{scope}
-\node[layertitle] at ([xshift=10pt,yshift=-2pt]cryptolayer.north west) {Cryptographic Computation Layer};
+\node[layertitle] at ([xshift=8pt,yshift=8pt]cryptolayer.north west) {Cryptographic Computation Layer};
 \draw[flow] (api.south) -- (cryptolayer.north);
 
 % =========================================================================
@@ -89,21 +89,21 @@
 \begin{scope}[on background layer]
   \node[layer,fit=(saA)(saB)] (privacy) {};
 \end{scope}
-\node[layertitle] at ([xshift=10pt,yshift=-2pt]privacy.north west) {Privacy Layer (SA\textsuperscript{2})};
+\node[layertitle] at ([xshift=8pt,yshift=8pt]privacy.north west) {Privacy Layer (SA\textsuperscript{2})};
 
 \draw[flow] (cryptolayer.south -| saA) --
-            node[left,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_A=E(v{+}m)$} (saA.north);
+            node[left,pos=0.3,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_A=E(v{+}m)$} (saA.north);
 \draw[flow] (cryptolayer.south -| saB) --
-            node[right,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_B=E(-m)$} (saB.north);
+            node[right,pos=0.3,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_B=E(-m)$} (saB.north);
 
 % =========================================================================
 %  Row 4 : Blockchain Storage Layer
 % =========================================================================
-\node[process] (gw)   at ( 0.5,-0.5) {Fabric Gateway\\\scriptsize gRPC + TLS};
-\node[process] (ord)  at ( 3.5,-0.5) {Orderer\\\scriptsize Raft consensus};
-\node[process] (p1)   at ( 6.0,-0.5) {Peer Org1};
-\node[process] (p2)   at ( 8.5,-0.5) {Peer Org2};
-\node[storage] (couch) at (11.3,-0.5) {CouchDB\\world state};
+\node[process,minimum width=2.4cm] (gw)   at ( 0.5,-0.5) {Fabric Gateway\\\scriptsize gRPC + TLS};
+\node[process,minimum width=2.4cm] (ord)  at ( 3.3,-0.5) {Orderer\\\scriptsize Raft consensus};
+\node[process,minimum width=2.4cm] (p1)   at ( 6.1,-0.5) {Peer Org1};
+\node[process,minimum width=2.4cm] (p2)   at ( 8.9,-0.5) {Peer Org2};
+\node[storage] (couch) at (11.5,-0.5) {CouchDB\\world state};
 
 \node[process,minimum width=6.5cm] (cc) at (5.0,-2.0)
    {Chaincode \texttt{covertvote\_2.0}\\
@@ -112,7 +112,7 @@
 \begin{scope}[on background layer]
   \node[layer,fit=(gw)(ord)(p1)(p2)(couch)(cc)] (chainlyr) {};
 \end{scope}
-\node[layertitle] at ([xshift=10pt,yshift=-2pt]chainlyr.north west) {Blockchain Storage Layer (Hyperledger Fabric v2.5)};
+\node[layertitle] at ([xshift=8pt,yshift=8pt]chainlyr.north west) {Blockchain Storage Layer (Hyperledger Fabric v2.5)};
 
 \draw[flow] (saA.south) -- (gw.north -| saA);
 \draw[flow] (saB.south) -- (couch.north -| saB);

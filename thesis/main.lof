@@ -1,0 +1,17 @@
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Proposed System Architecture Overview}}{28}{figure.caption.7}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces SMDC Deniable Credential Slot Structure}}{35}{figure.caption.9}%
+\contentsline {figure}{\numberline {3.3}{\ignorespaces Seventeen-Step Vote Casting Pipeline}}{40}{figure.caption.10}%
+\contentsline {figure}{\numberline {3.4}{\ignorespaces Voter Registration and Casting Activity}}{41}{figure.caption.11}%
+\contentsline {figure}{\numberline {3.5}{\ignorespaces Vote Casting Sequence Diagram}}{42}{figure.caption.12}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Cryptographic Primitive Per-Operation Cost}}{52}{figure.caption.15}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Vote Pipeline Per-Phase Breakdown}}{53}{figure.caption.17}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Homomorphic Tally Scaling with Voter Count}}{55}{figure.caption.20}%
+\contentsline {figure}{\numberline {4.4}{\ignorespaces Tally Time versus Candidate Count}}{56}{figure.caption.22}%
+\contentsline {figure}{\numberline {4.5}{\ignorespaces Ring Signature Sign and Verify Scaling}}{57}{figure.caption.24}%
+\contentsline {figure}{\numberline {4.6}{\ignorespaces Blockchain Throughput and Latency Benchmark}}{58}{figure.caption.26}%
+\addvspace {10\p@ }
+\addvspace {10\p@ }

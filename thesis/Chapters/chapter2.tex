@@ -1,5 +1,5 @@
-\chapter{Literature Review}
-\label{ch:literature-review}
+\chapter{Related Works}
+\label{ch:related-works}
 
 \section{Introduction}
 \label{sec:lit-intro}
@@ -8,7 +8,7 @@ Blockchain-based electronic voting has attracted growing research interest in re
 
 This chapter reviews six key works that represent the current state of the art in blockchain-based e-voting. The reviewed papers span multiple security dimensions including privacy preservation through homomorphic encryption and differential privacy, voter authentication through biometric verification, coercion resistance through formal game-based proofs, post-quantum security considerations, and broad architectural surveys. Each work is analyzed in terms of its methodology, contributions, and limitations. The chapter concludes with a comparative analysis that positions our framework relative to existing work and identifies the research gaps that this thesis addresses.
 
-\section{Literature Review}
+\section{Review of Selected Works}
 \label{sec:lit-review}
 
 \subsection{Improved Secure and Efficient E-Voting on Blockchain}
@@ -210,7 +210,7 @@ Coercion Resist. & \xmark & \xmark & \xmark & \xmark & \cmark & \cmark \\
 \hline
 Post-Quantum & \pmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
 \hline
-Biometric Auth. & \xmark & \xmark & \cmark & \xmark & \xmark & \cmark \\
+Biometric Auth. & \xmark & \xmark & \cmark & \xmark & \xmark & \pmark \\
 \hline
 Anonymous Agg. & \xmark & \xmark & \xmark & \xmark & \xmark & \cmark \\
 \hline
@@ -233,7 +233,9 @@ Implementation & \cmark & \cmark & \cmark & \pmark & \pmark & \cmark \\
 \footnotesize{\cmark\ = full support, \xmark\ = no support, \pmark\ = partial support, $O(\cdot)$ = tally complexity.}
 \end{table}
 
-From Table \ref{tab:comparison}, several observations can be made. First, no existing system provides all the security properties simultaneously. ISE-Voting offers ring signatures but lacks homomorphic encryption and coercion resistance. BP-Vot provides differential privacy but sacrifices exact tallying. Faruk et al. offer biometric authentication but with minimal cryptographic depth. Yuan et al. implement Paillier homomorphic encryption but without anonymity or coercion resistance. Yin et al.~\cite{yin_tdsc} represent the closest competitor to our framework, achieving both $O(n)$ complexity and coercion resistance with formal game-based proofs; however, their system lacks homomorphic tallying, post-quantum protection, biometric authentication, anonymous aggregation, and production blockchain deployment.
+The ``Ours'' Biometric Authentication entry is marked partial (\pmark) rather than full (\cmark). The proposed framework includes a biometric pipeline (\texttt{internal/biometric}) that performs SHA3 hash-equality comparison of fingerprint byte input against a stored per-voter hash, with constant-time verification to prevent timing side channels and a liveness pre-check. However, this construction is a hash-equality stub rather than a full biometric matcher: it does not perform feature extraction, fuzzy minutiae matching, or a distance-metric comparison, and the False Acceptance Rate (FAR), False Rejection Rate (FRR), and enrollment success rate have not been empirically characterised through a user trial. Faruk et al.~\cite{faruk2024} provide a 100-participant trial reporting an 87\% biometric registration success rate, which the present work does not match. The hash-equality stub is suitable for the cryptographic-pipeline integration scope of this thesis but should not be interpreted as a deployment-ready biometric matcher; characterising FAR, FRR, and enrollment success rates with a user study is identified as future work in Chapter~\ref{ch:conclusion}.
+
+From Table \ref{tab:comparison}, several observations can be made. First, no existing system provides all the security properties simultaneously. ISE-Voting offers ring signatures but lacks homomorphic encryption and coercion resistance. BP-Vot provides differential privacy but sacrifices exact tallying. Faruk et al. offer biometric authentication with a 100-participant user trial but with minimal cryptographic depth. Yuan et al. implement Paillier homomorphic encryption but without anonymity or coercion resistance. Yin et al.~\cite{yin_tdsc} represent the closest competitor to our framework, achieving both $O(n)$ complexity and coercion resistance with formal game-based proofs; however, their system lacks homomorphic tallying, post-quantum protection, biometric authentication, anonymous aggregation, and production blockchain deployment.
 
 the proposed framework is the only system that integrates all reviewed security properties (homomorphic encryption, zero-knowledge proofs, ring signatures, coercion resistance, post-quantum protection, biometric authentication, anonymous aggregation, and threshold decryption) into a single, functional voting pipeline with empirical blockchain performance benchmarks. Notably, The proposed framework integrates \textbf{seven} cryptographic protocols, compared to at most two in any existing system, and provides a full implementation with production blockchain deployment and ProVerif formal verification.
 
