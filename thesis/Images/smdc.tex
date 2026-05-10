@@ -1,0 +1,80 @@
+% =====================================================================
+%  SMDC Self-Masking Deniable Credentials (k=5) diagram for CovertVote
+%  --------------------------------------------------------------------
+%  Black & white safe.  Real slot distinguished by hatched fill,
+%  not colour.  Two outcome branches (genuine vs coerced) shown.
+% =====================================================================
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >={Stealth[length=2.0mm,width=1.4mm]},
+  every node/.style={align=center},
+  slot/.style     ={rectangle, draw=black, thick, rounded corners=2pt,
+                    minimum width=2.4cm, minimum height=2.0cm, fill=white},
+  realslot/.style ={rectangle, draw=black, very thick, rounded corners=2pt,
+                    minimum width=2.4cm, minimum height=2.0cm,
+                    pattern=north east lines, pattern color=black!50},
+  outcome/.style  ={rectangle, draw=black, thick, rounded corners=3pt,
+                    minimum width=4.5cm, minimum height=0.85cm, fill=gray!8},
+  flow/.style     ={->, thick, >={Stealth[length=2.0mm,width=1.4mm]}},
+]
+
+% Title
+\node[font=\sffamily\bfseries] at (6.5, 5.6)
+   {SMDC Credential ($k=5$ slots)};
+\node[font=\sffamily\scriptsize] at (6.5, 5.1)
+   {Real slot index $\text{idx}_{\text{real}} = \text{HMAC-SHA256}(\text{eid},\,\text{vid})\bmod k$};
+
+% Slot labels above
+\node[font=\sffamily\scriptsize] at ( 0.0, 4.4) {Slot 0};
+\node[font=\sffamily\scriptsize] at ( 3.0, 4.4) {Slot 1};
+\node[font=\sffamily\scriptsize] at ( 6.0, 4.4) {Slot 2};
+\node[font=\sffamily\scriptsize] at ( 9.0, 4.4) {Slot 3};
+\node[font=\sffamily\scriptsize] at (12.0, 4.4) {Slot 4};
+
+% Slots
+\node[slot]    (sl0) at ( 0.0, 3.0) {};
+\node[slot]    (sl1) at ( 3.0, 3.0) {};
+\node[realslot](sl2) at ( 6.0, 3.0) {};
+\node[slot]    (sl3) at ( 9.0, 3.0) {};
+\node[slot]    (sl4) at (12.0, 3.0) {};
+
+% In-slot text (overlaid)
+\foreach \x/\lab in {0/{$w_0=0$ (fake)\\$C_0=g^0\!\cdot\!h^{r_0}$\\$\pi_0^{\text{bin}}$},
+                     3/{$w_1=0$ (fake)\\$C_1=g^0\!\cdot\!h^{r_1}$\\$\pi_1^{\text{bin}}$},
+                     9/{$w_3=0$ (fake)\\$C_3=g^0\!\cdot\!h^{r_3}$\\$\pi_3^{\text{bin}}$},
+                     12/{$w_4=0$ (fake)\\$C_4=g^0\!\cdot\!h^{r_4}$\\$\pi_4^{\text{bin}}$}} {
+  \node[font=\sffamily\scriptsize, align=center] at (\x, 3.0) {\lab};
+}
+\node[font=\sffamily\scriptsize\bfseries, align=center] at (6.0, 3.0)
+   {$w_2=1$ (real)\\$C_2=g^1\!\cdot\!h^{r_2}$\\$\pi_2^{\text{bin}}$};
+
+% Sum proof bar below all slots
+\node[rectangle, draw=black, thick, minimum width=14cm, minimum height=0.7cm,
+      fill=gray!5, font=\sffamily\scriptsize] (sumproof) at (6.0, 1.5)
+   {Sum proof $\pi^{\text{sum}}$: $\textstyle\sum_i w_i = 1$ (no information about which slot)};
+
+% Outcome branches
+\node[outcome] (genuine) at ( 2.5, -0.7)
+   {\textbf{Genuine vote}\\\scriptsize voter presents real slot $\to$ $w=1$ counted};
+\node[outcome] (coerced) at (10.5, -0.7)
+   {\textbf{Under coercion}\\\scriptsize voter presents fake slot $\to$ $w=0$ silently discarded};
+
+% Final-vote arrows
+\draw[flow] (sumproof.south) ++(-3.5,0) -- (genuine.north);
+\draw[flow] (sumproof.south) ++( 3.5,0) -- (coerced.north);
+
+% Final outcome row
+\node[outcome, fill=white] (counted)  at ( 2.5, -2.3)
+   {Tally counts $w=1$ correctly};
+\node[outcome, fill=white] (discarded) at (10.5, -2.3)
+   {Coercer sees identical receipt;\\\scriptsize Pedersen hiding $\Rightarrow$ slots indistinguishable};
+
+\draw[flow] (genuine.south) -- (counted.north);
+\draw[flow] (coerced.south) -- (discarded.north);
+
+% Footnote
+\node[font=\sffamily\scriptsize, align=center] at (6.5, -3.4)
+   {The real index is \emph{never stored};
+    only the legitimate voter who knows $(\text{vid}, \text{eid})$ can re-derive it.};
+
+\end{tikzpicture}

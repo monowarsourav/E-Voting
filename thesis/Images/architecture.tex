@@ -1,0 +1,168 @@
+% =====================================================================
+%  System Architecture Diagram for CovertVote
+%  --------------------------------------------------------------------
+%  Black & white safe.  Distinguishable purely by SHAPE and LINE STYLE.
+%  Layer titles placed INSIDE each wrapper (top-left tab style) so that
+%  inter-layer arrow labels never collide with layer headers.
+% =====================================================================
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >={Stealth[length=2.2mm,width=1.6mm]},
+  every node/.style={align=center},
+  %------ shape styles (B/W safe) ------
+  actor/.style    ={ellipse, draw=black, thick,
+                    minimum width=2.6cm, minimum height=0.95cm, fill=gray!12},
+  process/.style  ={rectangle, draw=black, thick,
+                    minimum width=3.0cm, minimum height=0.85cm, fill=white},
+  module/.style   ={rectangle, draw=black,
+                    minimum width=1.85cm, minimum height=0.65cm,
+                    fill=white, font=\sffamily\scriptsize},
+  storage/.style  ={cylinder, draw=black, thick, shape border rotate=90,
+                    aspect=0.28, minimum width=1.8cm, minimum height=1.1cm,
+                    fill=gray!8, font=\sffamily\scriptsize},
+  result/.style   ={trapezium, trapezium left angle=70, trapezium right angle=110,
+                    draw=black, thick, minimum width=3.0cm, minimum height=0.9cm,
+                    fill=gray!18, font=\sffamily\bfseries},
+  layer/.style    ={rectangle, draw=black, dashed, inner sep=10pt,
+                    rounded corners=3pt, fill=gray!3},
+  layertitle/.style={font=\sffamily\bfseries\small, fill=white, inner sep=2pt,
+                    anchor=south west},
+  %------ arrow styles ------
+  flow/.style     ={->, thick, >={Stealth[length=2.2mm,width=1.6mm]}},
+  ctrl/.style     ={->, thick, dashed, >={Stealth[length=2.2mm,width=1.6mm]}},
+  bidir/.style    ={<->, thick, >={Stealth[length=2.2mm,width=1.6mm]}},
+]
+
+% =========================================================================
+%  Row 0 : External actors
+% =========================================================================
+\node[actor] (voter)  at (0,12.5) {Voter\\\scriptsize fingerprint, SMDC slot,\\\scriptsize duress signal (opt.)};
+\node[actor] (admin)  at (12,12.5) {Election Authority\\\scriptsize MSP (admin)};
+
+% =========================================================================
+%  Row 1 : REST API Server
+% =========================================================================
+\node[process,minimum width=8cm] (api) at (6,10.3)
+   {REST API Server (Gin v1.11, port 8080)\\
+    \scriptsize JWT Auth $|$ Admin MSP middleware $|$ Rate Limiter $|$ CORS};
+
+\draw[flow] (voter.south) -- node[right,font=\sffamily\scriptsize,pos=0.55,fill=white,inner sep=1pt]
+            {\texttt{POST /register}\\\texttt{POST /vote}} (api.north -| voter);
+\draw[flow] (admin.south) -- node[left,font=\sffamily\scriptsize,pos=0.55,fill=white,inner sep=1pt]
+            {\texttt{/admin/elections}\\\texttt{/admin/tally}} (api.north -| admin);
+
+% =========================================================================
+%  Row 2 : Cryptographic Computation Layer (12 modules in 2 sub-rows)
+% =========================================================================
+\node[module] (paill) at ( 0.5,7.6) {Paillier\\HE (2048b)};
+\node[module] (peder) at ( 2.6,7.6) {Pedersen\\Commit};
+\node[module] (zkp)   at ( 4.7,7.6) {ZKP\\$\Sigma$-proof};
+\node[module] (ring)  at ( 6.8,7.6) {Ring Sig\\Liu-Wei-Wong};
+\node[module] (smdc)  at ( 8.9,7.6) {SMDC\\$k{=}5$};
+\node[module] (kyber) at (11.0,7.6) {Kyber-768\\ML-KEM};
+
+\node[module] (fp)    at ( 0.5,6.5) {Fingerprint\\SHA-3};
+\node[module] (live)  at ( 2.6,6.5) {Liveness\\Detector};
+\node[module] (dur)   at ( 4.7,6.5) {Duress\\Detect (HMAC)};
+\node[module] (merk)  at ( 6.8,6.5) {Merkle\\Tree};
+\node[module] (audit) at ( 8.9,6.5) {Audit\\Logger};
+\node[module] (thr)   at (11.0,6.5) {Threshold\\Paillier (DJN)};
+
+\begin{scope}[on background layer]
+  \node[layer,fit=(paill)(thr)(fp)(audit)] (cryptolayer) {};
+\end{scope}
+\node[layertitle] at ([xshift=10pt,yshift=-2pt]cryptolayer.north west) {Cryptographic Computation Layer};
+\draw[flow] (api.south) -- (cryptolayer.north);
+
+% =========================================================================
+%  Row 3 : Privacy Layer (SA^2 two non-colluding aggregators)
+% =========================================================================
+\node[process] (saA) at (3.5,3.2)
+   {SA$^2$ Aggregator A (Leader)\\\scriptsize port 8081 \quad $\prod$ share$_A$};
+\node[process] (saB) at (8.5,3.2)
+   {SA$^2$ Aggregator B (Helper)\\\scriptsize port 8082 \quad $\prod$ share$_B$};
+
+% non-collusion constraint placed BELOW the boxes
+\draw[ctrl] (saA.south east) -- node[below,font=\sffamily\scriptsize,fill=white,inner sep=1pt]
+            {\textbf{must NOT collude}} (saB.south west);
+
+\begin{scope}[on background layer]
+  \node[layer,fit=(saA)(saB)] (privacy) {};
+\end{scope}
+\node[layertitle] at ([xshift=10pt,yshift=-2pt]privacy.north west) {Privacy Layer (SA\textsuperscript{2})};
+
+\draw[flow] (cryptolayer.south -| saA) --
+            node[left,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_A=E(v{+}m)$} (saA.north);
+\draw[flow] (cryptolayer.south -| saB) --
+            node[right,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_B=E(-m)$} (saB.north);
+
+% =========================================================================
+%  Row 4 : Blockchain Storage Layer
+% =========================================================================
+\node[process] (gw)   at ( 0.5,-0.5) {Fabric Gateway\\\scriptsize gRPC + TLS};
+\node[process] (ord)  at ( 3.5,-0.5) {Orderer\\\scriptsize Raft consensus};
+\node[process] (p1)   at ( 6.0,-0.5) {Peer Org1};
+\node[process] (p2)   at ( 8.5,-0.5) {Peer Org2};
+\node[storage] (couch) at (11.3,-0.5) {CouchDB\\world state};
+
+\node[process,minimum width=6.5cm] (cc) at (5.0,-2.0)
+   {Chaincode \texttt{covertvote\_2.0}\\
+    \scriptsize CreateElection $\cdot$ CastVote $\cdot$ StoreTallyResult $\cdot$ KeyImage check};
+
+\begin{scope}[on background layer]
+  \node[layer,fit=(gw)(ord)(p1)(p2)(couch)(cc)] (chainlyr) {};
+\end{scope}
+\node[layertitle] at ([xshift=10pt,yshift=-2pt]chainlyr.north west) {Blockchain Storage Layer (Hyperledger Fabric v2.5)};
+
+\draw[flow] (saA.south) -- (gw.north -| saA);
+\draw[flow] (saB.south) -- (couch.north -| saB);
+
+% =========================================================================
+%  Row 5 : Tally Service & Result publication
+% =========================================================================
+\node[process] (tally) at (5.0,-4.5)
+   {Tally Service\\\scriptsize DJN partial decrypt + Lagrange combine $\to E(\sum v)\to \sum v$};
+
+\node[result] (res) at (5.0,-6.0) {Published Result};
+
+\draw[flow] (chainlyr.south) -- node[right,font=\sffamily\scriptsize,fill=white,inner sep=1pt]
+            {encrypted shares} (tally.north);
+\draw[flow] (tally.south) -- (res.north);
+
+% =========================================================================
+%  Side : Local persistent storage
+% =========================================================================
+\node[storage] (sqlite) at (15.8,10.3)
+   {SQLite\\\scriptsize voters\\\scriptsize key-images\\\scriptsize audit log};
+
+\draw[bidir] (api.east) -- (sqlite.west);
+
+% =========================================================================
+%  Side : Public verifier
+% =========================================================================
+\node[actor] (verif) at (13.5,-6.0) {Public\\Verifier};
+\draw[flow] (res.east) -- node[above,font=\sffamily\scriptsize] {verifies} (verif.west);
+
+% =========================================================================
+%  Legend
+% =========================================================================
+\begin{scope}[shift={(-0.3,-8.3)}]
+  \node[font=\sffamily\bfseries\footnotesize] at (1.5,0.8) {Legend};
+  \node[actor,minimum width=1.3cm,minimum height=0.5cm] (l-actor) at (0.5,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (1.2,0) {Actor};
+  \node[process,minimum width=1.3cm,minimum height=0.5cm] (l-proc) at (3.4,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (4.1,0) {Process / Service};
+  \node[storage,minimum width=1.0cm,minimum height=0.5cm] (l-st) at (6.5,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (7.0,0) {Persistent Store};
+  \node[result,minimum width=1.3cm,minimum height=0.45cm] (l-res) at (9.0,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (9.8,0) {Public Output};
+
+  \draw[flow] (0.0,-0.7) -- (0.7,-0.7);
+  \node[anchor=west,font=\sffamily\scriptsize] at (0.8,-0.7) {data flow};
+  \draw[ctrl] (3.0,-0.7) -- (3.7,-0.7);
+  \node[anchor=west,font=\sffamily\scriptsize] at (3.8,-0.7) {control / non-collusion constraint};
+  \draw[bidir] (7.5,-0.7) -- (8.2,-0.7);
+  \node[anchor=west,font=\sffamily\scriptsize] at (8.3,-0.7) {bidirectional read/write};
+\end{scope}
+
+\end{tikzpicture}

@@ -1,0 +1,142 @@
+% =====================================================================
+%  Vote Casting Pipeline (17 steps, 4 phases) for CovertVote
+%  --------------------------------------------------------------------
+%  Black & white safe.  Phases distinguished by line style of grouping
+%  rectangle, not colour.  Steps are uniformly shaped rounded
+%  rectangles.  Decision branch (duress) shown by diamond.
+% =====================================================================
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >={Stealth[length=2.0mm,width=1.4mm]},
+  every node/.style={align=center},
+  pipestep/.style     ={rectangle, draw=black, thick, rounded corners=3pt,
+                    minimum width=2.5cm, minimum height=0.85cm,
+                    fill=white, font=\sffamily\scriptsize},
+  novelstep/.style={rectangle, draw=black, thick, rounded corners=3pt,
+                    minimum width=2.5cm, minimum height=0.85cm,
+                    pattern=north east lines, pattern color=black!35,
+                    font=\sffamily\scriptsize},
+  decision/.style ={diamond, draw=black, thick, aspect=2.0, inner sep=1pt,
+                    fill=gray!8, font=\sffamily\scriptsize},
+  outnode/.style  ={rectangle, draw=black, thick, rounded corners=3pt,
+                    minimum width=3.2cm, minimum height=0.85cm,
+                    fill=gray!5, font=\sffamily\scriptsize},
+  phase/.style    ={rectangle, draw=black, thick, dashed, inner sep=10pt,
+                    rounded corners=4pt, fill=white},
+  branch/.style   ={rectangle, draw=black!60, thick, dotted, inner sep=10pt,
+                    rounded corners=4pt, fill=white},
+  flow/.style     ={->, thick, >={Stealth[length=2.0mm,width=1.4mm]}},
+]
+
+% =========================================================================
+%  Phase 1 - Authentication (steps 1..5)
+% =========================================================================
+\node[pipestep] (s1) at ( 0.0, 12.0) {Step 1: Election\\active check};
+\node[pipestep] (s2) at ( 3.0, 12.0) {Step 2: Voter\\record lookup};
+\node[pipestep] (s3) at ( 6.0, 12.0) {Step 3: Already-\\voted RLock check};
+\node[pipestep] (s4) at ( 9.0, 12.0) {Step 4: Candidate\\validation};
+\node[pipestep] (s5) at (12.0, 12.0) {Step 5: SMDC\\slot validation};
+
+\begin{scope}[on background layer]
+\node[phase, fit=(s1)(s5),
+      label={[font=\sffamily\bfseries]above:Phase 1: Authentication}] {};
+\end{scope}
+
+% =========================================================================
+%  Phase 2 - Encryption & Proofs (steps 6..9)
+% =========================================================================
+\node[pipestep]  (s6) at ( 0.0, 9.5) {Step 6: Paillier\\encrypt $E(v)$};
+\node[novelstep] (s7) at ( 3.0, 9.5) {Step 7: Duress\\detect (HMAC)};
+\node[pipestep]  (s8) at ( 6.0, 9.5) {Step 8: $\text{finalW} =$\\$\text{smdcW}\times\text{behW}$};
+\node[pipestep]  (s9) at ( 9.0, 9.5) {Step 9: Pedersen\\commit + ZKP};
+
+\begin{scope}[on background layer]
+\node[phase, fit=(s6)(s9),
+      label={[font=\sffamily\bfseries]above:Phase 2: Encryption \& Proofs}] {};
+\end{scope}
+
+% =========================================================================
+%  Phase 3 - Anonymisation (steps 10..13)
+% =========================================================================
+\node[pipestep] (s10) at ( 0.0, 7.0) {Step 10: Select\\random ring (100)};
+\node[pipestep] (s11) at ( 3.0, 7.0) {Step 11: Ring sign\\$\sigma$ over $E(v)^{\text{fW}}$};
+\node[pipestep] (s12) at ( 6.0, 7.0) {Step 12: Extract\\key image $I$};
+\node[pipestep] (s13) at ( 9.0, 7.0) {Step 13: KeyImage\\cache check};
+
+\begin{scope}[on background layer]
+\node[phase, fit=(s10)(s13),
+      label={[font=\sffamily\bfseries]above:Phase 3: Anonymisation}] {};
+\end{scope}
+
+% =========================================================================
+%  Phase 4 - Privacy & Submission (steps 14..17)
+% =========================================================================
+\node[pipestep]  (s14) at ( 0.0, 4.5) {Step 14: SA$^2$\\split (share$_A$, share$_B$)};
+\node[pipestep]  (s15) at ( 3.0, 4.5) {Step 15: Get\\Merkle proof};
+\node[novelstep] (s16) at ( 6.0, 4.5) {Step 16: Coercion\\short-circuit};
+\node[pipestep]  (s17) at ( 9.0, 4.5) {Step 17: Submit\\to Fabric chaincode};
+
+\begin{scope}[on background layer]
+\node[phase, fit=(s14)(s17),
+      label={[font=\sffamily\bfseries]above:Phase 4: Privacy \& Submission}] {};
+\end{scope}
+
+% =========================================================================
+%  Output / Branch -- decision diamond + receipt + silent-discard
+%  Placed below Phase 4 in a separate dotted wrapper to avoid overlap.
+% =========================================================================
+\node[decision] (dur)     at ( 4.5, 1.8) {behavior $=0$?};
+\node[outnode]  (silent)  at ( 9.5, 1.8) {Silent discard,\\plausible receipt};
+\node[outnode]  (receipt) at ( 4.5, -0.4) {Vote receipt\\returned to voter};
+
+\begin{scope}[on background layer]
+\node[branch, fit=(dur)(silent)(receipt),
+      label={[font=\sffamily\bfseries]above right:Output \& Branch}] {};
+\end{scope}
+
+% =========================================================================
+%  Edges
+% =========================================================================
+\draw[flow] (s1) -- (s2);
+\draw[flow] (s2) -- (s3);
+\draw[flow] (s3) -- (s4);
+\draw[flow] (s4) -- (s5);
+
+% Phase 1 -> Phase 2
+\draw[flow] (s5.south) -- ++(0,-0.4) -| (s6.north);
+\draw[flow] (s6) -- (s7);
+\draw[flow] (s7) -- (s8);
+\draw[flow] (s8) -- (s9);
+
+% Phase 2 -> Phase 3
+\draw[flow] (s9.south) -- ++(0,-0.4) -| (s10.north);
+\draw[flow] (s10) -- (s11);
+\draw[flow] (s11) -- (s12);
+\draw[flow] (s12) -- (s13);
+
+% Phase 3 -> Phase 4
+\draw[flow] (s13.south) -- ++(0,-0.4) -| (s14.north);
+\draw[flow] (s14) -- (s15);
+\draw[flow] (s15) -- (s16);
+\draw[flow] (s16) -- (s17);
+
+% Phase 4 -> Decision -> outputs
+\draw[flow] (s17.south) -- ++(0,-0.6) -| (dur.north);
+\draw[flow] (dur.east) -- node[above,font=\sffamily\scriptsize] {yes (coerced)} (silent.west);
+\draw[flow] (dur.south) -- node[right,font=\sffamily\scriptsize] {no (genuine)} (receipt.north);
+\draw[flow] (silent.south) |- (receipt.east);
+
+% =========================================================================
+%  Legend (bottom)
+% =========================================================================
+\begin{scope}[shift={(0,-2.4)}]
+  \node[pipestep,minimum width=1.3cm,minimum height=0.5cm] (l-std) at (0,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (0.8,0) {Standard step};
+  \node[novelstep,minimum width=1.3cm,minimum height=0.5cm] (l-nov) at (4,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (4.8,0) {Novel contribution (this work)};
+  \node[decision,minimum width=1.3cm,minimum height=0.5cm,aspect=1.4]
+       (l-dec) at (10,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (10.8,0) {Decision};
+\end{scope}
+
+\end{tikzpicture}

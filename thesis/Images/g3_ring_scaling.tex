@@ -1,0 +1,47 @@
+% =====================================================================
+%  G3 - Ring signature sign and verify time vs ring size
+%  --------------------------------------------------------------------
+%  Backs the claim: linear scaling, ~0.24 ms per ring member
+%  Source: chapter4.tex Table tab:ring-scale
+% =====================================================================
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.85\textwidth,
+    height=6.5cm,
+    xlabel={Ring size $|\mathcal{R}|$},
+    ylabel={Time (ms)},
+    xmin=0, xmax=520,
+    ymin=0,
+    grid=both,
+    grid style={dashed, gray!30},
+    legend style={at={(0.02,0.98)}, anchor=north west,
+                  font=\sffamily\scriptsize, draw=black},
+    label style={font=\sffamily\small},
+    tick label style={font=\sffamily\scriptsize},
+    every axis plot/.append style={thick},
+]
+% Sign times
+\addplot+[mark=*, mark size=2.5pt, color=black, mark options={fill=black}] coordinates {
+    (10,   2.2)
+    (25,   6.0)
+    (50,  12.0)
+    (100, 24.0)
+    (200, 47.5)
+    (500, 120.5)
+};
+\addlegendentry{Ring sign}
+% Verify times
+\addplot+[mark=triangle*, mark size=3pt, color=black, mark options={fill=white,solid}] coordinates {
+    (10,   2.2)
+    (25,   5.8)
+    (50,  12.0)
+    (100, 24.2)
+    (200, 48.5)
+    (500, 120.5)
+};
+\addlegendentry{Ring verify}
+% Linear reference at 0.24 ms per member
+\addplot[domain=0:520, samples=2, dashed, thick, color=black!60] {0.24*x};
+\addlegendentry{ideal $0.24\,\text{ms}\times|\mathcal{R}|$}
+\end{axis}
+\end{tikzpicture}

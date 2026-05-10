@@ -1,0 +1,120 @@
+% =====================================================================
+%  Sequence Diagram for one full vote-cast in CovertVote
+%  --------------------------------------------------------------------
+%  Black & white safe.  Lifelines are dashed verticals; messages are
+%  solid horizontal arrows; activation bars are filled rectangles.
+%  Wider vertical gaps + label re-anchoring to avoid lifeline collision.
+% =====================================================================
+\begin{tikzpicture}[
+  font=\sffamily\scriptsize,
+  >={Stealth[length=2.0mm,width=1.4mm]},
+  every node/.style={align=center},
+  actor/.style    ={rectangle, draw=black, thick, fill=gray!12,
+                    minimum width=2.4cm, minimum height=0.8cm,
+                    font=\sffamily\footnotesize},
+  msg/.style      ={->, thick, >={Stealth[length=2.0mm,width=1.4mm]}},
+  retmsg/.style   ={->, thick, dashed, >={Stealth[length=2.0mm,width=1.4mm]}},
+  selfmsg/.style  ={->, thick, >={Stealth[length=2.0mm,width=1.4mm]}},
+  bar/.style      ={rectangle, draw=black, thick, fill=gray!25,
+                    minimum width=0.20cm},
+  altbox/.style   ={rectangle, draw=black, thick, dashed, inner sep=4pt,
+                    rounded corners=2pt, fill=white},
+  msglabel/.style ={font=\sffamily\scriptsize, fill=white, inner sep=1pt},
+]
+
+% ----- Actor boxes (top of diagram) -----
+\node[actor] (Av)  at ( 0, 0)    {Voter};
+\node[actor] (Aa)  at ( 3, 0)    {API\\Server};
+\node[actor] (Ac)  at ( 6, 0)    {Crypto\\Pipeline};
+\node[actor] (Asa) at ( 9, 0)    {SA$^2$\\Server A};
+\node[actor] (Asb) at (12, 0)    {SA$^2$\\Server B};
+\node[actor] (Af)  at (15, 0)    {Hyperledger\\Fabric};
+
+% Vertical spacing constant (used as y-step between messages)
+% Total bottom: ~ -22
+
+% ----- Lifeline columns (dashed verticals) -----
+\foreach \n in {Av,Aa,Ac,Asa,Asb,Af} {
+  \draw[dashed, gray] (\n.south) -- ($(\n.south) + (0,-22.5)$);
+}
+
+% =========================================================================
+%  Message sequence (top to bottom, 1.3-1.5cm gap between messages)
+% =========================================================================
+
+% (1) Voter -> API
+\draw[msg] (0,-1.2) -- node[msglabel,above] {1: \texttt{POST /vote(voterID, candidate, slot, signal)}} (3,-1.2);
+\node[bar,minimum height=18.0cm,anchor=north] at (3,-1.2) {};
+
+% (2) API -> Crypto
+\draw[msg] (3,-2.5) -- node[msglabel,above] {2: createBallot, Paillier encrypt, ZKP prove} (6,-2.5);
+\node[bar,minimum height=1.4cm,anchor=north] at (6,-2.5) {};
+
+% (3) Crypto -> API (return)
+\draw[retmsg] (6,-3.6) -- node[msglabel,above] {3: $(E(v), C, \pi^{\text{bin}}, \pi^{\text{sum}})$} (3,-3.6);
+
+% (4) API self : duress check (label placed FAR LEFT of API column)
+\draw[selfmsg] (3,-4.7) -- ++( 0.9,0) -- ++(0,-0.5) -- ++(-0.9,0);
+\node[msglabel, anchor=east, align=left] at (2.85,-4.95)
+   {4: HMAC verify duress signal,\\
+    \hphantom{4: }finalWeight $=$ smdcW $\times$ behavior};
+
+% (5) API -> Crypto : ring sign
+\draw[msg] (3,-6.3) -- node[msglabel,above] {5: ring sign over $E(v)^{\text{finalWeight}}$, ring 100} (6,-6.3);
+\node[bar,minimum height=1.4cm,anchor=north] at (6,-6.3) {};
+
+% (6) Crypto -> API (return)
+\draw[retmsg] (6,-7.4) -- node[msglabel,above] {6: $(\sigma, I)$ with $I = $ key image} (3,-7.4);
+
+% (7) API self : key image cache check (label LEFT of API)
+\draw[selfmsg] (3,-8.5) -- ++( 0.9,0) -- ++(0,-0.5) -- ++(-0.9,0);
+\node[msglabel, anchor=east] at (2.85,-8.75)
+   {7: KeyImage cache check (in-memory fast path)};
+
+% (8) API -> Crypto : SA² split
+\draw[msg] (3,-10.0) -- node[msglabel,above] {8: SA$^2$ split: pick mask, compute share$_A$, share$_B$} (6,-10.0);
+\node[bar,minimum height=1.4cm,anchor=north] at (6,-10.0) {};
+
+% (9) Crypto -> API (return)
+\draw[retmsg] (6,-11.1) -- node[msglabel,above] {9: (share$_A$, share$_B$)} (3,-11.1);
+
+% (10) API -> SA-A
+\draw[msg] (3,-12.4) -- node[msglabel,above] {10: forward share$_A = E(v + m)$} (9,-12.4);
+\node[bar,minimum height=0.8cm,anchor=north] at (9,-12.4) {};
+
+% (11) API -> SA-B
+\draw[msg] (3,-13.4) -- node[msglabel,above] {11: forward share$_B = E(-m)$} (12,-13.4);
+\node[bar,minimum height=0.8cm,anchor=north] at (12,-13.4) {};
+
+% (12, 13) ALT block: coerced vs genuine
+\node[altbox, anchor=north west] (alt) at (-0.4,-14.6)
+   {\begin{minipage}{16cm}\centering
+     \textbf{alt} \quad behaviorWeight $= 0$ (coerced) $\rightarrow$ short-circuit (skip 14--16, return identical receipt)\\
+     \hspace*{1em} else $\rightarrow$ proceed
+    \end{minipage}};
+
+% (14) SA-A -> Fabric
+\draw[msg] (9,-16.4) -- node[msglabel,above] {14: chaincode CastVote(share$_A$ ciphertext)} (15,-16.4);
+
+% (15) SA-B -> Fabric
+\draw[msg] (12,-17.4) -- node[msglabel,above] {15: chaincode CastVote(share$_B$ ciphertext)} (15,-17.4);
+\node[bar,minimum height=2.4cm,anchor=north] at (15,-16.4) {};
+
+% (16) Fabric self : key image uniqueness check (label LEFT of Fabric)
+\draw[selfmsg] (15,-18.6) -- ++( 0.9,0) -- ++(0,-0.5) -- ++(-0.9,0);
+\node[msglabel, anchor=east, align=left] at (14.85,-18.85)
+   {16: chaincode validates KeyImage uniqueness,\\
+    \hphantom{16: }persists Vote, emits \texttt{VoteCast} event};
+
+% (17) Fabric -> API : tx confirm
+\draw[retmsg] (15,-20.2) -- node[msglabel,above] {17: tx confirmation (block number)} (3,-20.2);
+
+% (18) API -> Voter : receipt
+\draw[retmsg] (3,-21.4) -- node[msglabel,above] {18: receipt $\{$voterID, receiptID, txID, key image$\}$} (0,-21.4);
+
+% Closing actor boxes (bottom)
+\foreach \n/\x in {Av/0,Aa/3,Ac/6,Asa/9,Asb/12,Af/15} {
+  \node[actor,minimum height=0.6cm,minimum width=2.0cm] at (\x,-22.7) {};
+}
+
+\end{tikzpicture}

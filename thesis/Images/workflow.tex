@@ -1,0 +1,110 @@
+% =====================================================================
+%  Voter Workflow / Activity Diagram for CovertVote
+%  --------------------------------------------------------------------
+%  Black & white safe.  UML-style activity diagram covering the full
+%  voter journey from registration through receipt.  Distinct shapes:
+%      - filled circle .. start
+%      - rounded rect  .. activity
+%      - diamond       .. decision
+%      - double circle .. end
+% =====================================================================
+\begin{tikzpicture}[
+  font=\sffamily\footnotesize,
+  >={Stealth[length=2.2mm,width=1.6mm]},
+  every node/.style={align=center},
+  start/.style    ={circle, draw=black, fill=black, minimum size=5mm, inner sep=0pt},
+  activity/.style ={rectangle, draw=black, thick, rounded corners=4pt,
+                    minimum width=4.5cm, minimum height=0.85cm, fill=white},
+  decision/.style ={diamond, draw=black, thick, aspect=1.8,
+                    inner sep=1pt, fill=gray!8, font=\sffamily\scriptsize},
+  endact/.style   ={circle, draw=black, thick, fill=white, minimum size=6mm,
+                    inner sep=0pt, path picture={
+                      \draw[fill=black] (path picture bounding box.center)
+                        circle (1.4mm);}},
+  flow/.style     ={->, thick, >={Stealth[length=2.2mm,width=1.6mm]}},
+]
+
+% =========================================================================
+%  Two-column layout : Registration phase (left) | Voting phase (right)
+% =========================================================================
+
+% ---------- Registration phase (left column) ----------
+\node[start]    (s1)  at (0, 11.5) {};
+\node[activity] (r1)  at (0, 10.4) {Submit voter ID and fingerprint};
+\node[activity] (r2)  at (0,  9.3) {Compute SHA-3 fingerprint hash};
+\node[activity] (r3)  at (0,  8.2) {Liveness detection (anti-spoof)};
+\node[decision] (d1)  at (0,  6.9) {Liveness\\pass?};
+\node[activity] (r4)  at (0,  5.6) {Check Merkle eligibility};
+\node[decision] (d2)  at (0,  4.3) {Eligible?};
+\node[activity] (r5)  at (0,  3.0) {Generate ring keypair $(\mathrm{sk},\mathrm{pk})$};
+\node[activity] (r6)  at (0,  1.9) {Generate SMDC credential\\\scriptsize $\text{idx}_{\text{real}} = \text{HMAC}(\text{eid}, \text{vid})\bmod k$};
+\node[activity] (r7)  at (0,  0.8) {(Optional) register duress signal\\\scriptsize HMAC-SHA256 hash stored};
+\node[activity] (r8)  at (0, -0.3) {Persist voter record (SQLite)};
+
+% ---------- Voting phase (right column) ----------
+\node[start]    (s2)  at (8, 11.5) {};
+\node[activity] (v1)  at (8, 10.4) {Voter authenticates (JWT)};
+\node[activity] (v2)  at (8,  9.3) {Select candidate \& SMDC slot};
+\node[activity] (v3)  at (8,  8.2) {(Optional) submit detected signal};
+\node[decision] (d3)  at (8,  6.9) {Election\\active?};
+\node[activity] (v4)  at (8,  5.6) {Encrypt vote, commit, prove (ZKP)};
+\node[decision] (d4)  at (8,  4.3) {Duress\\match?};
+\node[activity] (v5a) at (8,  3.0) {Ring sign + SA$^2$ split + submit\\\scriptsize key image marked, vote on Fabric};
+\node[activity] (v5b) at (12.5, 4.3) {Silent discard\\\scriptsize key image NOT marked,\\\scriptsize voter can re-vote later};
+\node[activity] (v6)  at (8,  1.9) {Return receipt to voter\\\scriptsize identical in both branches};
+\node[endact]   (e2)  at (8,  0.5) {};
+
+% ---------- Failure end states (kept inside left swimlane) ----------
+\node[endact]  (e1l) at (-2.5, 6.9) {};
+\node[endact]  (e1m) at (-2.5, 4.3) {};
+% Reject end-state for inactive election (placed inside right swimlane,
+% mirrors d1/d2 reject style for consistency)
+\node[endact]  (e2r) at ( 5.5, 6.9) {};
+
+% =========================================================================
+%  Edges - Registration path
+% =========================================================================
+\draw[flow] (s1) -- (r1);
+\draw[flow] (r1) -- (r2);
+\draw[flow] (r2) -- (r3);
+\draw[flow] (r3) -- (d1);
+\draw[flow] (d1) -- node[right,font=\sffamily\scriptsize] {yes} (r4);
+\draw[flow] (d1.west) -- node[above,font=\sffamily\scriptsize] {no (reject)} (e1l);
+\draw[flow] (r4) -- (d2);
+\draw[flow] (d2) -- node[right,font=\sffamily\scriptsize] {yes} (r5);
+\draw[flow] (d2.west) -- node[above,font=\sffamily\scriptsize] {no (reject)} (e1m);
+\draw[flow] (r5) -- (r6);
+\draw[flow] (r6) -- (r7);
+\draw[flow] (r7) -- (r8);
+
+% =========================================================================
+%  Edges - Voting path
+% =========================================================================
+\draw[flow] (s2) -- (v1);
+\draw[flow] (v1) -- (v2);
+\draw[flow] (v2) -- (v3);
+\draw[flow] (v3) -- (d3);
+\draw[flow] (d3) -- node[right,font=\sffamily\scriptsize] {yes} (v4);
+\draw[flow] (v4) -- (d4);
+\draw[flow] (d4) -- node[right,font=\sffamily\scriptsize] {yes (genuine)} (v5a);
+\draw[flow] (d4.east) -- node[above,font=\sffamily\scriptsize] {no (coerced)} (v5b);
+\draw[flow] (v5a) -- (v6);
+\draw[flow] (v5b) |- (v6);
+\draw[flow] (v6) -- (e2);
+
+% Reject path on election inactive: clean reject end-node (matches d1/d2 style)
+\draw[flow] (d3.west) -- node[above,font=\sffamily\scriptsize] {no (reject)} (e2r);
+
+% =========================================================================
+%  Phase swimlanes (background bands)
+% =========================================================================
+\begin{scope}[on background layer]
+  \draw[dashed,gray!50,thick]
+    ( -3.0, 12.2) rectangle ( 3.0, -1.0);
+  \draw[dashed,gray!50,thick]
+    (  5.0, 12.2) rectangle (14.5, -0.1);
+  \node[font=\sffamily\bfseries] at ( 0.0, 12.55) {Phase B: Voter Registration};
+  \node[font=\sffamily\bfseries] at ( 9.7, 12.55) {Phase C: Vote Casting};
+\end{scope}
+
+\end{tikzpicture}
