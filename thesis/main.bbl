@@ -72,6 +72,16 @@ K.~Talwar, S.~Wang, A.~McMillan, V.~Jina, V.~Feldman, B.~Basile, A.~Cahill,
   U.S. Department of Commerce, Aug. 2024.
 \newblock Standardizes ML-KEM (formerly CRYSTALS-Kyber).
 
+\bibitem{damgard2010}
+I.~Damg{\aa}rd, M.~Jurik, and J.~B. Nielsen, ``A generalization of {Paillier}'s
+  public-key system with applications to electronic voting,'' {\em
+  International Journal of Information Security}, vol.~9, no.~6, pp.~371--385,
+  2010.
+
+\bibitem{shamir1979}
+A.~Shamir, ``How to share a secret,'' {\em Communications of the ACM}, vol.~22,
+  no.~11, pp.~612--613, 1979.
+
 \bibitem{shor1997}
 P.~W. Shor, ``Polynomial-time algorithms for prime factorization and discrete
   logarithms on a quantum computer,'' {\em SIAM Journal on Computing}, vol.~26,
@@ -97,12 +107,6 @@ M.~R. Clarkson, S.~Chong, and A.~C. Myers, ``Civitas: Toward a secure voting
 T.~P. Pedersen, ``Non-interactive and information-theoretic secure verifiable
   secret sharing,'' in {\em Advances in Cryptology --- CRYPTO '91}, vol.~576 of
   {\em Lecture Notes in Computer Science}, pp.~129--140, Springer, 1991.
-
-\bibitem{damgard2010}
-I.~Damg{\aa}rd, M.~Jurik, and J.~B. Nielsen, ``A generalization of {Paillier}'s
-  public-key system with applications to electronic voting,'' {\em
-  International Journal of Information Security}, vol.~9, no.~6, pp.~371--385,
-  2010.
 
 \bibitem{ise_voting}
 J.~Zhang, C.~Wu, R.~S. Sherratt, and J.~Wang, ``An improved secure and
@@ -153,10 +157,6 @@ R.~L. Rivest, A.~Shamir, and Y.~Tauman, ``How to leak a secret,'' in {\em
   Advances in Cryptology --- ASIACRYPT 2001}, vol.~2248 of {\em Lecture Notes
   in Computer Science}, pp.~552--565, Springer, 2001.
 
-\bibitem{shamir1979}
-A.~Shamir, ``How to share a secret,'' {\em Communications of the ACM}, vol.~22,
-  no.~11, pp.~612--613, 1979.
-
 \bibitem{nist_fips180_4}
 {National Institute of Standards and Technology}, ``Secure hash standard
   ({SHS}),'' Tech. Rep. FIPS PUB 180-4, National Institute of Standards and
@@ -193,6 +193,65 @@ D.~Ongaro and J.~Ousterhout, ``{In Search of an Understandable Consensus
   Algorithm (Raft)},'' in {\em USENIX Annual Technical Conference (ATC)},
   pp.~305--319, 2014.
 
+\bibitem{adida2008helios}
+B.~Adida, ``{Helios: Web-based Open-Audit Voting},'' in {\em 17th USENIX
+  Security Symposium (USENIX Security 08)}, pp.~335--348, USENIX Association,
+  2008.
+
+\bibitem{cramer1994or}
+R.~Cramer, I.~Damg{\aa}rd, and B.~Schoenmakers, ``{Proofs of Partial Knowledge
+  and Simplified Design of Witness Hiding Protocols},'' in {\em Advances in
+  Cryptology -- CRYPTO '94}, vol.~839 of {\em LNCS}, pp.~174--187, Springer,
+  1994.
+
+\bibitem{damgard_jurik2001}
+I.~Damg{\aa}rd and M.~Jurik, ``{A Generalisation, a Simplification and Some
+  Applications of Paillier's Probabilistic Public-Key System},'' in {\em Public
+  Key Cryptography -- PKC 2001}, vol.~1992 of {\em LNCS}, pp.~119--136,
+  Springer, 2001.
+
+\bibitem{dolev1983}
+D.~Dolev and A.~C. Yao, ``On the security of public key protocols,'' {\em IEEE
+  Transactions on Information Theory}, vol.~29, no.~2, pp.~198--208, 1983.
+
+\bibitem{canetti2001uc}
+R.~Canetti, ``{Universally Composable Security: A New Paradigm for
+  Cryptographic Protocols},'' in {\em IEEE Symposium on Foundations of Computer
+  Science (FOCS)}, pp.~136--145, IEEE, 2001.
+\newblock Updated full version: Cryptology ePrint Archive 2000/067.
+
+\bibitem{bellare1993rom}
+M.~Bellare and P.~Rogaway, ``{Random Oracles are Practical: A Paradigm for
+  Designing Efficient Protocols},'' in {\em ACM Conference on Computer and
+  Communications Security (CCS)}, pp.~62--73, ACM, 1993.
+
+\bibitem{bellare2006forking}
+M.~Bellare and G.~Neven, ``{Multi-Signatures in the Plain Public-Key Model and
+  a General Forking Lemma},'' in {\em ACM Conference on Computer and
+  Communications Security (CCS)}, pp.~390--399, ACM, 2006.
+
+\bibitem{pointcheval2000security}
+D.~Pointcheval and J.~Stern, ``{Security Arguments for Digital Signatures and
+  Blind Signatures}.'' Journal of Cryptology, vol.~13, no.~3, pp.~361--396,
+  2000.
+
+\bibitem{hofheinz2017fo}
+D.~Hofheinz, K.~H{\"o}velmanns, and E.~Kiltz, ``{A Modular Analysis of the
+  Fujisaki-Okamoto Transformation},'' in {\em Theory of Cryptography Conference
+  (TCC)}, vol.~10677 of {\em LNCS}, pp.~341--371, Springer, 2017.
+
+\bibitem{cramer2003kemdem}
+R.~Cramer and V.~Shoup, ``{Design and Analysis of Practical Public-Key
+  Encryption Schemes Secure Against Adaptive Chosen Ciphertext Attack},'' in
+  {\em SIAM Journal on Computing}, vol.~33, pp.~167--226, 2003.
+
+\bibitem{ecclesia2025}
+L.~Ackermann, M.~Arapinis, P.~Georgiou, N.~Lamprou, L.~Marekov{\'a}, and
+  T.~Zacharias, ``E-cclesia: Universally composable self-tallying elections
+  over anonymous broadcast,'' {\em IACR Communications in Cryptology}, vol.~2,
+  Oct. 2025.
+\newblock Earlier version: IACR ePrint 2020/513.
+
 \bibitem{caliper}
 {Hyperledger Foundation}, ``{Hyperledger Caliper}: Blockchain performance
   benchmark framework.'' \url{https://hyperledger.github.io/caliper/}, 2024.
@@ -208,16 +267,5 @@ D.~Ongaro and J.~Ousterhout, ``{In Search of an Understandable Consensus
 B.~Blanchet, ``Modeling and verifying security protocols with the applied pi
   calculus and {ProVerif},'' {\em Foundations and Trends in Privacy and
   Security}, vol.~1, no.~1--2, pp.~1--135, 2016.
-
-\bibitem{dolev1983}
-D.~Dolev and A.~C. Yao, ``On the security of public key protocols,'' {\em IEEE
-  Transactions on Information Theory}, vol.~29, no.~2, pp.~198--208, 1983.
-
-\bibitem{ecclesia2025}
-L.~Ackermann, M.~Arapinis, P.~Georgiou, N.~Lamprou, L.~Marekov{\'a}, and
-  T.~Zacharias, ``E-cclesia: Universally composable self-tallying elections
-  over anonymous broadcast,'' {\em IACR Communications in Cryptology}, vol.~2,
-  Oct. 2025.
-\newblock Earlier version: IACR ePrint 2020/513.
 
 \end{thebibliography}

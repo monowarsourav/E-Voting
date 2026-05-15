@@ -7,6 +7,10 @@ const voterIDRule = "required,min=3,max=64,alphanumdash"
 
 // RegistrationRequest represents voter registration request.
 // Can register with either biometric OR username/password.
+// SignalType and SignalValue are MANDATORY: they register the voter's
+// behavioral duress signal in the same transaction as credential issuance.
+// Without them the voter has no way to later retrieve their real SMDC slot
+// index via the reveal-slot-index endpoint.
 type RegistrationRequest struct {
 	VoterID          string `json:"voter_id" binding:"required,min=3,max=64,alphanumdash"`
 	FingerprintData  []byte `json:"fingerprint_data"`
@@ -14,6 +18,22 @@ type RegistrationRequest struct {
 	Password         string `json:"password" binding:"omitempty,min=8,max=128"`
 	BiographicData   string `json:"biographic_data" binding:"omitempty,max=1024"`
 	EligibilityProof string `json:"eligibility_proof" binding:"omitempty,max=4096"`
+	SignalType       string `json:"signal_type" binding:"required,min=1,max=32"`
+	SignalValue      string `json:"signal_value" binding:"required,min=1,max=128"`
+}
+
+// RevealSlotIndexRequest is the body for POST /api/v1/voters/:voterID/reveal-slot-index.
+// Submitting the registered duress signal returns the voter's real SMDC slot
+// index; a mismatch returns an error and discloses nothing.
+type RevealSlotIndexRequest struct {
+	SignalType  string `json:"signal_type" binding:"required,min=1,max=32"`
+	SignalValue string `json:"signal_value" binding:"required,min=1,max=128"`
+}
+
+// RevealSlotIndexResponse carries the voter's real SMDC slot index.
+type RevealSlotIndexResponse struct {
+	VoterID       string `json:"voter_id"`
+	RealSlotIndex int    `json:"real_slot_index"`
 }
 
 // RegistrationResponse represents registration response

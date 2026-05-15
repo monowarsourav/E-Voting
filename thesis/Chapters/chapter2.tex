@@ -109,7 +109,7 @@ The main contribution is the first scalable coercion-resistant blockchain voting
 \subsubsection{Limitations}
 \label{subsubsec:yin-limits}
 
-Despite achieving scalable coercion resistance, the scheme has several limitations. It does not implement post-quantum cryptographic protection, leaving ballot privacy vulnerable to future quantum adversaries. The system lacks homomorphic encryption for privacy-preserving tallying, biometric voter authentication, and anonymous aggregation mechanisms. There is no integration with a production blockchain platform (such as Hyperledger Fabric) with deployed chaincode and real network benchmarks. The protocol implements only two cryptographic primitives, compared to the seven-protocol composition proposed in our framework. While the game-based formal proofs are stronger than symbolic-model verification, the system does not provide practical deployment validation or comprehensive test coverage.
+Despite achieving scalable coercion resistance, the scheme has several limitations. It does not implement post-quantum cryptographic protection, leaving ballot privacy vulnerable to future quantum adversaries. The system lacks homomorphic encryption for privacy-preserving tallying, biometric voter authentication, and anonymous aggregation mechanisms. There is no integration with a production blockchain platform (such as Hyperledger Fabric) with deployed chaincode and real network benchmarks. The protocol implements only two cryptographic primitives, compared to the multi-protocol composition proposed in our framework. While the game-based formal proofs are stronger than symbolic-model verification, the system does not provide practical deployment validation or comprehensive test coverage.
 
 \subsection{Survey: Blockchain for Securing Electronic Voting Systems}
 \label{subsec:survey}
@@ -144,7 +144,7 @@ The Paillier cryptosystem~\cite{paillier1999} is a probabilistic public-key encr
 \subsection{Pedersen Commitments}
 \label{subsec:bg-pedersen}
 
-A Pedersen commitment~\cite{pedersen1991} binds a committer to a secret value $m$ via $C = g^m h^r \bmod p$, where $g$ and $h$ are generators of a prime-order subgroup and $r$ is fresh randomness. The construction is \emph{perfectly binding} (no two openings exist for a given $C$) and \emph{computationally hiding} under the discrete logarithm assumption. Pedersen commitments serve as the cryptographic substrate for the zero-knowledge proofs used to verify ballot well-formedness and for the deniable credentials that underpin coercion resistance in this work.
+A Pedersen commitment~\cite{pedersen1991} binds a committer to a secret value $m$ via $C = g^m h^r \bmod p$, where $g$ and $h$ are generators of a prime-order subgroup with $\log_g h$ unknown and $r$ is fresh randomness uniformly sampled from $\mathbb{Z}_q$. The construction is \emph{perfectly hiding} (the distribution of $C$ over uniform $r$ is independent of $m$, so even an unbounded adversary learns nothing about $m$ from $C$) and \emph{computationally binding} under the discrete logarithm assumption (a collision $g^m h^r = g^{m'} h^{r'}$ with $(m,r) \neq (m',r')$ would yield $\log_g h$). Pedersen commitments serve as the cryptographic substrate for the zero-knowledge proofs used to verify ballot well-formedness and for the deniable credentials that underpin coercion resistance in this work.
 
 \subsection{Zero-Knowledge \texorpdfstring{$\Sigma$}{Sigma}-Protocols}
 \label{subsec:bg-zkp}
@@ -189,7 +189,7 @@ Samplable Anonymous Aggregation (SA\textsuperscript{2})~\cite{sa2_apple} is a tw
 \section{Comparison Among State-of-the-Art Works}
 \label{sec:comparison}
 
-Table \ref{tab:comparison} presents a comparative analysis of the reviewed e-voting systems across key security properties and implementation characteristics. This comparison highlights the gaps in existing solutions that The proposed framework addresses through its seven-protocol cryptographic stack.
+Table \ref{tab:comparison} presents a comparative analysis of the reviewed e-voting systems across key security properties and implementation characteristics. This comparison highlights the gaps in existing solutions that The proposed framework addresses through its multi-protocol cryptographic stack.
 
 \begin{table}[H]
 \centering
@@ -237,7 +237,7 @@ The ``Ours'' Biometric Authentication entry is marked partial (\pmark) rather th
 
 From Table \ref{tab:comparison}, several observations can be made. First, no existing system provides all the security properties simultaneously. ISE-Voting offers ring signatures but lacks homomorphic encryption and coercion resistance. BP-Vot provides differential privacy but sacrifices exact tallying. Faruk et al. offer biometric authentication with a 100-participant user trial but with minimal cryptographic depth. Yuan et al. implement Paillier homomorphic encryption but without anonymity or coercion resistance. Yin et al.~\cite{yin_tdsc} represent the closest competitor to our framework, achieving both $O(n)$ complexity and coercion resistance with formal game-based proofs; however, their system lacks homomorphic tallying, post-quantum protection, biometric authentication, anonymous aggregation, and production blockchain deployment.
 
-the proposed framework is the only system that integrates all reviewed security properties (homomorphic encryption, zero-knowledge proofs, ring signatures, coercion resistance, post-quantum protection, biometric authentication, anonymous aggregation, and threshold decryption) into a single, functional voting pipeline with empirical blockchain performance benchmarks. Notably, The proposed framework integrates \textbf{seven} cryptographic protocols, compared to at most two in any existing system, and provides a full implementation with production blockchain deployment and ProVerif formal verification.
+Among the works surveyed in this chapter, the proposed framework is the sole system that integrates all reviewed security properties (homomorphic encryption, zero-knowledge proofs, ring signatures, coercion resistance, post-quantum protection, biometric authentication, anonymous aggregation, and threshold decryption) into a single voting pipeline with empirical blockchain performance benchmarks. The proposed framework composes a \textbf{multi-protocol cryptographic stack} that combines substantially more primitives than the at-most-two integrated by any of the surveyed systems, and provides a full implementation with production blockchain deployment and ProVerif formal verification.
 
 \section{Summary}
 \label{sec:lit-summary}
@@ -253,9 +253,9 @@ Specifically, the literature analysis identifies the following critical gaps tha
     
     \item \textbf{Post-Quantum Gap}: No existing blockchain e-voting system provides post-quantum security with a standardized algorithm. The proposed framework integrates Kyber768 (ML-KEM, NIST FIPS 203) hybrid encryption.
     
-    \item \textbf{Protocol Integration Gap}: Existing systems implement at most two cryptographic protocols. The proposed framework integrates seven protocols while maintaining $O(n)$ tally complexity and sub-100ms per-vote pipeline time.
+    \item \textbf{Protocol Integration Gap}: Existing systems implement at most two cryptographic protocols. The proposed framework integrates a multi-protocol cryptographic stack with substantially broader primitive composition while maintaining $O(n)$ tally complexity and sub-100ms per-vote pipeline time.
     
     \item \textbf{Empirical Validation Gap}: Most systems provide only theoretical analysis or small-scale simulations. The proposed framework provides comprehensive empirical benchmarks on production Hyperledger Fabric infrastructure with up to 100,000 transactions.
 \end{enumerate}
 
-The comparison table (Table \ref{tab:comparison}) quantifies these gaps and demonstrates that The proposed framework addresses all identified limitations through its seven-protocol cryptographic stack. The next chapter presents the detailed system design and mathematical formulation of our framework, including the novel SMDC coercion resistance mechanism and SA\textsuperscript{2} anonymous aggregation protocol.
+The comparison table (Table \ref{tab:comparison}) quantifies these gaps and demonstrates that The proposed framework addresses all identified limitations through its multi-protocol cryptographic stack. The next chapter presents the detailed system design and mathematical formulation of our framework, including the novel SMDC coercion resistance mechanism and SA\textsuperscript{2} anonymous aggregation protocol.

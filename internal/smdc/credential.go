@@ -13,23 +13,34 @@ type SMDCGenerator struct {
 	PedersenParams *crypto.PedersenParams
 	K              int    // Number of slots
 	ElectionID     string // Election context for proof binding
+	// SecretKey is the server-held HMAC key used to derive each voter's
+	// real slot index. It must remain confidential to the election
+	// authority — its disclosure collapses SMDC's coercion resistance,
+	// because the real index is otherwise a deterministic function of
+	// public inputs (voterID, electionID).
+	SecretKey []byte
 }
 
-// NewSMDCGenerator creates a new SMDC generator
-func NewSMDCGenerator(pp *crypto.PedersenParams, k int, electionID string) *SMDCGenerator {
+// NewSMDCGenerator creates a new SMDC generator. secret is the server-held
+// HMAC key used to derive real slot indices; callers must supply at least
+// 32 bytes of high-entropy material in production.
+func NewSMDCGenerator(pp *crypto.PedersenParams, k int, electionID string, secret []byte) *SMDCGenerator {
 	return &SMDCGenerator{
 		PedersenParams: pp,
 		K:              k,
 		ElectionID:     electionID,
+		SecretKey:      secret,
 	}
 }
 
 // DeriveRealIndex deterministically derives the real slot index from voterID
-// and electionID using HMAC. This allows the legitimate voter to re-derive
-// their real index without it being stored in the credential struct.
+// and electionID using HMAC-SHA256 keyed by the server's secret. The legitimate
+// election authority can recompute the index for a voter, but a coercer who
+// knows only (voterID, electionID) cannot — that is what makes the slot
+// indistinguishable from the fake ones in the adversary's view.
 func (gen *SMDCGenerator) DeriveRealIndex(voterID string) int {
 	context := []byte("smdc-real-index:" + voterID + ":" + gen.ElectionID)
-	mac := crypto.HMACSHA256([]byte(gen.ElectionID), context)
+	mac := crypto.HMACSHA256(gen.SecretKey, context)
 	// Use first 8 bytes as uint64, then reduce mod k
 	idx := binary.BigEndian.Uint64(mac[:8])
 	return int(idx % uint64(gen.K))

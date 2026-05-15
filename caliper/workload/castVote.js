@@ -41,8 +41,19 @@ class CastVoteWorkload extends WorkloadModuleBase {
         this.voteCounter++;
         const voteID = `vote-w${this.workerIndex}-${this.voteCounter}-${Date.now()}`;
 
-        // Simulate encrypted vote data (in real system this would be Paillier ciphertext)
-        const encryptedVote = crypto.randomBytes(256).toString('hex');
+        // Simulate the 1-hot Paillier ciphertext array — 3 candidates × 2048-bit
+        // modulus. Each ciphertext is a decimal string of a random Z_{n^2}
+        // element (~1234 chars); the array is JSON-encoded into the
+        // encryptedVote argument, matching what
+        // internal/blockchain/fabric.go SubmitVote actually sends in the
+        // production 1-hot pipeline.
+        const NUM_CANDIDATES = 3;
+        const ciphertexts = [];
+        for (let j = 0; j < NUM_CANDIDATES; j++) {
+            const ct = BigInt('0x' + crypto.randomBytes(512).toString('hex')).toString();
+            ciphertexts.push(ct);
+        }
+        const encryptedVote = JSON.stringify(ciphertexts);
         const ringSignature = crypto.randomBytes(128).toString('hex');
         const keyImage = crypto.randomBytes(32).toString('hex') + `-${voteID}`;
         const smdcCommitment = crypto.randomBytes(64).toString('hex');

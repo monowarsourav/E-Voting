@@ -9,12 +9,20 @@ import (
 )
 
 // TestRealFabricIntegration tests the full blockchain integration against a
-// running Hyperledger Fabric network. Skip if the network is not running.
+// running Hyperledger Fabric network. Skipped unless FABRIC_LIVE=1 is set in
+// the environment, because the test depends on (i) a running peer at
+// localhost:7051 and (ii) pre-existing chain state (vote001 / election001).
 //
 // Prerequisites:
 //   - docker compose -f network/docker-compose-hf.yml up -d
 //   - Chaincode "covertvote" deployed on channel "covertvotechannel"
+//   - vote001 / election001 already submitted via CLI seed script
+//   - Run with: FABRIC_LIVE=1 go test ./internal/blockchain/...
 func TestRealFabricIntegration(t *testing.T) {
+	if os.Getenv("FABRIC_LIVE") != "1" {
+		t.Skip("Skipping: live Fabric integration test (set FABRIC_LIVE=1 to enable)")
+	}
+
 	// Determine the project root (4 levels up from this test file).
 	networkDir := findNetworkDir()
 	if networkDir == "" {
@@ -81,7 +89,7 @@ func TestRealFabricIntegration(t *testing.T) {
 		txID, err := fc.SubmitVote(
 			voteID,
 			"election001",
-			newBigInt(12345),
+			[]*big.Int{newBigInt(12345)},
 			nil, // ring signature not needed for blockchain test
 			newBigInt(67890),
 			newBigInt(11111),

@@ -1,9 +1,14 @@
 % =====================================================================
-%  System Architecture Diagram for CovertVote
+%  System Architecture Diagram for CovertVote (Updated)
 %  --------------------------------------------------------------------
 %  Black & white safe.  Distinguishable purely by SHAPE and LINE STYLE.
 %  Layer titles placed INSIDE each wrapper (top-left tab style) so that
 %  inter-layer arrow labels never collide with layer headers.
+%  Layers tinted with very light pastel fills (5-8% opacity) for visual
+%  separation while remaining legible in grayscale print.
+%  Updates: explicit Authentication Layer wrapper; per-candidate 1-hot
+%  Paillier annotation; CDS OR-proof annotation; duress-bound reveal
+%  endpoint shown on the voter-to-API flow.
 % =====================================================================
 \begin{tikzpicture}[
   font=\sffamily\footnotesize,
@@ -23,8 +28,14 @@
   result/.style   ={trapezium, trapezium left angle=70, trapezium right angle=110,
                     draw=black, thick, minimum width=3.0cm, minimum height=0.9cm,
                     fill=gray!18, font=\sffamily\bfseries},
-  layer/.style    ={rectangle, draw=black, dashed, inner sep=10pt,
-                    rounded corners=3pt, fill=gray!3},
+  authlayer/.style={rectangle, draw=black, dashed, inner sep=10pt,
+                    rounded corners=3pt, fill=blue!5},
+  cryptolayer/.style={rectangle, draw=black, dashed, inner sep=10pt,
+                    rounded corners=3pt, fill=yellow!5},
+  privacylayer/.style={rectangle, draw=black, dashed, inner sep=10pt,
+                    rounded corners=3pt, fill=red!5},
+  chainlayer/.style={rectangle, draw=black, dashed, inner sep=10pt,
+                    rounded corners=3pt, fill=green!5},
   layertitle/.style={font=\sffamily\bfseries\small, fill=white, inner sep=3pt,
                     anchor=south west},
   %------ arrow styles ------
@@ -34,29 +45,35 @@
 ]
 
 % =========================================================================
-%  Row 0 : External actors
+%  Row 0 : External actors (raised to clear the Authentication Layer title)
 % =========================================================================
-\node[actor] (voter)  at (0,12.5) {Voter\\\scriptsize fingerprint, SMDC slot,\\\scriptsize duress signal (opt.)};
-\node[actor] (admin)  at (12,12.5) {Election Authority\\\scriptsize MSP (admin)};
+\node[actor] (voter)  at (0,13.6) {Voter\\\scriptsize fingerprint, SMDC slot,\\\scriptsize duress signal (opt.)};
+\node[actor] (admin)  at (12,13.6) {Election Authority\\\scriptsize MSP (admin)};
 
 % =========================================================================
-%  Row 1 : REST API Server
+%  Row 1 : REST API Server (now inside Authentication Layer wrapper)
 % =========================================================================
 \node[process,minimum width=8cm] (api) at (6,10.3)
    {REST API Server (Gin v1.11, port 8080)\\
     \scriptsize JWT Auth $|$ Admin MSP middleware $|$ Rate Limiter $|$ CORS};
 
-\draw[flow] (voter.south) -- node[right,font=\sffamily\scriptsize,pos=0.55,fill=white,inner sep=1pt]
-            {\texttt{POST /register}\\\texttt{POST /vote}} (api.north -| voter);
-\draw[flow] (admin.south) -- node[left,font=\sffamily\scriptsize,pos=0.55,fill=white,inner sep=1pt]
+\begin{scope}[on background layer]
+  \node[authlayer, fit=(api)] (auth) {};
+\end{scope}
+\node[layertitle, anchor=south] at ([yshift=2pt]auth.north) {Authentication Layer};
+
+% Voter -> API: three endpoints, including the duress-bound reveal flow
+\draw[flow] (voter.south) -- node[right,font=\sffamily\scriptsize,pos=0.40,fill=white,inner sep=1pt]
+            {\texttt{POST /register}\\\texttt{POST /reveal-slot-index}\\\texttt{POST /vote}} (api.north -| voter);
+\draw[flow] (admin.south) -- node[left,font=\sffamily\scriptsize,pos=0.40,fill=white,inner sep=1pt]
             {\texttt{/admin/elections}\\\texttt{/admin/tally}} (api.north -| admin);
 
 % =========================================================================
 %  Row 2 : Cryptographic Computation Layer (12 modules in 2 sub-rows)
 % =========================================================================
-\node[module] (paill) at ( 0.5,7.6) {Paillier\\HE (2048b)};
+\node[module] (paill) at ( 0.5,7.6) {Paillier HE\\1-hot, 2048b};
 \node[module] (peder) at ( 2.6,7.6) {Pedersen\\Commit};
-\node[module] (zkp)   at ( 4.7,7.6) {ZKP\\$\Sigma$-proof};
+\node[module] (zkp)   at ( 4.7,7.6) {CDS $\Sigma$-proof\\Paillier-direct};
 \node[module] (ring)  at ( 6.8,7.6) {Ring Sig\\Liu-Wei-Wong};
 \node[module] (smdc)  at ( 8.9,7.6) {SMDC\\$k{=}5$};
 \node[module] (kyber) at (11.0,7.6) {Kyber-768\\ML-KEM};
@@ -69,10 +86,10 @@
 \node[module] (thr)   at (11.0,6.5) {Threshold\\Paillier (DJN)};
 
 \begin{scope}[on background layer]
-  \node[layer,fit=(paill)(thr)(fp)(audit)] (cryptolayer) {};
+  \node[cryptolayer,fit=(paill)(thr)(fp)(audit)] (cryptolyr) {};
 \end{scope}
-\node[layertitle] at ([xshift=8pt,yshift=8pt]cryptolayer.north west) {Cryptographic Computation Layer};
-\draw[flow] (api.south) -- (cryptolayer.north);
+\node[layertitle] at ([xshift=8pt,yshift=8pt]cryptolyr.north west) {Cryptographic Computation Layer};
+\draw[flow] (api.south) -- (cryptolyr.north);
 
 % =========================================================================
 %  Row 3 : Privacy Layer (SA^2 two non-colluding aggregators)
@@ -82,18 +99,21 @@
 \node[process] (saB) at (8.5,3.2)
    {SA$^2$ Aggregator B (Helper)\\\scriptsize port 8082 \quad $\prod$ share$_B$};
 
-% non-collusion constraint placed BELOW the boxes
-\draw[ctrl] (saA.south east) -- node[below,font=\sffamily\scriptsize,fill=white,inner sep=1pt]
+% non-collusion constraint placed BELOW the boxes (label pushed down
+% and a phantom anchor placed beneath it so the privacy-layer wrapper
+% extends downward to contain the constraint annotation cleanly).
+\draw[ctrl] (saA.south east) -- node[below,yshift=-0.35cm,font=\sffamily\scriptsize,fill=white,inner sep=1pt]
             {\textbf{must NOT collude}} (saB.south west);
+\coordinate (collusion-anchor) at ($(saA.south east)!0.5!(saB.south west) + (0,-0.55)$);
 
 \begin{scope}[on background layer]
-  \node[layer,fit=(saA)(saB)] (privacy) {};
+  \node[privacylayer,fit=(saA)(saB)(collusion-anchor)] (privacy) {};
 \end{scope}
 \node[layertitle] at ([xshift=8pt,yshift=8pt]privacy.north west) {Privacy Layer (SA\textsuperscript{2})};
 
-\draw[flow] (cryptolayer.south -| saA) --
+\draw[flow] (cryptolyr.south -| saA) --
             node[left,pos=0.3,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_A=E(v{+}m)$} (saA.north);
-\draw[flow] (cryptolayer.south -| saB) --
+\draw[flow] (cryptolyr.south -| saB) --
             node[right,pos=0.3,font=\sffamily\scriptsize,fill=white,inner sep=1pt] {share$_B=E(-m)$} (saB.north);
 
 % =========================================================================
@@ -106,11 +126,11 @@
 \node[storage] (couch) at (11.5,-0.5) {CouchDB\\world state};
 
 \node[process,minimum width=6.5cm] (cc) at (5.0,-2.0)
-   {Chaincode \texttt{covertvote\_2.0}\\
+   {Chaincode \texttt{v2.0}\\
     \scriptsize CreateElection $\cdot$ CastVote $\cdot$ StoreTallyResult $\cdot$ KeyImage check};
 
 \begin{scope}[on background layer]
-  \node[layer,fit=(gw)(ord)(p1)(p2)(couch)(cc)] (chainlyr) {};
+  \node[chainlayer,fit=(gw)(ord)(p1)(p2)(couch)(cc)] (chainlyr) {};
 \end{scope}
 \node[layertitle] at ([xshift=8pt,yshift=8pt]chainlyr.north west) {Blockchain Storage Layer (Hyperledger Fabric v2.5)};
 
@@ -146,23 +166,31 @@
 % =========================================================================
 %  Legend
 % =========================================================================
-\begin{scope}[shift={(-0.3,-8.3)}]
-  \node[font=\sffamily\bfseries\footnotesize] at (1.5,0.8) {Legend};
-  \node[actor,minimum width=1.3cm,minimum height=0.5cm] (l-actor) at (0.5,0) {};
-  \node[anchor=west,font=\sffamily\scriptsize] at (1.2,0) {Actor};
-  \node[process,minimum width=1.3cm,minimum height=0.5cm] (l-proc) at (3.4,0) {};
-  \node[anchor=west,font=\sffamily\scriptsize] at (4.1,0) {Process / Service};
-  \node[storage,minimum width=1.0cm,minimum height=0.5cm] (l-st) at (6.5,0) {};
-  \node[anchor=west,font=\sffamily\scriptsize] at (7.0,0) {Persistent Store};
-  \node[result,minimum width=1.3cm,minimum height=0.45cm] (l-res) at (9.0,0) {};
-  \node[anchor=west,font=\sffamily\scriptsize] at (9.8,0) {Public Output};
+\begin{scope}[shift={(-0.3,-8.8)}]
+  \node[font=\sffamily\bfseries\footnotesize] at (0.5,0.9) {Legend};
 
-  \draw[flow] (0.0,-0.7) -- (0.7,-0.7);
-  \node[anchor=west,font=\sffamily\scriptsize] at (0.8,-0.7) {data flow};
-  \draw[ctrl] (3.0,-0.7) -- (3.7,-0.7);
-  \node[anchor=west,font=\sffamily\scriptsize] at (3.8,-0.7) {control / non-collusion constraint};
-  \draw[bidir] (7.5,-0.7) -- (8.2,-0.7);
-  \node[anchor=west,font=\sffamily\scriptsize] at (8.3,-0.7) {bidirectional read/write};
+  % Row 1 : shape symbols with comfortable spacing
+  \node[actor,minimum width=1.2cm,minimum height=0.5cm] (l-actor) at (0.5,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (1.6,0) {Actor};
+
+  \node[process,minimum width=1.2cm,minimum height=0.5cm] (l-proc) at (4.0,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (4.9,0) {Process / Service};
+
+  \node[storage,minimum width=0.9cm,minimum height=0.5cm] (l-st) at (8.3,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (9.0,0) {Persistent Store};
+
+  \node[result,minimum width=1.2cm,minimum height=0.45cm] (l-res) at (12.2,0) {};
+  \node[anchor=west,font=\sffamily\scriptsize] at (13.2,0) {Public Output};
+
+  % Row 2 : arrow symbols with comfortable spacing
+  \draw[flow] (0.2,-0.9) -- (0.9,-0.9);
+  \node[anchor=west,font=\sffamily\scriptsize] at (1.1,-0.9) {data flow};
+
+  \draw[ctrl] (4.0,-0.9) -- (4.7,-0.9);
+  \node[anchor=west,font=\sffamily\scriptsize] at (4.9,-0.9) {control / non-collusion};
+
+  \draw[bidir] (8.3,-0.9) -- (9.0,-0.9);
+  \node[anchor=west,font=\sffamily\scriptsize] at (9.2,-0.9) {bidirectional read/write};
 \end{scope}
 
 \end{tikzpicture}

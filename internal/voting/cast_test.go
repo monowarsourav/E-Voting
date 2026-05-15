@@ -1,6 +1,7 @@
 package voting
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"testing"
@@ -11,60 +12,73 @@ import (
 	"github.com/covertvote/e-voting/internal/voter"
 )
 
+func smallCandidateList() []*Candidate {
+	return []*Candidate{
+		{ID: 1, Name: "A"},
+		{ID: 5, Name: "B"},
+		{ID: 7, Name: "C"},
+	}
+}
+
 func TestBallotCreation(t *testing.T) {
-	// Setup
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
-
 	bc := NewBallotCreator(pk)
+	cands := smallCandidateList()
 
-	// Create ballot
-	ballot, err := bc.CreateBallot("voter001", 1)
+	ballot, err := bc.CreateBallot("voter001", 1, cands, "test-election")
 	if err != nil {
 		t.Fatalf("Ballot creation failed: %v", err)
 	}
-
 	if ballot.VoterID != "voter001" {
 		t.Errorf("VoterID mismatch")
 	}
-
 	if ballot.CandidateID != 1 {
 		t.Errorf("CandidateID mismatch")
 	}
+	if len(ballot.EncryptedVotes) != len(cands) {
+		t.Fatalf("expected %d ciphertexts, got %d", len(cands), len(ballot.EncryptedVotes))
+	}
 
-	// Decrypt to verify
-	decrypted, _ := sk.Decrypt(ballot.EncryptedVote)
-	if decrypted.Cmp(big.NewInt(1)) != 0 {
-		t.Errorf("Decrypted vote mismatch: expected 1, got %v", decrypted)
+	// Position 0 corresponds to candidate ID 1 (the chosen one) → should decrypt to 1.
+	got0, _ := sk.Decrypt(ballot.EncryptedVotes[0])
+	if got0.Cmp(big.NewInt(1)) != 0 {
+		t.Errorf("position 0 (chosen) decryption: expected 1, got %v", got0)
+	}
+	// Other positions decrypt to 0.
+	for j := 1; j < len(cands); j++ {
+		got, _ := sk.Decrypt(ballot.EncryptedVotes[j])
+		if got.Sign() != 0 {
+			t.Errorf("position %d decryption: expected 0, got %v", j, got)
+		}
+	}
+	// ZK proofs should self-verify.
+	if !bc.VerifyBallotZK(ballot.EncryptedVotes, ballot.BinaryProofs, ballot.SumProof) {
+		t.Error("freshly generated ballot ZK proofs failed verification")
 	}
 }
 
 func TestWeightApplication(t *testing.T) {
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
-
 	bc := NewBallotCreator(pk)
+	cands := smallCandidateList()
 
-	// Create ballot for candidate 5
-	ballot, _ := bc.CreateBallot("voter001", 5)
+	ballot, _ := bc.CreateBallot("voter001", 5, cands, "test-election")
 
-	// Apply weight 1 (real slot)
-	weightedVote := bc.ApplyWeight(ballot.EncryptedVote, big.NewInt(1))
-
-	// Decrypt
-	decrypted, _ := sk.Decrypt(weightedVote)
-	expected := big.NewInt(5) // 5 × 1 = 5
-
-	if decrypted.Cmp(expected) != 0 {
-		t.Errorf("Weighted vote mismatch: expected %v, got %v", expected, decrypted)
+	// Weight 1: per-candidate decrypts to v_j (1-hot for position of candidate 5 = index 1).
+	weighted := bc.ApplyWeight(ballot.EncryptedVotes, big.NewInt(1))
+	got, _ := sk.Decrypt(weighted[1])
+	if got.Cmp(big.NewInt(1)) != 0 {
+		t.Errorf("weighted vote (w=1) position 1: expected 1, got %v", got)
 	}
-
-	// Apply weight 0 (fake slot)
-	weightedVoteZero := bc.ApplyWeight(ballot.EncryptedVote, big.NewInt(0))
-	decryptedZero, _ := sk.Decrypt(weightedVoteZero)
-
-	if decryptedZero.Cmp(big.NewInt(0)) != 0 {
-		t.Errorf("Zero-weighted vote should be 0, got %v", decryptedZero)
+	// Weight 0: every position collapses to encryption-of-0 (literal 1 in Z_{n^2}^*).
+	weightedZero := bc.ApplyWeight(ballot.EncryptedVotes, big.NewInt(0))
+	for j, e := range weightedZero {
+		d, _ := sk.Decrypt(e)
+		if d.Sign() != 0 {
+			t.Errorf("weighted vote (w=0) position %d: expected 0, got %v", j, d)
+		}
 	}
 }
 
@@ -90,7 +104,7 @@ func TestVoteCasting(t *testing.T) {
 
 	// Create registration system with eligible voters
 	eligibleVoters := []string{"voter001", "voter002", "voter003"}
-	rs := voter.NewRegistrationSystem(pp, rp, 5, eligibleVoters, "election001")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register some voters
 	fingerprint1 := make([]byte, 200)
@@ -133,7 +147,7 @@ func TestElectionTiming(t *testing.T) {
 		IsActive:   true,
 	}
 
-	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{}, "future")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{}, "future", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 	vc := NewVoteCaster(pk, rp, rs, futureElection)
 
 	// Try to vote (should fail - not in voting period)
@@ -181,13 +195,13 @@ func setupTestElection() (*Election, *crypto.PaillierPrivateKey, *crypto.RingPar
 }
 
 func setupTestRS(pp *crypto.PedersenParams, rp *crypto.RingParams, voterIDs []string, electionID string) *voter.RegistrationSystem {
-	return voter.NewRegistrationSystem(pp, rp, 5, voterIDs, electionID)
+	return voter.NewRegistrationSystem(pp, rp, 5, voterIDs, electionID, []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 }
 
 func registerVoter(t *testing.T, rs *voter.RegistrationSystem, voterID string) {
 	t.Helper()
 	fingerprint := []byte("fingerprint-" + voterID)
-	_, err := rs.RegisterVoter(voterID, fingerprint)
+	_, err := rs.RegisterVoter(voterID, fingerprint, "blink_count", "2")
 	if err != nil {
 		t.Fatalf("Failed to register voter %s: %v", voterID, err)
 	}
@@ -400,8 +414,13 @@ func TestVerifyVote(t *testing.T) {
 	// rebuild ordering; the important thing is code path coverage.
 	_ = vc.VerifyVote(castVote)
 
-	// Verify the ring signature directly (the first check in VerifyVote)
-	message := castVote.WeightedVote.EncryptedVote.Bytes()
+	// Verify the ring signature directly: the cast pipeline signs the
+	// SHA-256 hash of the concatenated weighted ciphertext vector.
+	h := sha256.New()
+	for _, e := range castVote.WeightedVote.EncryptedVotes {
+		h.Write(e.Bytes())
+	}
+	message := h.Sum(nil)
 	if !vc.RingParams.Verify(message, castVote.WeightedVote.RingSignature, castVote.WeightedVote.RingPublicKeys) {
 		t.Error("Ring signature verification failed")
 	}

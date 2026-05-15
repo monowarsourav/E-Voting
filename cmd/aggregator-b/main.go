@@ -155,9 +155,10 @@ func (s *AggregatorServerB) aggregate(c *gin.Context) {
 		return
 	}
 
-	// Aggregate shares
+	// Aggregate shares.
+	// NOTE: legacy single-position API; see aggregator-a for context.
 	log.Printf("Server B: Aggregating %d shares for election %s", len(shares), req.ElectionID)
-	result := s.Aggregator.AggregateShares(shares)
+	result := s.Aggregator.AggregateShares(0, shares)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":          true,

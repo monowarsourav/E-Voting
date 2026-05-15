@@ -146,9 +146,9 @@ func (h *RegistrationHandler) Register(c *gin.Context) {
 	var err error
 
 	if hasBiometric {
-		voterRecord, err = h.RegistrationSystem.RegisterVoter(voterID, fingerprintHash)
+		voterRecord, err = h.RegistrationSystem.RegisterVoter(voterID, fingerprintHash, req.SignalType, req.SignalValue)
 	} else {
-		voterRecord, err = h.RegistrationSystem.RegisterVoterWithPassword(voterID, passwordHash)
+		voterRecord, err = h.RegistrationSystem.RegisterVoterWithPassword(voterID, passwordHash, req.SignalType, req.SignalValue)
 	}
 
 	if err != nil {
@@ -419,5 +419,65 @@ func (h *RegistrationHandler) GetAllVoters(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"total_voters": len(allKeys),
 		"merkle_root":  hex.EncodeToString(h.RegistrationSystem.GetMerkleRoot()),
+	})
+}
+
+// RevealSlotIndex handles POST /api/v1/voters/:voterID/reveal-slot-index
+//
+// @Summary      Reveal the voter's real SMDC slot index
+// @Description  Returns the real SMDC slot index for the authenticated voter
+//               only when the submitted behavioral duress signal matches the
+//               one registered at sign-up. A mismatch returns 403 and discloses
+//               nothing about the index. This is the sole path through which a
+//               voter learns which of their k slots is real.
+// @Tags         Voters
+// @Accept       json
+// @Produce      json
+// @Param        voterID  path  string                          true  "Voter ID"
+// @Param        body     body  models.RevealSlotIndexRequest   true  "Duress signal"
+// @Success      200      {object}  models.RevealSlotIndexResponse
+// @Failure      400      {object}  models.ErrorResponse
+// @Failure      403      {object}  models.ErrorResponse
+// @Failure      404      {object}  models.ErrorResponse
+// @Security     BearerAuth
+// @Router       /voters/{voterID}/reveal-slot-index [post]
+func (h *RegistrationHandler) RevealSlotIndex(c *gin.Context) {
+	voterID := c.Param("voterID")
+
+	// Enforce that the caller is the same voter (session voter_id matches path).
+	if authedID, exists := c.Get("voter_id"); exists && authedID != voterID {
+		c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Error:   "forbidden",
+			Code:    http.StatusForbidden,
+			Message: "voter ID mismatch",
+		})
+		return
+	}
+
+	var req models.RevealSlotIndexRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, models.ErrorResponse{
+			Error:   "invalid_request",
+			Code:    http.StatusBadRequest,
+			Message: safeErrorMessage("bind_json", err),
+		})
+		return
+	}
+
+	idx, err := h.RegistrationSystem.RevealRealSlotIndex(voterID, req.SignalType, req.SignalValue)
+	if err != nil {
+		// Single opaque error for both "voter not found" and "signal mismatch"
+		// so an attacker cannot probe registration status via this endpoint.
+		c.JSON(http.StatusForbidden, models.ErrorResponse{
+			Error:   "reveal_denied",
+			Code:    http.StatusForbidden,
+			Message: "reveal denied",
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, models.RevealSlotIndexResponse{
+		VoterID:       voterID,
+		RealSlotIndex: idx,
 	})
 }

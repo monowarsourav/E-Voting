@@ -156,9 +156,16 @@ func (fc *FabricClient) Connect(connectionProfile, walletPath, identityName stri
 	return nil
 }
 
-// CreateElection creates a new election on the blockchain
+// CreateElection creates a new election on the blockchain.
+// The chaincode persists candidates as a flat list of names ([]string), so we
+// flatten the (ID, Name, ...) candidate structs into a name-only slice for the
+// chain payload. The richer in-process Candidate metadata stays off-chain.
 func (fc *FabricClient) CreateElection(election *voting.Election) (string, error) {
-	candidatesJSON, err := json.Marshal(election.Candidates)
+	candidateNames := make([]string, len(election.Candidates))
+	for i, c := range election.Candidates {
+		candidateNames[i] = c.Name
+	}
+	candidatesJSON, err := json.Marshal(candidateNames)
 	if err != nil {
 		return "", fmt.Errorf("marshal candidates: %v", err)
 	}
@@ -190,17 +197,26 @@ func (fc *FabricClient) CreateElection(election *voting.Election) (string, error
 	return "mock-tx-" + election.ElectionID, nil
 }
 
-// SubmitVote submits a vote to the blockchain
+// SubmitVote submits a vote to the blockchain. encryptedVotes is the
+// per-candidate weighted Paillier ciphertext vector E_w_j; it is serialised as
+// a JSON array of decimal strings so the chaincode can store all m positions
+// without losing structure.
 func (fc *FabricClient) SubmitVote(
 	voteID string,
 	electionID string,
-	encryptedVote *big.Int,
+	encryptedVotes []*big.Int,
 	ringSignature *crypto.RingSignature,
 	keyImage *big.Int,
 	smdcCommitment *big.Int,
 	merkleProof [][]byte,
 ) (string, error) {
-	encryptedVoteStr := encryptedVote.String()
+	encryptedVoteStrs := make([]string, len(encryptedVotes))
+	for j, e := range encryptedVotes {
+		if e != nil {
+			encryptedVoteStrs[j] = e.String()
+		}
+	}
+	encryptedVotesJSON, _ := json.Marshal(encryptedVoteStrs)
 	ringSignatureJSON, _ := json.Marshal(ringSignature)
 	keyImageStr := keyImage.String()
 	smdcCommitmentStr := smdcCommitment.String()
@@ -212,7 +228,7 @@ func (fc *FabricClient) SubmitVote(
 			"CastVote",
 			voteID,
 			electionID,
-			encryptedVoteStr,
+			string(encryptedVotesJSON),
 			string(ringSignatureJSON),
 			keyImageStr,
 			smdcCommitmentStr,
@@ -230,7 +246,7 @@ func (fc *FabricClient) SubmitVote(
 
 	// Mock fallback
 	fmt.Printf("Submitting vote to blockchain (mock): %s\n", voteID)
-	_ = encryptedVoteStr
+	_ = encryptedVotesJSON
 	_ = ringSignatureJSON
 	_ = keyImageStr
 	_ = smdcCommitmentStr

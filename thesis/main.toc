@@ -17,129 +17,192 @@
 \contentsline {section}{\numberline {1.2}Motivation}{8}{section.1.2}%
 \contentsline {section}{\numberline {1.3}Scope and Limitations}{9}{section.1.3}%
 \contentsline {subsection}{\numberline {1.3.1}In Scope}{9}{subsection.1.3.1}%
-\contentsline {subsection}{\numberline {1.3.2}Out of Scope}{9}{subsection.1.3.2}%
+\contentsline {subsection}{\numberline {1.3.2}Out of Scope}{10}{subsection.1.3.2}%
 \contentsline {section}{\numberline {1.4}Problem Statement}{10}{section.1.4}%
-\contentsline {section}{\numberline {1.5}Research Objectives}{10}{section.1.5}%
+\contentsline {section}{\numberline {1.5}Research Objectives}{11}{section.1.5}%
 \contentsline {section}{\numberline {1.6}Research Contributions}{11}{section.1.6}%
-\contentsline {section}{\numberline {1.7}Thesis Outline}{12}{section.1.7}%
-\contentsline {section}{\numberline {1.8}Conclusion}{13}{section.1.8}%
-\contentsline {chapter}{\numberline {2}Related Works}{14}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Introduction}{14}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Review of Selected Works}{14}{section.2.2}%
-\contentsline {subsection}{\numberline {2.2.1}Improved Secure and Efficient E-Voting on Blockchain}{14}{subsection.2.2.1}%
-\contentsline {subsubsection}{\numberline {2.2.1.1}Methodology}{14}{subsubsection.2.2.1.1}%
-\contentsline {subsubsection}{\numberline {2.2.1.2}Contributions}{15}{subsubsection.2.2.1.2}%
-\contentsline {subsubsection}{\numberline {2.2.1.3}Limitations}{15}{subsubsection.2.2.1.3}%
-\contentsline {subsection}{\numberline {2.2.2}Blockchain-Based E-Voting with Differential Privacy}{15}{subsection.2.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.2.1}Methodology}{16}{subsubsection.2.2.2.1}%
-\contentsline {subsubsection}{\numberline {2.2.2.2}Contributions}{16}{subsubsection.2.2.2.2}%
-\contentsline {subsubsection}{\numberline {2.2.2.3}Limitations}{16}{subsubsection.2.2.2.3}%
-\contentsline {subsection}{\numberline {2.2.3}Biometric-Authenticated Blockchain Voting}{17}{subsection.2.2.3}%
-\contentsline {subsubsection}{\numberline {2.2.3.1}Methodology}{17}{subsubsection.2.2.3.1}%
-\contentsline {subsubsection}{\numberline {2.2.3.2}Contributions}{17}{subsubsection.2.2.3.2}%
-\contentsline {subsubsection}{\numberline {2.2.3.3}Limitations}{17}{subsubsection.2.2.3.3}%
-\contentsline {subsection}{\numberline {2.2.4}Timed-Release E-Voting with Paillier Homomorphic Encryption}{18}{subsection.2.2.4}%
-\contentsline {subsubsection}{\numberline {2.2.4.1}Methodology}{18}{subsubsection.2.2.4.1}%
-\contentsline {subsubsection}{\numberline {2.2.4.2}Contributions}{18}{subsubsection.2.2.4.2}%
-\contentsline {subsubsection}{\numberline {2.2.4.3}Limitations}{18}{subsubsection.2.2.4.3}%
-\contentsline {subsection}{\numberline {2.2.5}Scalable Coercion-Resistant Blockchain Voting}{19}{subsection.2.2.5}%
-\contentsline {subsubsection}{\numberline {2.2.5.1}Methodology}{19}{subsubsection.2.2.5.1}%
-\contentsline {subsubsection}{\numberline {2.2.5.2}Contributions}{19}{subsubsection.2.2.5.2}%
-\contentsline {subsubsection}{\numberline {2.2.5.3}Limitations}{19}{subsubsection.2.2.5.3}%
-\contentsline {subsection}{\numberline {2.2.6}Survey: Blockchain for Securing Electronic Voting Systems}{20}{subsection.2.2.6}%
-\contentsline {subsubsection}{\numberline {2.2.6.1}Methodology}{20}{subsubsection.2.2.6.1}%
-\contentsline {subsubsection}{\numberline {2.2.6.2}Contributions}{20}{subsubsection.2.2.6.2}%
-\contentsline {subsubsection}{\numberline {2.2.6.3}Limitations}{20}{subsubsection.2.2.6.3}%
-\contentsline {section}{\numberline {2.3}Background Technology}{21}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Paillier Public-Key Cryptosystem}{21}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}Pedersen Commitments}{21}{subsection.2.3.2}%
-\contentsline {subsection}{\numberline {2.3.3}Zero-Knowledge $\Sigma $-Protocols}{21}{subsection.2.3.3}%
-\contentsline {subsection}{\numberline {2.3.4}Linkable Ring Signatures}{22}{subsection.2.3.4}%
-\contentsline {subsection}{\numberline {2.3.5}Threshold Cryptography and Secret Sharing}{22}{subsection.2.3.5}%
-\contentsline {subsection}{\numberline {2.3.6}Cryptographic Hash Functions and Message Authentication}{22}{subsection.2.3.6}%
-\contentsline {subsection}{\numberline {2.3.7}Post-Quantum Key Encapsulation: ML-KEM (Kyber)}{22}{subsection.2.3.7}%
-\contentsline {subsection}{\numberline {2.3.8}Authenticated Symmetric Encryption: AES-GCM}{23}{subsection.2.3.8}%
-\contentsline {subsection}{\numberline {2.3.9}Hyperledger Fabric}{23}{subsection.2.3.9}%
-\contentsline {subsection}{\numberline {2.3.10}Samplable Anonymous Aggregation}{23}{subsection.2.3.10}%
-\contentsline {section}{\numberline {2.4}Comparison Among State-of-the-Art Works}{23}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Summary}{25}{section.2.5}%
-\contentsline {chapter}{\numberline {3}System Design and Cryptographic Protocols}{27}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Introduction}{27}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Proposed Framework and Assumptions}{27}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Notation}{29}{section.3.3}%
-\contentsline {section}{\numberline {3.4}Cryptographic Protocol Formulation}{30}{section.3.4}%
-\contentsline {subsection}{\numberline {3.4.1}Paillier Homomorphic Encryption}{30}{subsection.3.4.1}%
-\contentsline {subsubsection}{\numberline {3.4.1.1}Key Generation}{30}{subsubsection.3.4.1.1}%
-\contentsline {subsubsection}{\numberline {3.4.1.2}Encryption}{30}{subsubsection.3.4.1.2}%
-\contentsline {subsubsection}{\numberline {3.4.1.3}Decryption}{31}{subsubsection.3.4.1.3}%
-\contentsline {subsubsection}{\numberline {3.4.1.4}Homomorphic Properties}{31}{subsubsection.3.4.1.4}%
-\contentsline {subsection}{\numberline {3.4.2}Pedersen Commitments}{31}{subsection.3.4.2}%
-\contentsline {subsubsection}{\numberline {3.4.2.1}Parameter Generation}{31}{subsubsection.3.4.2.1}%
-\contentsline {subsubsection}{\numberline {3.4.2.2}Commitment}{31}{subsubsection.3.4.2.2}%
-\contentsline {subsection}{\numberline {3.4.3}Zero-Knowledge Proofs ($\Sigma $-Protocol)}{32}{subsection.3.4.3}%
-\contentsline {subsubsection}{\numberline {3.4.3.1}Binary Proof}{32}{subsubsection.3.4.3.1}%
-\contentsline {subsubsection}{\numberline {3.4.3.2}Sum Proof}{33}{subsubsection.3.4.3.2}%
-\contentsline {subsection}{\numberline {3.4.4}Linkable Ring Signatures}{33}{subsection.3.4.4}%
-\contentsline {subsubsection}{\numberline {3.4.4.1}Key Generation}{33}{subsubsection.3.4.4.1}%
-\contentsline {subsubsection}{\numberline {3.4.4.2}Signing}{33}{subsubsection.3.4.4.2}%
-\contentsline {subsubsection}{\numberline {3.4.4.3}Verification and Linkability}{34}{subsubsection.3.4.4.3}%
-\contentsline {subsection}{\numberline {3.4.5}SMDC: Self-Masking Deniable Credentials}{34}{subsection.3.4.5}%
-\contentsline {subsubsection}{\numberline {3.4.5.1}Credential Generation}{34}{subsubsection.3.4.5.1}%
-\contentsline {subsubsection}{\numberline {3.4.5.2}Coercion Resistance Property}{35}{subsubsection.3.4.5.2}%
-\contentsline {subsubsection}{\numberline {3.4.5.3}Credential Verification}{36}{subsubsection.3.4.5.3}%
-\contentsline {subsection}{\numberline {3.4.6}SA\textsuperscript {2}: Samplable Anonymous Aggregation}{36}{subsection.3.4.6}%
-\contentsline {subsubsection}{\numberline {3.4.6.1}Vote Splitting}{36}{subsubsection.3.4.6.1}%
-\contentsline {subsubsection}{\numberline {3.4.6.2}Reconstruction}{36}{subsubsection.3.4.6.2}%
-\contentsline {subsection}{\numberline {3.4.7}Kyber768 Post-Quantum Hybrid Encryption}{37}{subsection.3.4.7}%
-\contentsline {subsubsection}{\numberline {3.4.7.1}Hardness Assumption and Parameter Selection}{37}{subsubsection.3.4.7.1}%
-\contentsline {subsubsection}{\numberline {3.4.7.2}KEM-DEM Hybrid Construction}{37}{subsubsection.3.4.7.2}%
-\contentsline {subsubsection}{\numberline {3.4.7.3}Scope and Limitations of Post-Quantum Coverage}{38}{subsubsection.3.4.7.3}%
-\contentsline {subsection}{\numberline {3.4.8}Threshold Paillier Decryption}{38}{subsection.3.4.8}%
-\contentsline {subsubsection}{\numberline {3.4.8.1}Key Distribution}{38}{subsubsection.3.4.8.1}%
-\contentsline {subsubsection}{\numberline {3.4.8.2}Partial Decryption}{38}{subsubsection.3.4.8.2}%
-\contentsline {subsubsection}{\numberline {3.4.8.3}Combination}{39}{subsubsection.3.4.8.3}%
-\contentsline {section}{\numberline {3.5}Vote Casting Pipeline}{39}{section.3.5}%
-\contentsline {section}{\numberline {3.6}Blockchain Integration}{43}{section.3.6}%
-\contentsline {section}{\numberline {3.7}Engineering and Societal Considerations}{44}{section.3.7}%
-\contentsline {subsection}{\numberline {3.7.1}Societal Impact}{44}{subsection.3.7.1}%
-\contentsline {subsection}{\numberline {3.7.2}Sustainability}{44}{subsection.3.7.2}%
-\contentsline {subsection}{\numberline {3.7.3}Accessibility}{44}{subsection.3.7.3}%
-\contentsline {subsection}{\numberline {3.7.4}Ethical Considerations}{44}{subsection.3.7.4}%
-\contentsline {section}{\numberline {3.8}Security Analysis}{44}{section.3.8}%
-\contentsline {subsection}{\numberline {3.8.1}Formal Security Theorems}{45}{subsection.3.8.1}%
-\contentsline {subsection}{\numberline {3.8.2}Duress Detection}{46}{subsection.3.8.2}%
-\contentsline {section}{\numberline {3.9}Conclusion}{47}{section.3.9}%
-\contentsline {chapter}{\numberline {4}Implementation, Results and Discussion}{49}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Introduction}{49}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Implementation Environment}{49}{section.4.2}%
-\contentsline {section}{\numberline {4.3}Performance Metrics}{50}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Experimental Results}{51}{section.4.4}%
-\contentsline {subsection}{\numberline {4.4.1}Cryptographic Micro-Benchmarks}{51}{subsection.4.4.1}%
-\contentsline {subsubsection}{\numberline {4.4.1.1}Post-Quantum Layer Cost Analysis}{52}{subsubsection.4.4.1.1}%
-\contentsline {subsection}{\numberline {4.4.2}End-to-End Pipeline Benchmark}{53}{subsection.4.4.2}%
-\contentsline {subsection}{\numberline {4.4.3}Scalability Validation}{54}{subsection.4.4.3}%
-\contentsline {subsubsection}{\numberline {4.4.3.1}Homomorphic Tally Scalability}{54}{subsubsection.4.4.3.1}%
-\contentsline {paragraph}{Complexity derivation.}{54}{paragraph*.18}%
-\contentsline {subsubsection}{\numberline {4.4.3.2}Linear-in-$m$ Total Scaling (Candidate-Count Validation)}{55}{subsubsection.4.4.3.2}%
-\contentsline {subsubsection}{\numberline {4.4.3.3}Ring Signature Scalability}{56}{subsubsection.4.4.3.3}%
-\contentsline {subsection}{\numberline {4.4.4}Blockchain Performance}{57}{subsection.4.4.4}%
-\contentsline {section}{\numberline {4.5}Discussion}{58}{section.4.5}%
-\contentsline {subsection}{\numberline {4.5.1}Pipeline Bottleneck Analysis}{59}{subsection.4.5.1}%
-\contentsline {subsection}{\numberline {4.5.2}Scalability Significance}{59}{subsection.4.5.2}%
-\contentsline {subsection}{\numberline {4.5.3}Blockchain Performance Analysis}{60}{subsection.4.5.3}%
-\contentsline {subsection}{\numberline {4.5.4}Practical Deployment Considerations}{61}{subsection.4.5.4}%
-\contentsline {section}{\numberline {4.6}Test Coverage Analysis}{61}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Formal Verification with ProVerif}{62}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Comparative Analysis}{62}{section.4.8}%
-\contentsline {subsection}{\numberline {4.8.1}Comparison With Related Works}{62}{subsection.4.8.1}%
-\contentsline {chapter}{\numberline {5}Conclusion and Future Work}{65}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Introduction}{65}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Summary of the Study}{65}{section.5.2}%
-\contentsline {section}{\numberline {5.3}Limitations and Future Work}{66}{section.5.3}%
-\contentsline {chapter}{References}{69}{Item.71}%
-\contentsline {chapter}{\numberline {A}ProVerif Formal Verification Artefacts}{73}{chapter.A}%
-\contentsline {section}{\numberline {A.1}Reproducing the Verification}{73}{section.A.1}%
-\contentsline {section}{\numberline {A.2}Ballot Privacy: \texttt {privacy.pv}}{73}{section.A.2}%
-\contentsline {section}{\numberline {A.3}Individual Verifiability: \texttt {verifiability.pv}}{75}{section.A.3}%
-\contentsline {section}{\numberline {A.4}Voter Eligibility: \texttt {eligibility.pv}}{77}{section.A.4}%
-\contentsline {section}{\numberline {A.5}Summary}{78}{section.A.5}%
+\contentsline {section}{\numberline {1.7}Thesis Outline}{13}{section.1.7}%
+\contentsline {section}{\numberline {1.8}Conclusion}{14}{section.1.8}%
+\contentsline {chapter}{\numberline {2}Related Works}{15}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Introduction}{15}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Review of Selected Works}{15}{section.2.2}%
+\contentsline {subsection}{\numberline {2.2.1}Improved Secure and Efficient E-Voting on Blockchain}{15}{subsection.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.1.1}Methodology}{15}{subsubsection.2.2.1.1}%
+\contentsline {subsubsection}{\numberline {2.2.1.2}Contributions}{16}{subsubsection.2.2.1.2}%
+\contentsline {subsubsection}{\numberline {2.2.1.3}Limitations}{16}{subsubsection.2.2.1.3}%
+\contentsline {subsection}{\numberline {2.2.2}Blockchain-Based E-Voting with Differential Privacy}{16}{subsection.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.2.1}Methodology}{17}{subsubsection.2.2.2.1}%
+\contentsline {subsubsection}{\numberline {2.2.2.2}Contributions}{17}{subsubsection.2.2.2.2}%
+\contentsline {subsubsection}{\numberline {2.2.2.3}Limitations}{17}{subsubsection.2.2.2.3}%
+\contentsline {subsection}{\numberline {2.2.3}Biometric-Authenticated Blockchain Voting}{18}{subsection.2.2.3}%
+\contentsline {subsubsection}{\numberline {2.2.3.1}Methodology}{18}{subsubsection.2.2.3.1}%
+\contentsline {subsubsection}{\numberline {2.2.3.2}Contributions}{18}{subsubsection.2.2.3.2}%
+\contentsline {subsubsection}{\numberline {2.2.3.3}Limitations}{18}{subsubsection.2.2.3.3}%
+\contentsline {subsection}{\numberline {2.2.4}Timed-Release E-Voting with Paillier Homomorphic Encryption}{19}{subsection.2.2.4}%
+\contentsline {subsubsection}{\numberline {2.2.4.1}Methodology}{19}{subsubsection.2.2.4.1}%
+\contentsline {subsubsection}{\numberline {2.2.4.2}Contributions}{19}{subsubsection.2.2.4.2}%
+\contentsline {subsubsection}{\numberline {2.2.4.3}Limitations}{19}{subsubsection.2.2.4.3}%
+\contentsline {subsection}{\numberline {2.2.5}Scalable Coercion-Resistant Blockchain Voting}{20}{subsection.2.2.5}%
+\contentsline {subsubsection}{\numberline {2.2.5.1}Methodology}{20}{subsubsection.2.2.5.1}%
+\contentsline {subsubsection}{\numberline {2.2.5.2}Contributions}{20}{subsubsection.2.2.5.2}%
+\contentsline {subsubsection}{\numberline {2.2.5.3}Limitations}{20}{subsubsection.2.2.5.3}%
+\contentsline {subsection}{\numberline {2.2.6}Survey: Blockchain for Securing Electronic Voting Systems}{21}{subsection.2.2.6}%
+\contentsline {subsubsection}{\numberline {2.2.6.1}Methodology}{21}{subsubsection.2.2.6.1}%
+\contentsline {subsubsection}{\numberline {2.2.6.2}Contributions}{21}{subsubsection.2.2.6.2}%
+\contentsline {subsubsection}{\numberline {2.2.6.3}Limitations}{21}{subsubsection.2.2.6.3}%
+\contentsline {section}{\numberline {2.3}Background Technology}{22}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Paillier Public-Key Cryptosystem}{22}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}Pedersen Commitments}{22}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}Zero-Knowledge $\Sigma $-Protocols}{22}{subsection.2.3.3}%
+\contentsline {subsection}{\numberline {2.3.4}Linkable Ring Signatures}{23}{subsection.2.3.4}%
+\contentsline {subsection}{\numberline {2.3.5}Threshold Cryptography and Secret Sharing}{23}{subsection.2.3.5}%
+\contentsline {subsection}{\numberline {2.3.6}Cryptographic Hash Functions and Message Authentication}{23}{subsection.2.3.6}%
+\contentsline {subsection}{\numberline {2.3.7}Post-Quantum Key Encapsulation: ML-KEM (Kyber)}{23}{subsection.2.3.7}%
+\contentsline {subsection}{\numberline {2.3.8}Authenticated Symmetric Encryption: AES-GCM}{24}{subsection.2.3.8}%
+\contentsline {subsection}{\numberline {2.3.9}Hyperledger Fabric}{24}{subsection.2.3.9}%
+\contentsline {subsection}{\numberline {2.3.10}Samplable Anonymous Aggregation}{24}{subsection.2.3.10}%
+\contentsline {section}{\numberline {2.4}Comparison Among State-of-the-Art Works}{24}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Summary}{26}{section.2.5}%
+\contentsline {chapter}{\numberline {3}System Design and Cryptographic Protocols}{28}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Introduction}{28}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Proposed Framework and Assumptions}{29}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Notation}{32}{section.3.3}%
+\contentsline {section}{\numberline {3.4}Cryptographic Protocol Formulation}{33}{section.3.4}%
+\contentsline {subsection}{\numberline {3.4.1}Paillier Homomorphic Encryption}{33}{subsection.3.4.1}%
+\contentsline {subsubsection}{\numberline {3.4.1.1}Key Generation}{33}{subsubsection.3.4.1.1}%
+\contentsline {subsubsection}{\numberline {3.4.1.2}Encryption}{34}{subsubsection.3.4.1.2}%
+\contentsline {subsubsection}{\numberline {3.4.1.3}Decryption}{34}{subsubsection.3.4.1.3}%
+\contentsline {subsubsection}{\numberline {3.4.1.4}Homomorphic Properties}{34}{subsubsection.3.4.1.4}%
+\contentsline {subsection}{\numberline {3.4.2}Pedersen Commitments}{35}{subsection.3.4.2}%
+\contentsline {subsubsection}{\numberline {3.4.2.1}Parameter Generation}{35}{subsubsection.3.4.2.1}%
+\contentsline {subsubsection}{\numberline {3.4.2.2}Commitment}{35}{subsubsection.3.4.2.2}%
+\contentsline {subsection}{\numberline {3.4.3}Zero-Knowledge Proofs ($\Sigma $-Protocol)}{36}{subsection.3.4.3}%
+\contentsline {subsubsection}{\numberline {3.4.3.1}Binary Proof on Paillier Ciphertexts}{36}{subsubsection.3.4.3.1}%
+\contentsline {subsubsection}{\numberline {3.4.3.2}Sum-to-One Proof on Paillier Ciphertexts}{37}{subsubsection.3.4.3.2}%
+\contentsline {subsubsection}{\numberline {3.4.3.3}Relationship to the SMDC Slot Proofs}{38}{subsubsection.3.4.3.3}%
+\contentsline {paragraph}{Two parallel proof systems.}{38}{paragraph*.8}%
+\contentsline {paragraph}{Pedersen-instantiated binary and sum proofs.}{38}{paragraph*.9}%
+\contentsline {subsection}{\numberline {3.4.4}Linkable Ring Signatures}{38}{subsection.3.4.4}%
+\contentsline {paragraph}{Group parameters.}{39}{paragraph*.10}%
+\contentsline {subsubsection}{\numberline {3.4.4.1}Key Generation}{39}{subsubsection.3.4.4.1}%
+\contentsline {subsubsection}{\numberline {3.4.4.2}Signing}{39}{subsubsection.3.4.4.2}%
+\contentsline {subsubsection}{\numberline {3.4.4.3}Verification and Linkability}{40}{subsubsection.3.4.4.3}%
+\contentsline {subsection}{\numberline {3.4.5}SMDC: Self-Masking Deniable Credentials}{40}{subsection.3.4.5}%
+\contentsline {paragraph}{Duress-bound index disclosure.}{40}{paragraph*.11}%
+\contentsline {subsubsection}{\numberline {3.4.5.1}Credential Generation}{41}{subsubsection.3.4.5.1}%
+\contentsline {subsubsection}{\numberline {3.4.5.2}Coercion Resistance Property}{41}{subsubsection.3.4.5.2}%
+\contentsline {subsubsection}{\numberline {3.4.5.3}Credential Verification}{42}{subsubsection.3.4.5.3}%
+\contentsline {subsection}{\numberline {3.4.6}SA\textsuperscript {2}: Samplable Anonymous Aggregation}{42}{subsection.3.4.6}%
+\contentsline {subsubsection}{\numberline {3.4.6.1}Per-candidate Vote Splitting}{43}{subsubsection.3.4.6.1}%
+\contentsline {subsubsection}{\numberline {3.4.6.2}Per-candidate Reconstruction}{43}{subsubsection.3.4.6.2}%
+\contentsline {subsection}{\numberline {3.4.7}Kyber768 Post-Quantum Hybrid Encryption}{44}{subsection.3.4.7}%
+\contentsline {subsubsection}{\numberline {3.4.7.1}Hardness Assumption and Parameter Selection}{44}{subsubsection.3.4.7.1}%
+\contentsline {subsubsection}{\numberline {3.4.7.2}KEM-DEM Hybrid Construction}{44}{subsubsection.3.4.7.2}%
+\contentsline {subsubsection}{\numberline {3.4.7.3}Scope and Limitations of Post-Quantum Coverage}{45}{subsubsection.3.4.7.3}%
+\contentsline {subsection}{\numberline {3.4.8}Threshold Paillier Decryption}{45}{subsection.3.4.8}%
+\contentsline {subsubsection}{\numberline {3.4.8.1}Key Distribution}{46}{subsubsection.3.4.8.1}%
+\contentsline {subsubsection}{\numberline {3.4.8.2}Partial Decryption with ZK Correctness Proof}{46}{subsubsection.3.4.8.2}%
+\contentsline {subsubsection}{\numberline {3.4.8.3}Verification and Combination}{46}{subsubsection.3.4.8.3}%
+\contentsline {subsection}{\numberline {3.4.9}Behavioural Duress Detection}{46}{subsection.3.4.9}%
+\contentsline {section}{\numberline {3.5}Vote Casting Pipeline}{48}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Blockchain Integration}{52}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Engineering and Societal Considerations}{53}{section.3.7}%
+\contentsline {subsection}{\numberline {3.7.1}Societal Impact}{53}{subsection.3.7.1}%
+\contentsline {subsection}{\numberline {3.7.2}Sustainability}{53}{subsection.3.7.2}%
+\contentsline {subsection}{\numberline {3.7.3}Accessibility}{54}{subsection.3.7.3}%
+\contentsline {subsection}{\numberline {3.7.4}Ethical Considerations}{54}{subsection.3.7.4}%
+\contentsline {subsection}{\numberline {3.7.5}Privacy and Data Protection}{55}{subsection.3.7.5}%
+\contentsline {section}{\numberline {3.8}Security Analysis}{55}{section.3.8}%
+\contentsline {subsection}{\numberline {3.8.1}Computational Security: Game-Based Reductions}{55}{subsection.3.8.1}%
+\contentsline {subsubsection}{\numberline {3.8.1.1}Notational Conventions for Proofs}{56}{subsubsection.3.8.1.1}%
+\contentsline {subsubsection}{\numberline {3.8.1.2}Hardness Assumptions}{56}{subsubsection.3.8.1.2}%
+\contentsline {subsubsection}{\numberline {3.8.1.3}Theorem 1: Ballot Indistinguishability (DCRA)}{57}{subsubsection.3.8.1.3}%
+\contentsline {paragraph}{Informal claim.}{57}{paragraph*.16}%
+\contentsline {paragraph}{Ballot composition recap.}{57}{paragraph*.17}%
+\contentsline {paragraph}{IND-Ballot-CPA experiment.}{57}{paragraph*.18}%
+\contentsline {paragraph}{Scope and limitations.}{59}{paragraph*.19}%
+\contentsline {subsubsection}{\numberline {3.8.1.4}Theorem 2: Vote Validity (Soundness of CDS OR-proofs in the ROM)}{59}{subsubsection.3.8.1.4}%
+\contentsline {paragraph}{Informal claim.}{59}{paragraph*.20}%
+\contentsline {paragraph}{Formal relation.}{59}{paragraph*.21}%
+\contentsline {paragraph}{Soundness experiment.}{60}{paragraph*.22}%
+\contentsline {paragraph}{Remark on the absence of computational hardness.}{61}{paragraph*.23}%
+\contentsline {paragraph}{Remark on Strong Fiat--Shamir.}{61}{paragraph*.24}%
+\contentsline {subsubsection}{\numberline {3.8.1.5}Theorem 3: Voter Anonymity (DDH)}{62}{subsubsection.3.8.1.5}%
+\contentsline {paragraph}{Informal claim.}{62}{paragraph*.25}%
+\contentsline {paragraph}{Anonymity experiment.}{62}{paragraph*.26}%
+\contentsline {paragraph}{Linkability is preserved.}{63}{paragraph*.27}%
+\contentsline {paragraph}{Note on the original ``statistically indistinguishable'' claim.}{63}{paragraph*.28}%
+\contentsline {subsubsection}{\numberline {3.8.1.6}Theorem 4: Coercion Resistance (Pedersen Perfect Hiding + JCJ)}{63}{subsubsection.3.8.1.6}%
+\contentsline {paragraph}{Informal claim.}{63}{paragraph*.29}%
+\contentsline {paragraph}{Threat-model scope.}{64}{paragraph*.30}%
+\contentsline {paragraph}{Coercion experiment.}{64}{paragraph*.31}%
+\contentsline {paragraph}{Modulo-$k$ bias remark.}{65}{paragraph*.32}%
+\contentsline {paragraph}{Silent-discard semantics.}{65}{paragraph*.33}%
+\contentsline {subsubsection}{\numberline {3.8.1.7}Theorem 5: SA\textsuperscript {2} Aggregation Privacy (DCRA + A1)}{65}{subsubsection.3.8.1.7}%
+\contentsline {paragraph}{Informal claim.}{65}{paragraph*.34}%
+\contentsline {paragraph}{Single-server-view game.}{66}{paragraph*.35}%
+\contentsline {paragraph}{Per-candidate hybrid extension.}{66}{paragraph*.36}%
+\contentsline {paragraph}{Mask-range remark.}{66}{paragraph*.37}%
+\contentsline {paragraph}{Multi-voter extension.}{67}{paragraph*.38}%
+\contentsline {subsubsection}{\numberline {3.8.1.8}Theorem 6: Post-Quantum Hybrid (Module-LWE + DCRA)}{67}{subsubsection.3.8.1.8}%
+\contentsline {paragraph}{Informal claim.}{67}{paragraph*.39}%
+\contentsline {paragraph}{Hybrid construction recap.}{67}{paragraph*.40}%
+\contentsline {paragraph}{Kyber-768 vs.\ ML-KEM-768.}{67}{paragraph*.41}%
+\contentsline {paragraph}{Integrity experiment.}{68}{paragraph*.42}%
+\contentsline {paragraph}{Confidentiality (P1).}{69}{paragraph*.43}%
+\contentsline {paragraph}{Quantum-adversary scope.}{69}{paragraph*.44}%
+\contentsline {paragraph}{Auxiliary AES-256-GCM use.}{69}{paragraph*.45}%
+\contentsline {subsubsection}{\numberline {3.8.1.9}Composition Discussion: Toward UC Security}{69}{subsubsection.3.8.1.9}%
+\contentsline {paragraph}{Why this discussion is informal.}{69}{paragraph*.46}%
+\contentsline {paragraph}{Ideal functionalities sketch.}{70}{paragraph*.47}%
+\contentsline {paragraph}{Informal composition argument.}{70}{paragraph*.48}%
+\contentsline {paragraph}{Limitations of this discussion (explicitly).}{70}{paragraph*.49}%
+\contentsline {subsection}{\numberline {3.8.2}Duress Detection: Security Properties}{71}{subsection.3.8.2}%
+\contentsline {section}{\numberline {3.9}Conclusion}{71}{section.3.9}%
+\contentsline {chapter}{\numberline {4}Implementation, Results and Discussion}{73}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Introduction}{73}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Implementation Environment}{73}{section.4.2}%
+\contentsline {section}{\numberline {4.3}Performance Metrics}{74}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Experimental Results}{75}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Cryptographic Micro-Benchmarks}{75}{subsection.4.4.1}%
+\contentsline {subsubsection}{\numberline {4.4.1.1}Post-Quantum Layer Cost Analysis}{76}{subsubsection.4.4.1.1}%
+\contentsline {subsection}{\numberline {4.4.2}End-to-End Pipeline Benchmark (Per-Primitive Decomposition)}{77}{subsection.4.4.2}%
+\contentsline {subsection}{\numberline {4.4.3}Scalability Validation}{78}{subsection.4.4.3}%
+\contentsline {subsubsection}{\numberline {4.4.3.1}Homomorphic Tally Scalability}{78}{subsubsection.4.4.3.1}%
+\contentsline {paragraph}{Complexity derivation.}{78}{paragraph*.55}%
+\contentsline {paragraph}{Benchmark methodology.}{79}{paragraph*.56}%
+\contentsline {subsubsection}{\numberline {4.4.3.2}Linear-in-$m$ Total Scaling (Candidate-Count Validation)}{80}{subsubsection.4.4.3.2}%
+\contentsline {subsubsection}{\numberline {4.4.3.3}Ring Signature Scalability}{81}{subsubsection.4.4.3.3}%
+\contentsline {subsection}{\numberline {4.4.4}Blockchain Performance}{82}{subsection.4.4.4}%
+\contentsline {paragraph}{Saturation behaviour.}{83}{paragraph*.64}%
+\contentsline {paragraph}{State-bound degradation under sustained 200\,TPS.}{83}{paragraph*.66}%
+\contentsline {paragraph}{Real-election context.}{84}{paragraph*.68}%
+\contentsline {subsection}{\numberline {4.4.5}End-to-End Election Simulation}{84}{subsection.4.4.5}%
+\contentsline {paragraph}{Pre-election versus election-day costs.}{86}{paragraph*.70}%
+\contentsline {section}{\numberline {4.5}Discussion}{86}{section.4.5}%
+\contentsline {subsection}{\numberline {4.5.1}Pipeline Bottleneck Analysis}{87}{subsection.4.5.1}%
+\contentsline {paragraph}{From per-primitive cost to per-ballot cost.}{87}{paragraph*.71}%
+\contentsline {subsection}{\numberline {4.5.2}Scalability Significance}{88}{subsection.4.5.2}%
+\contentsline {subsection}{\numberline {4.5.3}Blockchain Performance Analysis}{89}{subsection.4.5.3}%
+\contentsline {subsection}{\numberline {4.5.4}Practical Deployment Considerations}{89}{subsection.4.5.4}%
+\contentsline {section}{\numberline {4.6}Test Coverage Analysis}{90}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Tier 2, Symbolic Protocol Verification with ProVerif}{91}{section.4.7}%
+\contentsline {paragraph}{Role of this section.}{91}{paragraph*.73}%
+\contentsline {paragraph}{Why both tiers.}{91}{paragraph*.74}%
+\contentsline {paragraph}{Vote Privacy.}{92}{paragraph*.76}%
+\contentsline {paragraph}{Individual Verifiability.}{92}{paragraph*.77}%
+\contentsline {paragraph}{Voter Eligibility.}{92}{paragraph*.78}%
+\contentsline {paragraph}{Combined assurance.}{92}{paragraph*.79}%
+\contentsline {section}{\numberline {4.8}Comparative Analysis}{92}{section.4.8}%
+\contentsline {subsection}{\numberline {4.8.1}Comparison With Related Works}{92}{subsection.4.8.1}%
+\contentsline {chapter}{\numberline {5}Conclusion and Future Work}{95}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Introduction}{95}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Summary of the Study}{95}{section.5.2}%
+\contentsline {section}{\numberline {5.3}Limitations and Future Work}{96}{section.5.3}%
+\contentsline {chapter}{References}{100}{Item.86}%
+\contentsline {chapter}{\numberline {A}ProVerif Formal Verification Artefacts}{105}{chapter.A}%
+\contentsline {section}{\numberline {A.1}Reproducing the Verification}{105}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Ballot Privacy: \texttt {privacy.pv}}{105}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Individual Verifiability: \texttt {verifiability.pv}}{107}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Voter Eligibility: \texttt {eligibility.pv}}{109}{section.A.4}%
+\contentsline {section}{\numberline {A.5}Summary}{110}{section.A.5}%

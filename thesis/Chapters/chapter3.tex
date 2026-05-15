@@ -4,27 +4,33 @@
 \section{Introduction}
 \label{sec:meth-intro}
 
-This chapter presents the complete system design of the proposed framework, a blockchain-based e-voting system, deployed on Hyperledger Fabric~\cite{androulaki2018}, that integrates seven cryptographic protocols into a unified voting pipeline. Section~\ref{sec:framework} describes the overall system framework and assumptions. Section~\ref{sec:notation} defines the mathematical notation used throughout this chapter. Section~\ref{sec:crypto-formulation} presents the detailed formulation of each cryptographic protocol. Section~\ref{sec:pipeline} describes the 17-step vote casting pipeline. Section~\ref{sec:blockchain-integration} details the Hyperledger Fabric blockchain integration. Section~\ref{sec:engineering} addresses engineering and societal considerations. Section~\ref{sec:security-analysis} presents the formal security analysis with six theorems and proof sketches. Section~\ref{sec:meth-conclusion} concludes the chapter.
+This chapter presents the complete system design of the proposed blockchain-based e-voting framework, deployed on Hyperledger Fabric~\cite{androulaki2018}, that integrates a multi-protocol cryptographic stack into a unified voting pipeline. On top of standard cryptographic primitives (Pedersen commitments, HMAC, $\Sigma$-protocols, linkable ring signatures, threshold Paillier), the chapter introduces three engineering-level design contributions that, to the best of our knowledge and within the works surveyed in Chapter~\ref{ch:related-works}, have not been previously combined in this form: (i)~Self-Masking Deniable Credentials (SMDC) with $k=5$ slots and secret-keyed real-slot indexing for coercion resistance; (ii)~a duress-bound reveal-slot-index flow that withholds the legitimate slot index from the voter until a registered behavioural signal is presented, denying the index to both registration-time and post-registration coercers; and (iii)~a behavioural-duress short-circuit that silently discards coerced votes while returning a receipt indistinguishable from a genuine cast.
+
+Among the existing primitives in the stack, the Samplable Anonymous Aggregation (SA\textsuperscript{2}) construction of Talwar~et~al.~\cite{sa2_apple}---originally designed for federated data analysis---is, to the best of our knowledge and within the works surveyed in Chapter~\ref{ch:related-works}, applied here for the first time to an e-voting tally pipeline. The vote-encoding follows the Helios-style~\cite{adida2008helios} 1-hot Paillier construction with Cramer--Damg{\aa}rd--Schoenmakers OR-proofs~\cite{cramer1994or} taken directly on the per-candidate ciphertexts.
+
+The chapter is organised as follows. Section~\ref{sec:framework} describes the four-layer architecture and the framework's trust assumptions. Section~\ref{sec:notation} defines the mathematical notation. Section~\ref{sec:crypto-formulation} presents the seven cryptographic protocols of the stack---Paillier homomorphic encryption, Pedersen commitments, the Paillier-direct CDS $\Sigma$-protocol, linkable ring signatures, SMDC deniable credentials, SA\textsuperscript{2} samplable anonymous aggregation, Kyber768 post-quantum hybrid encryption, and DJN threshold decryption. Section~\ref{sec:pipeline} describes the twenty-step vote-casting pipeline and its activity/sequence diagrams. Section~\ref{sec:blockchain-integration} details the Hyperledger Fabric integration. Section~\ref{sec:engineering} addresses engineering and societal considerations. Section~\ref{sec:security-analysis} presents a two-tier formal security analysis: Tier~1 game-based reductions to standard assumptions (six theorems with full proofs) and a complementary subsection on the duress-detection mechanism that ties the registration-time, retrieval-time, and cast-time signal handling to the coercion-resistance argument. Section~\ref{sec:meth-conclusion} concludes the chapter.
 
 \section{Proposed Framework and Assumptions}
 \label{sec:framework}
 
-The proposed framework consists of four architectural layers that interact to provide comprehensive voting security, as illustrated in Figure~\ref{fig:architecture}. The layers are: (1) the Authentication Layer, which handles voter identity verification through biometric and credential-based mechanisms; (2) the Cryptographic Computation Layer, which executes the seven-protocol pipeline for each vote; (3) the Privacy Layer, which implements SA\textsuperscript{2} anonymous aggregation and SMDC deniable credentials; and (4) the Blockchain Storage Layer, which records encrypted vote records on Hyperledger Fabric v2.5.
+The proposed framework consists of four architectural layers that interact to provide comprehensive voting security, as illustrated in Figure~\ref{fig:architecture}. The layers are: (1) the Authentication Layer, which handles voter identity verification through biometric and credential-based mechanisms; (2) the Cryptographic Computation Layer, which executes the multi-protocol cryptographic pipeline for each vote (including SMDC deniable-credential construction, Paillier 1-hot encryption, CDS zero-knowledge proofs, linkable ring signing, and the per-vote duress check); (3) the Privacy Layer, which implements the two-server SA\textsuperscript{2} mask-cancellation aggregation across non-colluding aggregators; and (4) the Blockchain Storage Layer, which records the resulting encrypted vote shares on Hyperledger Fabric v2.5.
 
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/architecture.tex}}
-\caption[Proposed System Architecture Overview]{End-to-end system architecture of the proposed framework. The diagram traces the full path from voter authentication through the cryptographic pipeline, the two non-colluding SA\textsuperscript{2} aggregators, the Hyperledger Fabric storage layer, and the threshold tally service to the published result. All shapes and line styles are distinguishable in greyscale.}
+\caption[Proposed System Architecture Overview]{End-to-end system architecture of the proposed framework. The diagram traces the full path from voter authentication (including the duress-bound \texttt{/reveal-slot-index} endpoint that gates the disclosure of the SMDC real-slot index on a registered behavioural signal) through the cryptographic pipeline, the two non-colluding SA\textsuperscript{2} aggregators, the Hyperledger Fabric storage layer, and the threshold tally service to the published result. The four labelled layers are tinted with light pastel fills for visual separation; all shapes and line styles remain distinguishable in greyscale.}
 \label{fig:architecture}
 \end{figure}
 
-The framework operates under the following assumptions:
+The framework operates under the following system-level trust and trust-model assumptions; the cryptographic hardness assumptions (DCRA, DDH, Module-LWE, DLog) that underpin the formal security analysis are listed separately in Section~\ref{subsubsec:hardness-assumptions}.
 
 \begin{enumerate}
     \item The blockchain network consists of at least one ordering node and two peer nodes running Hyperledger Fabric~v2.5~\cite{androulaki2018} with Raft consensus~\cite{ongaro2014raft}.
     \item The two SA\textsuperscript{2} aggregation servers are operated by independent, non-colluding entities. The security guarantee holds as long as at least one server remains honest.
+    \item The threshold Paillier tally service is operated by a committee of $t \geq 3$ trustees holding $(t,n)$-Shamir shares of the private key; the secrecy of the decrypted partial results, and therefore of the final tally, holds as long as at most $t-1$ trustees are corrupted.
     \item Voters have access to a secure device for biometric authentication and vote submission.
-    \item The election authority generates and distributes SMDC credentials to eligible voters before the election begins.
+    \item Before the election begins, the election authority (i)~issues each eligible voter a public SMDC credential consisting of $k=5$ slot Pedersen commitments together with their binary and sum proofs, and (ii)~records the voter's behavioural duress signal as $h_{\text{stored}} = \text{HMAC-SHA256}(K_d, \tau \| v_\sigma)$. The voter's real slot index $\text{idx}_{\text{real}}$ is \emph{not} returned at credential issue: it is recomputable only by the authority via $\text{HMAC-SHA256}(k_{\text{srv}}, \cdot)$, and is disclosed to the voter through a separate authenticated reveal endpoint that gates the response on a successful duress-signal match (\S\ref{subsec:smdc}).
+    \item The two server-held HMAC keys $k_{\text{srv}}$ (SMDC real-slot derivation) and $K_d$ (duress signal hashing) are sampled at election setup from at least 256 bits of high-entropy material and remain confidential to the election authority. Disclosure of $k_{\text{srv}}$ would let an adversary recompute $\text{idx}_{\text{real}}$ for every voter from the public pair $(\text{vid}, \text{eid})$ and would therefore void the SMDC coercion-resistance argument; disclosure of $K_d$ would let an adversary brute-force the registered signal value $v_\sigma$ from its hash and bypass the duress short-circuit.
     \item The Paillier key pair is generated with a minimum of 2048-bit modulus for computational security.
     \item Each voter is assigned $k=5$ credential slots (1 real, 4 fake) for coercion resistance.
 \end{enumerate}
@@ -34,58 +40,104 @@ The framework operates under the following assumptions:
 
 Table~\ref{tab:notation} summarizes the mathematical symbols used throughout this chapter.
 
-\begin{table}[H]
-\centering
-\caption{Mathematical Notation}
-\label{tab:notation}
-\small
-\begin{tabular}{|c|p{10cm}|}
+{\small
+\begin{longtable}{|c|p{10cm}|}
+\caption{Mathematical Notation} \label{tab:notation} \\
 \hline
 \textbf{Symbol} & \textbf{Meaning} \\
 \hline
+\endfirsthead
+
+\multicolumn{2}{c}{\textit{Table~\thetable{} continued from previous page}} \\
+\hline
+\textbf{Symbol} & \textbf{Meaning} \\
+\hline
+\endhead
+
+\hline
+\multicolumn{2}{r}{\textit{Continued on next page}} \\
+\endfoot
+
+\hline
+\endlastfoot
+
+\multicolumn{2}{|l|}{\textit{Paillier and Pedersen parameters}} \\
+\hline
 $p, q$ & Large primes for key generation \\
 \hline
-$n$ & RSA modulus $n = p \times q$ (Paillier) \\
+$n$ & Paillier RSA modulus $n = p \times q$ \\
 \hline
 $g$ & Generator; $g = n + 1$ for Paillier, subgroup generator for Pedersen \\
 \hline
-$h$ & Independent generator for Pedersen ($\log_g h$ unknown) \\
+$h$ & Independent Pedersen generator with $\log_g h$ unknown \\
 \hline
-$\lambda$ & $\text{lcm}(p-1, q-1)$ (Paillier private key component) \\
+$\lambda$ & Paillier private key $\lambda = \text{lcm}(p-1, q-1)$; also used as the security parameter where context disambiguates \\
 \hline
-$\mu$ & $L(g^\lambda \bmod n^2)^{-1} \bmod n$ (Paillier decryption parameter) \\
+$\mu$ & Paillier decryption parameter $\mu = L(g^\lambda \bmod n^2)^{-1} \bmod n$ \\
 \hline
-$L(x)$ & $L(x) = (x-1)/n$ (Paillier L-function) \\
+$L(x)$ & Paillier $L$-function $L(x) = (x-1)/n$ \\
 \hline
-$E(m)$ & Paillier encryption of message $m$: $g^m \cdot r^n \bmod n^2$ \\
+$E(x)$ & Paillier encryption of plaintext $x$: $E(x) = (1+n)^{x} \cdot r^{n} \bmod n^2$ (generic $x \in \mathbb{Z}_n$; the per-candidate vote indicator is $v_j$, below) \\
 \hline
-$C$ & Pedersen commitment: $C = g^m \cdot h^r \bmod p$ \\
+$C$ & Pedersen commitment $C = g^{x} \cdot h^{r} \bmod p$ to plaintext $x$ (used only for SMDC slot weights, \S\ref{subsec:smdc}) \\
 \hline
-$r$ & Randomness for encryption or commitment \\
+$r$ & Randomness, context-dependent: (i) Paillier encryption randomness ($r$ generic, $r_j$ per candidate); (ii) Pedersen commitment randomness; (iii) ring-signature responses ($r_0, r_1, \ldots$) \\
 \hline
-$w_i$ & Vote weight for candidate $i$; $w_i \in \{0, 1\}$, $\sum w_i = 1$ \\
+\multicolumn{2}{|l|}{\textit{Ballot and ZK proofs}} \\
 \hline
-$k$ & Number of SMDC credential slots (default $k = 5$) \\
+$m$ & Number of candidates in the election \\
 \hline
-$I$ & Key image for linkable ring signature: $I = H(\text{pk})^{\text{sk}}$ \\
+$v_j$ & Per-candidate vote indicator, $v_j \in \{0,1\}$ with $\sum_{j=1}^{m} v_j = 1$ (1-hot encoding) \\
 \hline
-$\sigma$ & Ring signature tuple $(I, c_0, r_0, r_1, \ldots, r_{n-1})$ \\
+$E_j$ & Per-candidate Paillier ciphertext $E_j = (1+n)^{v_j} r_j^{n} \bmod n^2$ \\
+\hline
+$\pi_j^{\text{bin}}$ & CDS OR-proof on $E_j$ that $v_j \in \{0,1\}$ (\S\ref{subsubsec:binary-proof}) \\
+\hline
+$\pi^{\text{sum}}$ & Schnorr-style proof that $\sum_j v_j = 1$ on $\prod_j E_j$ (\S\ref{subsubsec:sum-proof}) \\
+\hline
+$\Pi$ & Homomorphic product $\Pi = \prod_{j=1}^{m} E_j \bmod n^2$ \\
+\hline
+\multicolumn{2}{|l|}{\textit{SMDC credentials and duress signal}} \\
+\hline
+$k$ & Number of SMDC credential slots (default $k=5$, with 1 real and $k-1$ fake) \\
+\hline
+$k_{\text{srv}}$ & Server-held HMAC key for SMDC real-slot derivation (confidential to election authority) \\
+\hline
+$\text{idx}_{\text{real}}$ & Voter's real SMDC slot index, $\text{idx}_{\text{real}} = \text{HMAC-SHA256}(k_{\text{srv}}, \cdot) \bmod k$ \\
+\hline
+$\text{vid}, \text{eid}$ & Voter identifier and election identifier \\
+\hline
+$K_d$ & Server-held HMAC key for the behavioural duress signal (separate from $k_{\text{srv}}$) \\
+\hline
+$\tau, v_{\sigma}$ & Duress signal type (e.g., \texttt{blink\_count}) and signal value supplied at registration or at cast \\
+\hline
+$h_{\text{stored}}$ & Stored duress hash $h_{\text{stored}} = \text{HMAC-SHA256}(K_d, \tau \| v_{\sigma})$ persisted at registration \\
+\hline
+\multicolumn{2}{|l|}{\textit{Ring signature, SA\textsuperscript{2}, and Kyber}} \\
+\hline
+$I$ & Key image for linkable ring signature: $I = H(\text{pk})^{\text{sk}} \bmod p$ \\
+\hline
+$\sigma$ & Ring signature tuple $(I, c_0, r_0, r_1, \ldots, r_{N-1})$ over a ring of size $N$ \\
 \hline
 $\text{pk}_i, \text{sk}_i$ & Public/private key pair for ring member $i$ \\
 \hline
-$\mathcal{R}$ & Ring of public keys $\{\text{pk}_1, \ldots, \text{pk}_n\}$ with $|\mathcal{R}| = 100$ \\
+$\mathcal{R}$ & Ring of public keys with $|\mathcal{R}| = 100$ \\
 \hline
-$S_A, S_B$ & SA\textsuperscript{2} vote shares for Server A and Server B \\
+$S_{A,j}, S_{B,j}$ & SA\textsuperscript{2} per-candidate vote shares for Server~A and Server~B \\
 \hline
-$\text{mask}$ & Random masking value for SA\textsuperscript{2} share splitting \\
+$\text{mask}_j$ & Random masking value for the SA\textsuperscript{2} split of $E_j$ \\
 \hline
-\end{tabular}
-\end{table}
+$\text{ct}_{\text{ky}}, K$ & Kyber-768 KEM ciphertext and encapsulated symmetric key \\
+\hline
+$\text{MAC}$ & HMAC-SHA256 outer integrity tag over the Paillier ciphertext using a key derived from $K$ \\
+\hline
+\end{longtable}
+}
 
 \section{Cryptographic Protocol Formulation}
 \label{sec:crypto-formulation}
 
-This section presents the mathematical formulation of all seven cryptographic protocols implemented in our framework. Each protocol provides a specific security guarantee, and their composition forms the complete voting pipeline.
+This section presents the mathematical formulation of the multi-protocol cryptographic stack implemented in our framework. Each protocol provides a specific security guarantee, and their composition forms the complete voting pipeline.
 
 \subsection{Paillier Homomorphic Encryption}
 \label{subsec:paillier}
@@ -123,12 +175,12 @@ The public key is $(n, g, n^2)$ and the private key is $(\lambda, \mu, p, q)$.
 \subsubsection{Encryption}
 \label{subsubsec:paillier-enc}
 
-Encryption of a plaintext message $m \in \mathbb{Z}_n$ proceeds as defined by Paillier~\cite{paillier1999}:
+Encryption of a plaintext message $x \in \mathbb{Z}_n$ proceeds as defined by Paillier~\cite{paillier1999}:
 \begin{enumerate}
-    \item Select a random $r \in \mathbb{Z}_n^*$ where $r > 0$.
+    \item Select a random $r \in \mathbb{Z}_n^*$.
     \item Compute the ciphertext:
     \begin{equation}
-        c = g^m \cdot r^n \bmod n^2
+        c = g^x \cdot r^n \bmod n^2
         \label{eq:paillier-enc}
     \end{equation}
 \end{enumerate}
@@ -138,7 +190,7 @@ Encryption of a plaintext message $m \in \mathbb{Z}_n$ proceeds as defined by Pa
 
 Decryption follows the inverse construction of Paillier~\cite{paillier1999}:
 \begin{equation}
-    m = L(c^\lambda \bmod n^2) \cdot \mu \bmod n
+    x = L(c^\lambda \bmod n^2) \cdot \mu \bmod n
     \label{eq:paillier-dec}
 \end{equation}
 
@@ -149,113 +201,142 @@ The Paillier cryptosystem supports the following homomorphic operations~\cite{pa
 
 \textbf{Additive Homomorphism.} The product of two ciphertexts decrypts to the sum of their plaintexts:
 \begin{equation}
-    E(m_1) \cdot E(m_2) \bmod n^2 = E(m_1 + m_2)
+    E(x_1) \cdot E(x_2) \bmod n^2 = E(x_1 + x_2)
     \label{eq:homo-add}
 \end{equation}
 
-This property is the foundation of the proposed framework's $O(n)$-per-candidate (and $O(n \cdot m)$ total over $m$ candidates) tally. Given $n$ encrypted votes $\{E(v_1), E(v_2), \ldots, E(v_n)\}$ for a single candidate, the encrypted tally is:
+This property is the foundation of the proposed framework's $O(N)$-per-candidate (and $O(N \cdot m)$ total over $m$ candidates) tally, where $N$ denotes the voter count, distinct from the Paillier modulus $n$. Given $N$ encrypted votes $\{E(v_1), E(v_2), \ldots, E(v_N)\}$ for a single candidate, the encrypted tally is:
 \begin{equation}
-    E\left(\sum_{i=1}^{n} v_i\right) = \prod_{i=1}^{n} E(v_i) \bmod n^2
+    E\left(\sum_{i=1}^{N} v_i\right) = \prod_{i=1}^{N} E(v_i) \bmod n^2
     \label{eq:tally}
 \end{equation}
 
-\textbf{Scalar Multiplication.} A ciphertext raised to a scalar $k$ yields the encryption of $k \times m$:
+\textbf{Scalar Multiplication.} A ciphertext raised to a scalar $k$ yields the encryption of $k \times x$:
 \begin{equation}
-    E(m)^k \bmod n^2 = E(k \cdot m)
+    E(x)^k \bmod n^2 = E(k \cdot x)
     \label{eq:homo-scalar}
 \end{equation}
 
 \subsection{Pedersen Commitments}
 \label{subsec:pedersen}
 
-Pedersen commitments~\cite{pedersen1991} provide computationally hiding and perfectly binding commitments, serving as the foundation for zero-knowledge proofs in our framework.
+Pedersen commitments~\cite{pedersen1991} provide perfectly hiding and computationally binding commitments. In the present framework they are used exclusively to commit to the SMDC slot weights (Section~\ref{subsec:smdc}); the per-candidate vote-validity zero-knowledge proofs run directly on Paillier ciphertexts (Section~\ref{subsec:zkp}) and do not rely on Pedersen commitments.
 
 \subsubsection{Parameter Generation}
 \label{subsubsec:pedersen-params}
 
 \begin{enumerate}
     \item Generate a safe prime $p = 2q + 1$ where $q$ is also prime.
-    \item Find a generator $g$ of the subgroup of order $q$: select random $h \in \mathbb{Z}_p^*$ and compute $g = h^{(p-1)/q} \bmod p$ until $g \neq 1$.
-    \item Derive an independent generator $h$ such that $\log_g h$ is unknown, using hash-to-group: $h = \text{SHA3}(g)^{(p-1)/q} \bmod p$.
+    \item Find a generator $g$ of the order-$q$ subgroup of $\mathbb{Z}_p^*$: select a random auxiliary element $a \in \mathbb{Z}_p^*$ and compute $g = a^{(p-1)/q} \bmod p$; resample $a$ until $g \neq 1$.
+    \item Derive an independent generator $h$ such that $\log_g h$ is unknown, using a hash-to-group construction: $h = \big(\text{OS2IP}(\text{SHA3}(g))\big)^{(p-1)/q} \bmod p$, where $\text{OS2IP}$ is the standard octet-string-to-integer primitive that interprets the SHA-3 digest as a big-endian integer in $\mathbb{Z}_p^*$.
 \end{enumerate}
 
 \subsubsection{Commitment}
 \label{subsubsec:pedersen-commit}
 
-A commitment to a value $m \in \mathbb{Z}_q$ with randomness $r \in \mathbb{Z}_q$ takes the form defined by Pedersen~\cite{pedersen1991}:
+A commitment to a value $x \in \mathbb{Z}_q$ with randomness $r \in \mathbb{Z}_q$ takes the form defined by Pedersen~\cite{pedersen1991}:
 \begin{equation}
-    C = g^m \cdot h^r \bmod p
+    C = g^x \cdot h^r \bmod p
     \label{eq:pedersen}
 \end{equation}
 
 \textbf{Security Properties:}
 \begin{itemize}
-    \item \textbf{Computationally Hiding}: Given $C$, no polynomial-time adversary can determine $m$ (under the Discrete Logarithm assumption).
-    \item \textbf{Perfectly Binding}: There exists no $(m', r') \neq (m, r)$ such that $g^{m'} \cdot h^{r'} = g^m \cdot h^r$ (information-theoretically).
+    \item \textbf{Perfectly Hiding}: For uniformly random $r \stackrel{\$}{\leftarrow} \mathbb{Z}_q$, the value $h^r$ is uniformly distributed over the order-$q$ subgroup, so $C = g^x \cdot h^r$ is uniform on the subgroup independently of $x$. The two distributions corresponding to any pair of plaintexts $x \neq x'$ are therefore identical, and an unbounded adversary learns no information about $x$ from $C$.
+    \item \textbf{Computationally Binding}: Under the Discrete Logarithm assumption in the order-$q$ subgroup, no PPT adversary can produce a collision $(x, r) \neq (x', r')$ with $x \neq x'$ satisfying $g^x \cdot h^r = g^{x'} \cdot h^{r'}$, since such a collision would yield $\log_g h = (r - r') \cdot (x' - x)^{-1} \bmod q$. (A collision with $x = x'$ but $r \neq r'$ is excluded by $g^x \cdot h^r = g^x \cdot h^{r'}$ implying $h^{r - r'} = 1$, i.e.\ $r \equiv r' \pmod{q}$.)
 \end{itemize}
 
 \textbf{Homomorphic Property}~\cite{pedersen1991}\textbf{:}
 \begin{equation}
-    C_1 \cdot C_2 = g^{m_1+m_2} \cdot h^{r_1+r_2} \bmod p = \text{Commit}(m_1 + m_2, r_1 + r_2)
+    C_1 \cdot C_2 = g^{x_1+x_2} \cdot h^{r_1+r_2} \bmod p = \text{Commit}(x_1 + x_2, r_1 + r_2)
     \label{eq:pedersen-homo}
 \end{equation}
+This homomorphism is what enables the SMDC sum proof (Section~\ref{subsubsec:smdc-gen}) to demonstrate $\sum_{i=0}^{k-1} w_i = 1$ across the $k$ slot commitments: the product $\prod_i C_i$ equals $\text{Commit}\big(\sum_i w_i,\ \sum_i r_i\big)$, so a proof of $\sum_i w_i = 1$ reduces to a Schnorr proof of knowledge of $\sum_i r_i$ in $\prod_i C_i / g$.
 
 \subsection{Zero-Knowledge Proofs ($\Sigma$-Protocol)}
 \label{subsec:zkp}
 
-Our framework implements two zero-knowledge proofs built from the Schnorr proof of knowledge of a discrete logarithm~\cite{schnorr1991} and rendered non-interactive by the Fiat-Shamir transformation~\cite{fiat_shamir1986}. Following the recommendation of Bernhard, Pereira, and Warinschi~\cite{bernhard2012}, the \emph{Strong} variant of Fiat-Shamir is used, which incorporates the public parameters and statement into the hash input to prevent malleability. Two proofs are required per ballot: a binary proof that each per-candidate weight $w_i \in \{0, 1\}$, and a sum proof that $\sum_i w_i = 1$.
+The framework implements two non-interactive zero-knowledge proofs that operate \emph{directly} on the per-candidate Paillier ciphertexts. This Helios-style construction~\cite{adida2008helios} avoids the auxiliary commitment-equality proof that a parallel Paillier--Pedersen design would require, while preserving the properties needed by Theorem~\ref{subsubsec:t2-vote-validity} (vote validity) and Theorem~\ref{subsubsec:t1-ballot-privacy} (ballot indistinguishability). Both proofs follow the disjunctive composition of Cramer, Damg{\aa}rd, and Schoenmakers~\cite{cramer1994or} on top of Schnorr's proof of knowledge~\cite{schnorr1991}, rendered non-interactive by the Strong Fiat--Shamir transform~\cite{fiat_shamir1986,bernhard2012} that incorporates the public parameters and the full statement into the hash input to prevent malleability. Two proofs are required per ballot: a \emph{per-candidate} binary proof that each ciphertext $E_j$ encrypts $v_j \in \{0,1\}$, and a single sum proof that the candidate ciphertexts jointly encrypt values whose sum is exactly $1$.
 
-\subsubsection{Binary Proof}
+\subsubsection{Binary Proof on Paillier Ciphertexts}
 \label{subsubsec:binary-proof}
 
-The binary proof demonstrates that a Pedersen commitment $C = g^w \cdot h^r$ contains either $w = 0$ or $w = 1$, without revealing which. It is constructed as an OR-composition of two Schnorr proofs~\cite{schnorr1991} and made non-interactive via the Fiat-Shamir transform~\cite{fiat_shamir1986}.
+For a per-candidate Paillier ciphertext $E_j = (1+n)^{v_j} \cdot r_j^{n} \bmod n^2$, the binary proof demonstrates that $v_j \in \{0,1\}$ without revealing which. Note that
+\begin{equation*}
+    E_j = r_j^{n} \bmod n^2 \quad \text{when } v_j = 0, \qquad E_j = (1+n) \cdot r_j^{n} \bmod n^2 \quad \text{when } v_j = 1.
+\end{equation*}
+The voter therefore proves knowledge of $r_j \in \mathbb{Z}_n^*$ such that either $E_j$ is an $n$-th residue (case $v_j = 0$) or $E_j / (1+n)$ is an $n$-th residue (case $v_j = 1$). The two branches are combined by the CDS OR-composition~\cite{cramer1994or}, instantiated on the Paillier $n$-th-residuosity language~\cite{damgard_jurik2001,paillier1999}.
 
-\textbf{Proof Generation} (for $w = 0$; the $w = 1$ case is symmetric):
+\textbf{Proof Generation} (case $v_j = 0$; the $v_j = 1$ case is symmetric):
 \begin{enumerate}
-    \item \textbf{Simulate} the $w = 1$ branch: choose random $d_1, r_1 \in \mathbb{Z}_q$ and compute:
+    \item \textbf{Simulate} the $v_j = 1$ branch: choose random $d_1 \in \mathbb{Z}_n$ and random $s_1 \in \mathbb{Z}_n^*$, and compute the simulated commitment
     \begin{equation}
-        A_1 = g \cdot h^{r_1} \cdot (C/g)^{-d_1} \bmod p
+        a_1 \;=\; s_1^{n} \cdot \left(\frac{E_j}{1+n}\right)^{-d_1} \bmod n^2.
     \end{equation}
-    \item \textbf{Real proof} for $w = 0$: choose random $r_0 \in \mathbb{Z}_q$ and compute:
+    \item \textbf{Real proof} for $v_j = 0$: choose random $u_0 \in \mathbb{Z}_n^*$ and compute
     \begin{equation}
-        A_0 = h^{r_0} \bmod p
+        a_0 \;=\; u_0^{n} \bmod n^2.
     \end{equation}
-    \item Compute the Strong Fiat-Shamir challenge~\cite{fiat_shamir1986,bernhard2012} using a SHA-256 random oracle~\cite{nist_fips180_4}:
+    \item Compute the Strong Fiat--Shamir challenge~\cite{fiat_shamir1986,bernhard2012} using a SHA3-256 random oracle~\cite{nist_fips202} with an explicit domain-separation tag $\mathsf{DS}_{\text{bin}} = \text{``CovertVote-PaillierZKP-Binary-v1''}$:
     \begin{equation}
-        c = H(\text{params} \| \text{nonce} \| \text{electionID} \| C \| A_0 \| A_1) \bmod q
-        \label{eq:fiat-shamir}
+        c \;=\; H(\mathsf{DS}_{\text{bin}} \,\|\, n \,\|\, \text{nonce} \,\|\, \text{electionID} \,\|\, j \,\|\, E_j \,\|\, a_0 \,\|\, a_1) \bmod n.
+        \label{eq:bin-fs}
     \end{equation}
-    where $\text{params} = (p, q, g, h)$ are included per the Bernhard-Pereira-Warinschi recommendation~\cite{bernhard2012}.
-    \item Compute $d_0 = c - d_1 \bmod q$ and $f_0 = r_0 + d_0 \cdot r \bmod q$.
+    \item Set $d_0 = c - d_1 \bmod n$ and $s_0 = u_0 \cdot r_j^{d_0} \bmod n$.
 \end{enumerate}
-
-The proof is $\pi = (A_0, A_1, d_0, d_1, f_0, f_1, \text{nonce}, \text{electionID})$.
+The proof is $\pi_j^{\text{bin}} = (a_0, a_1, d_0, d_1, s_0, s_1, \text{nonce})$.
 
 \textbf{Verification:}
 \begin{enumerate}
-    \item Check $d_0 + d_1 \equiv c \pmod{q}$
-    \item Check $h^{f_0} \cdot C^{-d_0} \equiv A_0 \pmod{p}$
-    \item Check $g \cdot h^{f_1} \cdot (C/g)^{-d_1} \equiv A_1 \pmod{p}$
+    \item Recompute $c$ via~\eqref{eq:bin-fs} and check $d_0 + d_1 \equiv c \pmod{n}$.
+    \item Check $s_0^{n} \equiv a_0 \cdot E_j^{d_0} \pmod{n^2}$.
+    \item Check $s_1^{n} \equiv a_1 \cdot \left(\dfrac{E_j}{1+n}\right)^{d_1} \pmod{n^2}$, where $(1+n)^{-1} \bmod n^2$ is the modular inverse used in the division and equals $n^2 - n + 1 \bmod n^2$ since $(1+n)(1-n) \equiv 1 \pmod{n^2}$.
 \end{enumerate}
 
-\subsubsection{Sum Proof}
+The protocol is non-interactive zero-knowledge in the random-oracle model and has computational special soundness; under the random-oracle modelling of SHA3-256 the soundness error is negligible in $|n|$~\cite{cramer1994or,damgard_jurik2001}.
+
+\subsubsection{Sum-to-One Proof on Paillier Ciphertexts}
 \label{subsubsec:sum-proof}
 
-The sum proof demonstrates that $\sum_{i=1}^{m} w_i = 1$ across all candidate commitments, ensuring each voter selects exactly one candidate.
-
-Given commitments $\{C_1, \ldots, C_m\}$ with randomness $\{r_1, \ldots, r_m\}$:
+The sum proof demonstrates that the $m$ per-candidate ciphertexts $E_1, \ldots, E_m$ jointly encrypt values whose sum is exactly $1$, ensuring each voter selects exactly one candidate. By Paillier's additive homomorphism~\cite{paillier1999},
+\begin{equation}
+    \Pi \;=\; \prod_{j=1}^{m} E_j \;=\; (1+n)^{\sum_j v_j} \cdot \left(\prod_j r_j\right)^{n} \bmod n^2.
+\end{equation}
+If $\sum_j v_j = 1$, then $\Pi / (1+n) = R^{n} \bmod n^2$ where $R = \prod_j r_j \bmod n$. The voter therefore proves knowledge of $R \in \mathbb{Z}_n^*$ such that $\Pi / (1+n)$ is an $n$-th residue, via a Schnorr-style proof of $n$-th-residue knowledge~\cite{schnorr1991,damgard_jurik2001}:
 \begin{enumerate}
-    \item Compute the product: $\Pi = \prod_{i=1}^{m} C_i = g^{\sum w_i} \cdot h^{\sum r_i} \bmod p$
-    \item Since $\sum w_i = 1$, we have $\Pi = g \cdot h^{R} \bmod p$ where $R = \sum r_i \bmod q$.
-    \item Execute a Schnorr proof of knowledge~\cite{schnorr1991} of $R$: choose random $k$, compute $A = h^k$, challenge $c = H(\text{params} \| \Pi \| A \| g)$ via Fiat-Shamir~\cite{fiat_shamir1986}, response $s = k + c \cdot R \bmod q$.
+    \item Choose random $u \in \mathbb{Z}_n^*$ and compute commitment $a = u^{n} \bmod n^2$.
+    \item Compute the Strong Fiat--Shamir challenge (SHA3-256~\cite{nist_fips202}, domain tag $\mathsf{DS}_{\text{sum}} = \text{``CovertVote-PaillierZKP-Sum-v1''}$):
+    \begin{equation}
+        c \;=\; H(\mathsf{DS}_{\text{sum}} \,\|\, n \,\|\, \text{nonce} \,\|\, \text{electionID} \,\|\, E_1 \,\|\, \cdots \,\|\, E_m \,\|\, a) \bmod n.
+        \label{eq:sum-fs}
+    \end{equation}
+    \item Compute response $s = u \cdot R^{c} \bmod n$.
 \end{enumerate}
+The proof is $\pi^{\text{sum}} = (a, c, s, \text{nonce})$.
 
-\textbf{Verification:} Recompute $A$ from $(s, c)$: check $h^s \cdot (\Pi/g)^{-c} \equiv A \pmod{p}$.
+\textbf{Verification:} Recompute $c$ via~\eqref{eq:sum-fs} and $\Pi = \prod_j E_j \bmod n^2$, then check
+\begin{equation*}
+    s^{n} \;\equiv\; a \cdot \left(\dfrac{\Pi}{1+n}\right)^{c} \pmod{n^2}.
+\end{equation*}
+
+\subsubsection{Relationship to the SMDC Slot Proofs}
+\label{subsubsec:zkp-smdc-distinction}
+
+\paragraph{Two parallel proof systems.} The Pedersen-based binary and sum proofs used by SMDC (Section~\ref{subsec:smdc}) are conceptually distinct from the Paillier-based proofs above. The Pedersen proofs bind the SMDC \emph{slot weights}---a $k$-vector of commitments with one slot weighted $1$ and the remaining $k-1$ slots weighted $0$---to enable coercion-resistant deniable credentials. The Paillier proofs of this section bind the per-\emph{candidate} encrypted votes to enforce ballot validity. The two proof systems coexist independently in a single ballot, address disjoint concerns, and provide independent security guarantees; in particular, the SMDC slot proofs are generated once at credential-issue time and reused across the voter's lifetime in the election, whereas the Paillier proofs are generated fresh at each vote cast. To distinguish them notationally, this thesis uses $\pi_j^{\text{bin}}$ (subscript $j$, per candidate) for the Paillier proofs and $\pi_i^{\text{bin}}$ (subscript $i$, per SMDC slot) for the Pedersen proofs.
+
+\paragraph{Pedersen-instantiated binary and sum proofs.} The SMDC slot proofs follow the same CDS OR-composition~\cite{cramer1994or} on top of Schnorr's proof of knowledge~\cite{schnorr1991}, but instantiated on the Pedersen language $\{C = g^w h^r : w \in \{0,1\}\}$ rather than the Paillier $n$-th-residuosity language. Concretely, for the slot commitment $C_i = g^{w_i} h^{r_i}$:
+\begin{itemize}
+    \item \textbf{Binary proof}: an OR-composition of two Schnorr proofs of $\log_h(\cdot)$, one for the branch $w_i = 0$ (i.e.\ $C_i = h^{r_i}$) and one for the branch $w_i = 1$ (i.e.\ $C_i / g = h^{r_i}$). The construction is identical in structure to Section~\ref{subsubsec:binary-proof} but with $h$, $C_i$, and $C_i / g$ replacing $r_j^n$, $E_j$, and $E_j/(1+n)$.
+    \item \textbf{Sum-to-one proof}: a Schnorr proof of knowledge of $R = \sum_i r_i \bmod q$ such that $\big(\prod_i C_i\big) / g = h^R$, witnessing $\sum_i w_i = 1$. The construction parallels Section~\ref{subsubsec:sum-proof} with the Pedersen homomorphism (Equation~\ref{eq:pedersen-homo}) replacing Paillier's.
+\end{itemize}
+Both Pedersen proofs use Strong Fiat--Shamir with SHA3-256 and the domain-separation tags $\mathsf{DS}_{\text{slot-bin}}$ and $\mathsf{DS}_{\text{slot-sum}}$ respectively; soundness reduces to the discrete-logarithm assumption in the order-$q$ subgroup via the standard CDS/Schnorr forking argument.
 
 \subsection{Linkable Ring Signatures}
 \label{subsec:ring-sig}
 
-The framework employs linkable ring signatures, a refinement~\cite{liu2004} of the original spontaneous-anonymous-group signature of Rivest, Shamir, and Tauman~\cite{rivest2001ring}. A fixed ring size of $|\mathcal{R}| = 100$ members is used. The hash function $H(\cdot)$ in equations~\eqref{eq:key-image} and the signing procedure is instantiated with SHA-256~\cite{nist_fips180_4}.
+The framework employs linkable ring signatures, a refinement~\cite{liu2004} of the original spontaneous-anonymous-group signature of Rivest, Shamir, and Tauman~\cite{rivest2001ring}. A fixed ring size of $|\mathcal{R}| = 100$ members is used. The hash function $H(\cdot)$ used throughout this subsection (for the key image, the hash-to-point operation, and the Fiat--Shamir-style challenge chain) is instantiated with SHA3-256~\cite{nist_fips202}.
+
+\paragraph{Group parameters.} The ring signature operates in a dedicated order-$q$ subgroup of $\mathbb{Z}_p^*$ generated independently of the Pedersen group of Section~\ref{subsec:pedersen}: the implementation calls \texttt{crypto.GenerateRingParams} to produce a fresh safe-prime modulus $p$, prime order $q$, and subgroup generator $g$ (see \texttt{internal/crypto/ring\_signature.go}). The hash-to-point function $H_{\text{grp}}: \mathbb{Z}_p^* \to \mathbb{G}_q$ used by the key image (Equation~\ref{eq:key-image}) maps a public key into the same order-$q$ subgroup via $H_{\text{grp}}(\mathrm{pk}) = (\text{OS2IP}(\text{SHA3}(\mathrm{pk})))^{(p-1)/q} \bmod p$, in the same style as the Pedersen hash-to-group of Section~\ref{subsec:pedersen}.
 
 \subsubsection{Key Generation}
 \label{subsubsec:ring-keygen}
@@ -269,22 +350,22 @@ Each voter generates a key pair following the Liu-Wei-Wong construction~\cite{li
 \subsubsection{Signing}
 \label{subsubsec:ring-sign}
 
-Given message $M$, signer key $(\text{sk}_s, \text{pk}_s)$, ring $\mathcal{R} = \{\text{pk}_0, \ldots, \text{pk}_{n-1}\}$, and signer index $s$, the signing procedure follows~\cite{liu2004}:
+Given message $M$, signer key $(\text{sk}_s, \text{pk}_s)$, ring $\mathcal{R} = \{\text{pk}_0, \ldots, \text{pk}_{|\mathcal{R}|-1}\}$, and signer index $s$, the signing procedure follows~\cite{liu2004}. All index arithmetic below is taken modulo $|\mathcal{R}|$ (i.e.\ $c_{|\mathcal{R}|}$ wraps to $c_0$).
 
 \begin{enumerate}
-    \item Compute the key image (for double-vote detection):
+    \item Compute the key image (for double-vote detection), where $H_{\text{grp}}$ is the hash-to-point function introduced above:
     \begin{equation}
-        I = H(\text{pk}_s)^{\text{sk}_s} \bmod p
+        I = H_{\text{grp}}(\text{pk}_s)^{\text{sk}_s} \bmod p
         \label{eq:key-image}
     \end{equation}
     \item Choose random $\alpha \in \mathbb{Z}_q$ and compute:
     \begin{equation}
-        L_s = g^\alpha \bmod p, \quad R_s = H(\text{pk}_s)^\alpha \bmod p
+        L_s = g^\alpha \bmod p, \quad R_s = H_{\text{grp}}(\text{pk}_s)^\alpha \bmod p
     \end{equation}
     \item Set $c_{s+1} = H(M \| L_s \| R_s)$.
-    \item For each non-signer $i \neq s$ (in cyclic order), choose random $r_i$ and compute:
+    \item For each non-signer $i \neq s$ (in cyclic order $s+1, s+2, \ldots, s-1 \bmod |\mathcal{R}|$), choose random $r_i \in \mathbb{Z}_q$ and compute:
     \begin{equation}
-        L_i = g^{r_i} \cdot \text{pk}_i^{c_i} \bmod p, \quad R_i = H(\text{pk}_i)^{r_i} \cdot I^{c_i} \bmod p
+        L_i = g^{r_i} \cdot \text{pk}_i^{c_i} \bmod p, \quad R_i = H_{\text{grp}}(\text{pk}_i)^{r_i} \cdot I^{c_i} \bmod p
     \end{equation}
     \begin{equation}
         c_{i+1} = H(M \| L_i \| R_i)
@@ -292,21 +373,28 @@ Given message $M$, signer key $(\text{sk}_s, \text{pk}_s)$, ring $\mathcal{R} = 
     \item Close the ring: $r_s = \alpha - c_s \cdot \text{sk}_s \bmod q$.
 \end{enumerate}
 
-The signature is $\sigma = (I, c_0, r_0, r_1, \ldots, r_{n-1})$.
+The signature is $\sigma = (I, c_0, r_0, r_1, \ldots, r_{|\mathcal{R}|-1})$.
 
 \subsubsection{Verification and Linkability}
 \label{subsubsec:ring-verify}
 
-Verification reconstructs all $(L_i, R_i)$ pairs and checks that the ring closes: the final computed challenge equals $c_0$. Linkability is achieved through key images: two signatures from the same signer produce identical $I$ values, enabling double-vote detection via $I_1 \stackrel{?}{=} I_2$.
+Verification recomputes each $(L_i, R_i)$ pair from the public ring elements and the signature components, and checks that the challenge chain closes back to $c_0$. Concretely, given $\sigma = (I, c_0, r_0, \ldots, r_{|\mathcal{R}|-1})$ and the public ring $\mathcal{R}$, set $c'_0 = c_0$ and for $i = 0, 1, \ldots, |\mathcal{R}|-1$ compute
+\begin{equation}
+    L'_i = g^{r_i} \cdot \text{pk}_i^{c'_i} \bmod p, \quad R'_i = H_{\text{grp}}(\text{pk}_i)^{r_i} \cdot I^{c'_i} \bmod p, \quad c'_{i+1} = H(M \| L'_i \| R'_i).
+    \label{eq:ring-verify}
+\end{equation}
+The signature is accepted iff $c'_{|\mathcal{R}|} \equiv c_0$, i.e.\ the recomputed challenge chain closes onto its starting value. Linkability is achieved through the key image: two signatures from the same signer produce identical $I$ values regardless of message or ring composition, so double voting is detected by the equality test $I_1 \stackrel{?}{=} I_2$ across previously recorded key images.
 % Chapter 3 Part B - Continuation
 % This file is merged with chapter3a.tex into chapter3.tex
 
 \subsection{SMDC: Self-Masking Deniable Credentials}
 \label{subsec:smdc}
 
-\emph{The construction presented in this subsection is a novel contribution of this thesis.} While the underlying cryptographic primitives (Pedersen commitments, $\Sigma$-proofs, and HMAC) are standard, their composition into a deniable-credential mechanism with $k$-slot self-masking, deterministic HMAC-derived real-slot indexing, and silent-discard semantics for coerced votes is, to the best of our knowledge, original to this work.
+The Self-Masking Deniable Credentials (SMDC) construction presented in this subsection is one of the three engineering-level design contributions of this thesis (Section~\ref{sec:meth-intro}). Its building blocks---Pedersen commitments, $\Sigma$-proofs, and HMAC---are standard; the composition into a deniable-credential mechanism with $k$-slot self-masking, secret-keyed HMAC-derived real-slot indexing, and silent-discard semantics for coerced votes is, to the best of our knowledge and within the works surveyed in Chapter~\ref{ch:related-works}, original to this work.
 
-Each voter receives $k = 5$ credential slots, of which exactly one is real (weight $= 1$) and the remaining four are fake (weight $= 0$). The real slot index is derived deterministically via HMAC-SHA256~\cite{rfc2104,nist_fips198,nist_fips180_4} and is never stored, ensuring only the legitimate voter can re-derive it from $(\text{vid}, \text{eid})$.
+Each voter receives $k = 5$ credential slots, of which exactly one is real (weight $= 1$) and the remaining four are fake (weight $= 0$). The real slot index is derived deterministically via HMAC-SHA256~\cite{rfc2104,nist_fips198} keyed by a server-held secret $k_{\text{srv}} \in \{0,1\}^{\geq 256}$ that is sampled at election setup and held confidentially by the election authority. The index is never stored on chain; the legitimate authority can recompute it for any voter, while a coercer who knows only the public pair $(\text{vid}, \text{eid})$ cannot, since HMAC-SHA256 is widely modelled as a PRF under its key.
+
+\paragraph{Duress-bound index disclosure.} At registration the voter chooses a private behavioral duress signal (Section~\ref{subsec:duress-detection}), which is stored as an HMAC under a separate server key in the same transaction as credential issuance. The registration response does \emph{not} include the real slot index. To learn it, the voter must subsequently submit the registered signal to a dedicated reveal-slot-index endpoint; the server verifies the signal in constant time and, only on match, returns $\text{idx}_{\text{real}}$. This binding has two consequences: (i) a coercer present at registration sees neither the index in the response nor a value derivable from public inputs, and (ii) a coercer who later forces the voter to retrieve the index can be deceived by the voter presenting a wrong signal, in which case the server returns a uniform error and discloses nothing. The election authority retains the policy choice over how often and under what authentication the reveal endpoint may be called.
 
 \subsubsection{Credential Generation}
 \label{subsubsec:smdc-gen}
@@ -314,11 +402,12 @@ Each voter receives $k = 5$ credential slots, of which exactly one is real (weig
 For voter with identifier $\text{vid}$ in election $\text{eid}$:
 
 \begin{enumerate}
-    \item \textbf{Derive real index} (deterministic, re-derivable):
+    \item \textbf{Derive real index} (deterministic, recomputable by the election authority only):
     \begin{equation}
-        \text{idx}_{\text{real}} = \text{HMAC-SHA256}(\text{eid}, \text{``smdc-real-index:''} \| \text{vid} \| \text{eid}) \bmod k
+        \text{idx}_{\text{real}} = \text{HMAC-SHA256}(k_{\text{srv}},\, \text{``smdc-real-index:''} \| \text{vid} \| \text{eid}) \bmod k
         \label{eq:smdc-index}
     \end{equation}
+    where $k_{\text{srv}}$ is the server-held SMDC HMAC key. Confidentiality of $k_{\text{srv}}$ is what reduces the coercer's view to a uniform guess over the $k$ slots; its disclosure would let an adversary recompute $\text{idx}_{\text{real}}$ for every voter from public inputs and would therefore void the coercion-resistance argument of \S\ref{subsubsec:smdc-coercion}.
     
     \item \textbf{Create $k$ slots}: For each slot $i \in \{0, \ldots, k-1\}$:
     \begin{equation}
@@ -331,9 +420,9 @@ For voter with identifier $\text{vid}$ in election $\text{eid}$:
         \label{eq:smdc-commit}
     \end{equation}
     
-    \item \textbf{Prove binary}: For each $C_i$, generate a ZK proof $\pi_i^{\text{bin}}$ that $w_i \in \{0, 1\}$.
-    
-    \item \textbf{Prove sum}: Generate proof $\pi^{\text{sum}}$ that $\sum_{i=0}^{k-1} w_i = 1$.
+    \item \textbf{Prove binary}: For each $C_i$, generate a Pedersen-instantiated CDS OR-proof $\pi_i^{\text{bin}}$ that $w_i \in \{0, 1\}$ (construction sketch in Section~\ref{subsubsec:zkp-smdc-distinction}).
+
+    \item \textbf{Prove sum}: Generate a Schnorr-style proof $\pi^{\text{sum}}$ that $\sum_{i=0}^{k-1} w_i = 1$, by proving knowledge of $\sum_i r_i \bmod q$ such that $\prod_i C_i / g = h^{\sum_i r_i}$ (construction sketch in Section~\ref{subsubsec:zkp-smdc-distinction}).
 \end{enumerate}
 
 The credential is $\text{Cred} = (\text{vid}, k, \{(C_i, \pi_i^{\text{bin}})\}_{i=0}^{k-1}, \pi^{\text{sum}})$.
@@ -348,12 +437,12 @@ Under coercion, the voter presents a \emph{fake} slot $j \neq \text{idx}_{\text{
     \item A valid sum proof $\pi^{\text{sum}}$ (proving exactly one slot has $w = 1$)
 \end{itemize}
 
-Due to Pedersen's \textbf{computational hiding} property, the coercer cannot determine whether $C_j$ commits to 0 or 1. The vote cast with a fake credential is silently discarded during tally (it contributes $w = 0$ to the homomorphic sum), while the voter's receipt appears identical to a real vote receipt. Figure~\ref{fig:smdc} illustrates this mechanism.
+Due to Pedersen's \textbf{perfect hiding} property, the distributions of $C_j$ for $w_j = 0$ and $w_j = 1$ are statistically identical (uniform over the order-$q$ subgroup); the coercer therefore learns no information about $w_j$ from $C_j$, even with unbounded computational power. When a vote is cast on a fake slot, the SMDC slot weight $w_j = 0$ is multiplied into the per-candidate ciphertext at cast time (Section~\ref{sec:pipeline}), so the homomorphic per-candidate tally at decryption time receives zero contribution from that voter; this happens silently---the voter's receipt is structurally identical to that of a genuine cast. Figure~\ref{fig:smdc} illustrates this mechanism.
 
 \begin{figure}[H]
 \centering
 \resizebox{\textwidth}{!}{\input{Images/smdc.tex}}
-\caption[SMDC Deniable Credential Slot Structure]{SMDC deniable credential structure with $k=5$ slots. The real slot is distinguishable only via the cross-hatched fill in this diagram; cryptographically, the Pedersen hiding property renders the real and fake slots computationally indistinguishable to a coercer.}
+\caption[SMDC Deniable Credential Slot Structure]{SMDC deniable credential structure with $k=5$ slots. The real slot is distinguishable only via the cross-hatched fill in this diagram; cryptographically, the Pedersen perfect-hiding property renders the slot commitments statistically (information-theoretically) indistinguishable to a coercer.}
 \label{fig:smdc}
 \end{figure}
 
@@ -369,37 +458,38 @@ The election system verifies credentials without learning the real index:
 \subsection{SA\textsuperscript{2}: Samplable Anonymous Aggregation}
 \label{subsec:sa2}
 
-This subsection describes the integration of the existing SA\textsuperscript{2} primitive of Apple Machine Learning Research~\cite{sa2_apple}---which itself builds on the secure aggregation construction of Bonawitz et al.~\cite{bonawitz2017}---into the proposed voting pipeline. \emph{The two-server, non-colluding mask-cancellation construction of SA\textsuperscript{2} is not a contribution of this thesis; it is invoked as an existing primitive.} The integration choice made here is to pair Paillier additive ciphertexts $E(v)$ with the SA\textsuperscript{2} mask-cancellation across the two aggregators in equations~\eqref{eq:sa2-share-a}--\eqref{eq:sa2-reconstruct}, so that the encrypted tally is reconstructed via mask homomorphism rather than via plaintext secret sharing (the original federated-learning setting).
+This subsection describes the integration of the existing SA\textsuperscript{2} primitive of Apple Machine Learning Research~\cite{sa2_apple}, which itself builds on the secure aggregation construction of Bonawitz et al.~\cite{bonawitz2017}, into the proposed voting pipeline. \emph{The two-server, non-colluding mask-cancellation construction of SA\textsuperscript{2} is not a contribution of this thesis; it is invoked as an existing primitive.} The integration choice made here is to pair the per-candidate Paillier ciphertexts $\{E_j\}_{j=1}^{m}$ produced by the 1-hot encoding of Section~\ref{subsec:zkp} with an independent SA\textsuperscript{2} mask-cancellation per candidate, so that the encrypted tally is reconstructed via mask homomorphism rather than via the plaintext secret sharing of the original federated-learning setting. The per-candidate parallel structure is reflected in the cast pipeline (Algorithm~\ref{alg:pipeline}, Step~14) and in the \texttt{sa2.VoteShare} type, whose \texttt{SharesA} and \texttt{SharesB} fields are length-$m$ vectors.
 
-\subsubsection{Vote Splitting}
+\subsubsection{Per-candidate Vote Splitting}
 \label{subsubsec:sa2-split}
 
-Given an encrypted vote $E(v)$ for voter $u$, the proposed mask-cancellation construction (adapted from Apple's SA\textsuperscript{2}~\cite{sa2_apple} which itself builds on the secure-aggregation protocol of Bonawitz~et~al.~\cite{bonawitz2017}) operates as follows:
+Given the per-candidate weighted ciphertext vector $\{E_{w,j}\}_{j=1}^{m}$ for voter~$u$ (where $E_{w,j}$ denotes the post-SMDC-weight Paillier ciphertext from Algorithm~\ref{alg:pipeline}), the splitting procedure operates independently on each candidate position $j \in \{1, \ldots, m\}$:
 
 \begin{enumerate}
-    \item Generate a random mask: $\text{mask} \xleftarrow{\$} \mathbb{Z}_{n/100}$
+    \item Generate a fresh random mask: $\text{mask}_j \xleftarrow{\$} \mathbb{Z}_{\lfloor n / 100 \rfloor}$. The conservative bound $\lfloor n/100 \rfloor$ ensures that, summed over the typical batch of $\sim$100 concurrent voters, the cumulative mask remains below $n$ and therefore cannot overflow the Paillier message space. (Information-theoretic hiding of $v_j$ would require uniform $\text{mask}_j \in \mathbb{Z}_n$; here the primary confidentiality guarantee is the computational hardness of Paillier IND-CPA under DCRA, with the mask providing additional non-collusion-based protection.)
     \item Compute Share A (for Server A):
     \begin{equation}
-        S_A = E(v) \cdot E(\text{mask}) = E(v + \text{mask}) \bmod n^2
+        S_{A,j} = E_{w,j} \cdot E(\text{mask}_j) = E(v_j + \text{mask}_j) \bmod n^2
         \label{eq:sa2-share-a}
     \end{equation}
     \item Compute Share B (for Server B):
     \begin{equation}
-        S_B = E(-\text{mask}) = E(n - \text{mask}) \bmod n^2
+        S_{B,j} = E(-\text{mask}_j) = E(n - \text{mask}_j) \bmod n^2
         \label{eq:sa2-share-b}
     \end{equation}
 \end{enumerate}
 
-\subsubsection{Reconstruction}
+\subsubsection{Per-candidate Reconstruction}
 \label{subsubsec:sa2-reconstruct}
 
-Due to Paillier's additive homomorphism~\cite{paillier1999}:
+For each candidate $j$, Paillier additive homomorphism~\cite{paillier1999} cancels the mask:
 \begin{equation}
-    S_A \cdot S_B = E(v + \text{mask}) \cdot E(-\text{mask}) = E(v) \bmod n^2
+    S_{A,j} \cdot S_{B,j} = E(v_j + \text{mask}_j) \cdot E(-\text{mask}_j) = E(v_j) \bmod n^2
     \label{eq:sa2-reconstruct}
 \end{equation}
+Aggregation across all voters is performed independently per candidate column; tallying $N$ voters for $m$ candidates therefore reduces to $m$ parallel applications of the homomorphic Paillier sum.
 
-\textbf{Security Guarantee:} As long as at least one of the two servers remains honest and does not share its received share with the other server, no individual vote $v$ can be reconstructed. Server A sees only $E(v + \text{mask})$ and Server B sees only $E(-\text{mask})$; neither can derive $E(v)$ alone.
+\textbf{Security guarantee.} The SA\textsuperscript{2} layer adds a \emph{non-collusion} guarantee on top of the underlying Paillier semantic security: even if one of the two aggregation servers is malicious, no individual per-candidate value $v_j$ can be reconstructed from that server's view alone. Server A sees only $\{E(v_j + \text{mask}_j)\}_j$ and Server B sees only $\{E(-\text{mask}_j)\}_j$; reconstructing $E(v_j)$ requires combining the two views, which is impossible without collusion. The underlying Paillier ciphertexts already hide $v_j$ computationally under DCRA; the SA\textsuperscript{2} mask thus protects against the additional threat in which an honest-but-curious aggregator separately holds the Paillier decryption key, which Theorem~\ref{subsubsec:t5-aggregation-privacy} formalises.
 
 \subsection{Kyber768 Post-Quantum Hybrid Encryption}
 \label{subsec:kyber}
@@ -416,26 +506,23 @@ NIST defines five security categories. Category~1 matches AES-128~\cite{nist_aes
 \subsubsection{KEM-DEM Hybrid Construction}
 \label{subsubsec:hybrid}
 
-The hybrid follows the standard KEM-DEM paradigm: the post-quantum KEM transports a fresh symmetric key, which is then used in a classical authenticator over the Paillier ciphertext. The procedure operates as follows:
+The hybrid follows the standard KEM-DEM paradigm: the post-quantum KEM transports a fresh symmetric key, which is then used in a classical authenticator over the (per-candidate) Paillier ciphertext vector. The procedure operates as follows:
 \begin{enumerate}
     \item \textbf{Kyber Key Generation}: Generate a Kyber768 key pair $(\text{pk}_{\text{ky}}, \text{sk}_{\text{ky}})$ providing NIST Level 3 security (equivalent to AES-192).
-    \item \textbf{Paillier Encryption}~\cite{paillier1999}: Encrypt the vote with Paillier to preserve homomorphic properties:
-    \begin{equation}
-        E(v) = g^v \cdot r^n \bmod n^2
-    \end{equation}
+    \item \textbf{Paillier Encryption}~\cite{paillier1999}: Encrypt the per-candidate 1-hot vote vector $\{v_j\}_{j=1}^{m}$ (Section~\ref{subsec:zkp}) under Paillier, yielding the ciphertext vector $\{E_j\}_{j=1}^{m}$ with $E_j = (1+n)^{v_j} \cdot r_j^{n} \bmod n^2$, preserving the additive homomorphism required for tallying.
     \item \textbf{Encapsulation}~\cite{nist_kyber}: Generate a shared secret $K$ and ciphertext $\text{ct}_{\text{ky}}$:
     \begin{equation}
         (K, \text{ct}_{\text{ky}}) = \text{Kyber.Encapsulate}(\text{pk}_{\text{ky}})
     \end{equation}
-    \item \textbf{Key Derivation}: Derive an authentication key $K_{\text{auth}} = \text{SHA256}(K \| \text{salt})$~\cite{nist_fips180_4}.
-    \item \textbf{MAC Authentication}~\cite{rfc2104,nist_fips198}: Compute HMAC-SHA256 over the Paillier ciphertext:
+    \item \textbf{Salt and Key Derivation}: Sample a fresh 32-byte salt $\sigma_{\text{salt}} \xleftarrow{\$} \{0,1\}^{256}$ per cast (domain-separation against replay and per-vote key isolation), and derive the authentication key $K_{\text{auth}} = \text{SHA256}(K \| \sigma_{\text{salt}})$~\cite{nist_fips180_4}.
+    \item \textbf{MAC Authentication}~\cite{rfc2104,nist_fips198}: Compute one HMAC-SHA256 over the concatenated per-candidate ciphertext vector so that a single tag protects the whole ballot's integrity:
     \begin{equation}
-        \text{MAC} = \text{HMAC-SHA256}(K_{\text{auth}}, E(v))
+        \text{MAC} = \text{HMAC-SHA256}\bigl(K_{\text{auth}},\, E_1 \,\|\, E_2 \,\|\, \cdots \,\|\, E_m\bigr)
     \end{equation}
-    \item \textbf{Transmission}: Send $(\text{ct}_{\text{ky}}, E(v), \text{salt}, \text{MAC})$.
+    \item \textbf{Transmission}: Send $(\text{ct}_{\text{ky}}, \{E_j\}_{j=1}^{m}, \sigma_{\text{salt}}, \text{MAC})$.
 \end{enumerate}
 
-This hybrid construction ensures dual-layer protection: the Paillier ciphertext $E(v)$ provides semantic security under DCRA and preserves the homomorphic structure required for tallying, while the Kyber-768 layer provides a post-quantum integrity binding via the HMAC. An adversary must compromise \emph{both} layers to tamper with votes undetected; an attacker who later acquires the Kyber secret key (or solves Module-LWE on a future quantum computer) is still confronted with the unmodified Paillier ciphertext, which carries no plaintext information beyond what the adversary already obtains from the public tally. The generic message encryption functions additionally use AES-256-GCM~\cite{nist_gcm} for authenticated symmetric encryption of non-homomorphic payloads such as audit metadata.
+This hybrid construction provides dual-layer protection \emph{under the pre-quantum threat model}: the Paillier ciphertexts $\{E_j\}$ provide semantic security under DCRA and preserve the homomorphic structure required for tallying, while the Kyber-768 layer provides a post-quantum integrity binding via the HMAC. An adversary must compromise \emph{both} layers to tamper with a ballot undetected. \emph{In the post-quantum threat model}, however, the situation is more nuanced: an adversary who can break Module-LWE to recover $\text{sk}_{\text{ky}}$ can typically also factor the Paillier modulus $n$ via Shor's algorithm~\cite{shor1997}, simultaneously breaking DCRA. The Kyber-MAC therefore protects vote-integrity \emph{only at rest and in transit during the pre-quantum window}; long-term post-quantum confidentiality of historical ballots requires the migration to a fully post-quantum stack outlined in Section~\ref{subsubsec:pq-scope}. The framework additionally uses AES-256-GCM~\cite{nist_gcm} for authenticated symmetric encryption of non-homomorphic payloads (audit-log entries, session tokens) outside the vote-ciphertext path.
 
 \subsubsection{Scope and Limitations of Post-Quantum Coverage}
 \label{subsubsec:pq-scope}
@@ -445,175 +532,42 @@ The ML-KEM-768 layer described above provides post-quantum integrity for vote ci
 \subsection{Threshold Paillier Decryption}
 \label{subsec:threshold}
 
-To prevent any single entity from decrypting election results, Our framework implements the Damg\aa rd-Jurik-Nielsen (DJN)~\cite{damgard2010} threshold decryption scheme with Shamir's Secret Sharing.
+To prevent any single entity from decrypting election results, our framework implements the Damg\aa rd-Jurik-Nielsen (DJN)~\cite{damgard2010} threshold decryption scheme on top of Shamir's Secret Sharing~\cite{shamir1979}. Throughout this subsection we use $T$ for the total number of trustees and $t$ for the cooperation threshold, to avoid the symbol clash with the Paillier modulus~$n$.
 
 \subsubsection{Key Distribution}
 \label{subsubsec:threshold-dist}
 
-The private key $\lambda$ is split into $n$ shares using $(t, n)$-Shamir Secret Sharing~\cite{shamir1979}, where at least $t$ parties must cooperate for decryption. Each party $i$ receives share $\lambda_i$.
+The Paillier private key $\lambda$ is split into $T$ shares using $(t, T)$-Shamir Secret Sharing~\cite{shamir1979}: the dealer chooses a polynomial $f \in \mathbb{Z}[X]$ of degree $t-1$ with $f(0) = \lambda$, and trustee $i \in \{1, \ldots, T\}$ receives share $\lambda_i = f(i)$. At least $t$ trustees must cooperate to reconstruct $\lambda$ via Lagrange interpolation at $X = 0$.
 
-\subsubsection{Partial Decryption}
+\subsubsection{Partial Decryption with ZK Correctness Proof}
 \label{subsubsec:threshold-partial}
 
-Each party $i$ computes a partial decryption with a ZK proof of correctness:
+For each candidate's homomorphically-aggregated ciphertext $c \in \mathbb{Z}_{n^2}^*$, trustee $i$ computes a partial decryption together with a non-interactive zero-knowledge proof of correctness:
 \begin{equation}
     d_i = c^{\lambda_i} \bmod n^2
     \label{eq:partial-dec}
 \end{equation}
+The accompanying proof is a Chaum--Pedersen equality-of-discrete-logarithms~\cite{cramer1994or,schnorr1991} demonstrating that the same exponent $\lambda_i$ produced both the public commitment $g^{\lambda_i}$ (registered at key-distribution time) and the partial decryption $d_i = c^{\lambda_i}$. Concretely, trustee~$i$ chooses random $u \in \mathbb{Z}_q$, computes commitments $a_1 = g^u$ and $a_2 = c^u \bmod n^2$, derives the Strong Fiat--Shamir challenge $e = H(\mathsf{DS}_{\text{thr}} \,\|\, c \,\|\, d_i \,\|\, a_1 \,\|\, a_2)$, and returns the response $s = u + e \cdot \lambda_i$. Verifiers accept iff $g^s \equiv a_1 \cdot (g^{\lambda_i})^e$ and $c^s \equiv a_2 \cdot d_i^{\,e} \pmod{n^2}$.
 
-\subsubsection{Combination}
+\subsubsection{Verification and Combination}
 \label{subsubsec:threshold-combine}
 
-Given $t$ valid partial decryptions, Lagrange interpolation~\cite{shamir1979,damgard2010} reconstructs the plaintext:
+The combiner first \emph{verifies} every received pair $(d_i, \text{proof}_i)$ against the public share commitment $g^{\lambda_i}$ using the Chaum--Pedersen check above and rejects any partial whose proof fails. Given $t$ \emph{valid} partial decryptions indexed by $S \subseteq \{1, \ldots, T\}$, Lagrange interpolation at $X = 0$ reconstructs the plaintext:
 \begin{equation}
-    m = L\left(\prod_{i \in S} d_i^{\delta_i} \bmod n^2\right) \cdot \mu \bmod n
+    x = L\!\left(\prod_{i \in S} d_i^{\delta_i} \bmod n^2\right) \cdot \mu \bmod n
     \label{eq:threshold-combine}
 \end{equation}
-where $\delta_i = \prod_{j \in S, j \neq i} \frac{j}{j - i}$ are the Lagrange coefficients defined for the share evaluation points~\cite{shamir1979} and $S$ is the set of participating parties.
+where the Lagrange coefficients $\delta_i = \prod_{j \in S, j \neq i} \tfrac{j}{j - i}$ correspond to evaluation at $X = 0$ with positive-integer share indices $\{1, \ldots, T\}$~\cite{shamir1979}. Because the $\delta_i$ are rationals while the exponents in Equation~\eqref{eq:threshold-combine} must be integers, the DJN construction~\cite{damgard2010} introduces an integer scaling factor $\Delta = T!$ (omitted above for clarity) that clears the denominators in the Lagrange formula; the integer-form $2\Delta^2 \delta_i$ is used in the actual exponentiation. The plaintext $x$ is the decrypted per-candidate tally.
 
-\section{Vote Casting Pipeline}
-\label{sec:pipeline}
-
-Figure~\ref{fig:pipeline} illustrates the four-phase pipeline, and Algorithm~\ref{alg:pipeline} presents the formal pseudocode.
-
-\begin{figure}[H]
-\centering
-\resizebox{\textwidth}{!}{\input{Images/pipeline.tex}}
-\caption[Seventeen-Step Vote Casting Pipeline]{The proposed 17-step vote-casting pipeline, organised into four phases. Hatched boxes denote novel contributions of this thesis (duress detection, coercion short-circuit). The diamond marks the duress decision branch leading to either persistent submission or silent discard with a plausible receipt.}
-\label{fig:pipeline}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\resizebox{\textwidth}{!}{\input{Images/workflow.tex}}
-\caption[Voter Registration and Casting Activity]{Voter activity diagram covering the registration phase (left swimlane) and the vote-casting phase (right swimlane). Decision diamonds carry both the genuine and the coerced execution paths; reject paths terminate at the bullseye end nodes.}
-\label{fig:workflow}
-\end{figure}
-
-\begin{figure}[H]
-\centering
-\resizebox{\textwidth}{!}{\input{Images/sequence.tex}}
-\caption[Vote Casting Sequence Diagram]{Sequence diagram of one full vote-cast interaction. Solid arrows are synchronous request messages; dashed arrows are responses; self-arrows are internal computations. The \textbf{alt} block indicates the coercion short-circuit: when the duress signal does not match, steps 14--16 are skipped and the receipt returned to the voter is identical to a genuine cast.}
-\label{fig:sequence}
-\end{figure}
-
-\begin{algorithm}[H]
-\caption{Proposed 17-Step Vote Casting Pipeline (mirrors \texttt{internal/voting/cast.go})}
-\label{alg:pipeline}
-\begin{algorithmic}[1]
-\Require Voter ID $\text{vid}$; candidate selection $j$; SMDC slot index $s_{\text{idx}}$ supplied by client; presented duress signal $(\tau, v_{\sigma})$ or $\bot$; voter record (ring keypair, SMDC credential, fingerprint); election parameters
-\Ensure Encrypted, ring-signed, share-split vote record persisted on Hyperledger Fabric, or a plausible receipt under coercion
-
-\Statex \textit{// Phase 1: Authentication}
-\State Verify election is active and within voting window
-\State Look up voter record $V$ by $\text{vid}$
-\State Fast-path check: voter has not already cast a vote (RLock on \texttt{castVotes})
-\State Validate that candidate $j$ is in the election's candidate list
-\State Validate $0 \le s_{\text{idx}} < k$; let $\text{slot} \gets V.\text{SMDCCredential.Slots}[s_{\text{idx}}]$
-
-\Statex \textit{// Phase 2: Encryption \& Proofs}
-\State Encrypt vote: $E(v) \gets \text{Paillier.Encrypt}(j)$ \Comment{single ciphertext, not 1-hot}
-\State Compute $\text{behaviorWeight} \gets \textsc{DuressCheck}(\text{vid}, \tau, v_{\sigma}, V.h_{\text{stored}})$ \Comment{Algorithm~\ref{alg:duress}}
-\State $\text{finalWeight} \gets \text{slot.Weight} \times \text{behaviorWeight}$;\ \ $E_w \gets E(v)^{\text{finalWeight}}$ \Comment{Paillier scalar multiplication}
-\State \textit{(SMDC commitments and binary/sum ZK proofs were generated and verified at credential-issue time per \S\ref{subsec:smdc} and are bound to the published credential.)}
-
-\Statex \textit{// Phase 3: Anonymisation}
-\State Select random ring $\mathcal{R}$ of size $|\mathcal{R}| = 100$ from registered voter public keys
-\State Compute $\sigma \gets \text{RingSign}(E_w.\text{Bytes}(), V.\text{sk}, \mathcal{R}, \text{signerIdx})$
-\State Extract key image $I \gets H(V.\text{pk})^{V.\text{sk}}$ from $\sigma$
-\State Fast-path check: $I \notin \text{usedKeyImages}$ (in-memory cache, RLock)
-
-\Statex \textit{// Phase 4: Privacy, Submission \& Branch}
-\State $(S_A, S_B) \gets \text{SplitVote}(\text{vid}, E_w)$ \Comment{$S_A = E(v + m)$, $S_B = E(-m)$}
-\State Retrieve Merkle eligibility proof $\pi^{\text{Merkle}}$ for $\text{vid}$
-\If{$\text{behaviorWeight} = 0$} \Comment{Coercion short-circuit (novel; \texttt{cast.go:292})}
-    \State Emit audit event $\textsc{LogDuressSignalMismatch}(\text{vid}, \text{eid})$
-    \State \textbf{return} plausible receipt; \emph{do not} persist key image \Comment{voter can re-vote later}
-\EndIf
-\State $\text{KeyImageStore}.\text{MarkUsed}(I)$ \Comment{atomic; SQLite UNIQUE constraint enforces single-use}
-\State Submit $\{\text{voteID}, S_A, S_B, \sigma, I, C_{s_{\text{idx}}}, \pi^{\text{Merkle}}\}$ to Hyperledger Fabric chaincode \texttt{CastVote}
-\State \textbf{return} receipt $\{\text{vid}, \text{receiptID}, \text{txID}, I\}$
-\end{algorithmic}
-\end{algorithm}
-
-\section{Blockchain Integration}
-\label{sec:blockchain-integration}
-
-The framework uses Hyperledger Fabric v2.5~\cite{androulaki2018} as its blockchain infrastructure. The deployment consists of:
-
-\begin{itemize}
-    \item \textbf{1 Raft Orderer Node}: Provides transaction ordering with crash fault tolerance.
-    \item \textbf{2 Peer Nodes}: Maintain the distributed ledger and execute chaincode.
-    \item \textbf{1 Certificate Authority}: Issues MSP identities for network participants.
-\end{itemize}
-
-The chaincode (smart contract), written in Go, implements the following functions:
-
-\begin{itemize}
-    \item \texttt{CreateElection}: Initializes an election with metadata and candidate list.
-    \item \texttt{CastVote}: Records an encrypted vote with ZK proofs and ring signature.
-    \item \texttt{GetElection}: Queries election state from the world state database.
-    \item \texttt{TallyVotes}: Performs homomorphic aggregation of encrypted votes.
-\end{itemize}
-
-Application-level communication uses the Fabric Gateway SDK (v1.10.1) with gRPC/TLS connections, providing authenticated, encrypted communication between the voting application and peer nodes.
-
-\section{Engineering and Societal Considerations}
-\label{sec:engineering}
-
-\subsection{Societal Impact}
-The proposed framework addresses voter coercion, a problem particularly prevalent in developing nations where family voting, vote buying, and employer pressure undermine democratic processes. The SMDC mechanism provides mathematical guarantees of coercion resistance, potentially improving electoral integrity for billions of voters worldwide.
-
-\subsection{Sustainability}
-Unlike proof-of-work blockchain systems, Hyperledger Fabric~\cite{androulaki2018} uses Raft consensus~\cite{ongaro2014raft}, which requires minimal energy. The environmental footprint of the proposed framework is comparable to a standard web application.
-
-\subsection{Accessibility}
-The system is designed for remote voting, improving accessibility for voters with mobility challenges, those in remote areas, or overseas citizens.
-
-\subsection{Ethical Considerations}
-The deniable credential mechanism raises ethical questions about vote accountability. While coercion resistance protects voters, it also makes it impossible to prove how any individual voted, which is by design a fundamental requirement of democratic elections.
-
-\section{Security Analysis}
-\label{sec:security-analysis}
-
-This section presents the formal security properties of the proposed framework. Each theorem corresponds to a specific security guarantee provided by the cryptographic protocols described in Sections~\ref{sec:crypto-formulation}--\ref{sec:pipeline}.
-
-\subsection{Formal Security Theorems}
-\label{subsec:security-theorems}
-
-\textbf{Theorem 1 (Ballot Privacy).} \textit{Under the Decisional Composite Residuosity Assumption (DCRA), no probabilistic polynomial-time adversary can distinguish $E(v_i)$ from $E(v_j)$ for any two valid vote values $v_i, v_j \in \{0, 1\}$.}
-
-\textit{Proof Sketch.} The semantic security of the Paillier cryptosystem guarantees that $E(0)$ and $E(1)$ are computationally indistinguishable. Given ciphertext $c = g^m \cdot r^n \bmod n^2$ with random $r \xleftarrow{\$} \mathbb{Z}_n^*$, distinguishing $m = 0$ from $m = 1$ requires solving the DCRA problem, which is reducible to factoring $n = p \cdot q$ with $|p| = |q| = 1024$ bits. Our implementation uses 2048-bit modulus, providing $\geq 112$-bit security. \hfill $\square$
-
-\textbf{Theorem 2 (Vote Validity).} \textit{The zero-knowledge $\Sigma$-proofs (binary + sum) ensure that every counted vote satisfies $w_i \in \{0, 1\}$ for each candidate and $\sum_{i=1}^{m} w_i = 1$, with soundness error $\leq 2^{-256}$.}
-
-\textit{Proof Sketch.} The binary proof uses an OR-composition of two Schnorr proofs, achieving special soundness: an extractor can recover the witness from two accepting transcripts with distinct challenges. The Strong Fiat-Shamir transformation with domain separation (including public parameters in the hash per Bernhard-Pereira-Warinschi~\cite{bernhard2012}) ensures non-interactive soundness in the random oracle model. The sum proof is a standard Schnorr proof of knowledge of the discrete log $R = \sum r_i$ satisfying $\Pi/g = h^R$. With SHA-256 producing 256-bit challenges, the soundness error is bounded by $2^{-256}$. \hfill $\square$
-
-\textbf{Theorem 3 (Voter Anonymity).} \textit{Given a valid ring signature $\sigma = (I, c_0, r_0, \ldots, r_{n-1})$ with ring size $|\mathcal{R}| = 100$, the signer is statistically indistinguishable among the $|\mathcal{R}|$ ring members; an adversary's distinguishing advantage over uniform guessing is negligible under the Decisional Diffie-Hellman (DDH) assumption.}
-
-\textit{Proof Sketch.} The Liu-Wei-Wong linkable ring signature scheme~\cite{liu2004} achieves signer ambiguity: for each non-signer $i$, the values $(c_i, r_i)$ are sampled uniformly at random during signing, making them statistically indistinguishable from the signer's values $(c_s, r_s = \alpha - c_s \cdot \text{sk}_s)$ under DDH. The key image $I = H(\text{pk}_s)^{\text{sk}_s}$ enables linkability (double-vote detection) without revealing the signer's identity, as computing $\text{sk}_s$ from $I$ requires solving the discrete log problem. \hfill $\square$
-
-\textbf{Theorem 4 (Coercion Resistance).} \textit{Given SMDC credentials with $k = 5$ slots, a coercer observing a voter's credential usage cannot distinguish whether the presented slot $j$ is real ($w_j = 1$) or fake ($w_j = 0$), under the Computational Hiding property of Pedersen commitments.}
-
-\textit{Proof Sketch.} Each slot $i$ has commitment $C_i = g^{w_i} \cdot h^{r_i} \bmod p$ with independent randomness $r_i$. By Pedersen's computational hiding property (under DLog), distinguishing $C_i = g^0 \cdot h^{r_i}$ from $C_i = g^1 \cdot h^{r_i}$ requires computing $\log_g h$, which is infeasible. The accompanying ZK proofs $\pi_i^{\text{bin}}$ are zero-knowledge (simulator exists), so they leak no information about $w_i$. The real index $\text{idx}_{\text{real}}$ is derived via HMAC-SHA256 and never stored, making it re-derivable only by the legitimate voter who knows $\text{vid}$ and $\text{eid}$. A coerced vote contributes $w = 0$ to the homomorphic tally, silently discarded without any observable difference. \hfill $\square$
-
-\textbf{Theorem 5 (Aggregation Privacy).} \textit{Under the SA\textsuperscript{2} two-server model, no individual vote $v$ can be reconstructed as long as at least one of the two servers remains honest.}
-
-\textit{Proof Sketch.} Server A receives $S_A = E(v + \text{mask})$ and Server B receives $S_B = E(-\text{mask})$, where $\text{mask} \xleftarrow{\$} \mathbb{Z}_{n/100}$. Under Paillier's semantic security, Server A cannot distinguish $S_A$ from a random element of $\mathbb{Z}_{n^2}^*$, and Server B's share $S_B$ is independent of $v$. Reconstruction requires $S_A \cdot S_B = E(v)$, which is possible only when both shares are combined. A corrupted single server gains no information about $v$ beyond what is implied by the final tally. \hfill $\square$
-
-\textbf{Theorem 6 (Post-Quantum Encryption Layer).} \textit{The Kyber768 hybrid encryption provides a post-quantum integrity and confidentiality binding for vote ciphertexts during transit and storage. An adversary must break both the Paillier DCRA assumption and the Module-LWE assumption underlying Kyber768 (NIST Category~3, equivalent to AES-192 against quantum exhaustive search under Grover's algorithm; classical security under best-known cryptanalysis is significantly higher) to tamper with or forge vote records.}
-
-\textit{Proof Sketch.} The hybrid scheme binds a Kyber768 KEM-derived key to each Paillier ciphertext via HMAC-SHA256 authentication. An adversary attempting to tamper with $E(v)$ must forge a valid MAC, which requires knowledge of the Kyber shared secret $K$. Computing $K$ from the KEM ciphertext requires solving Module-LWE, which is believed to be quantum-resistant per NIST's standardization of ML-KEM-768 (FIPS 203, August 2024). Generic message encryption additionally uses AES-256-GCM for authenticated symmetric encryption. Note that the homomorphic tallying operates on Paillier ciphertexts, which remain classically secure under DCRA. Similarly, the linkable ring signatures rely on the discrete logarithm assumption. Full post-quantum migration of these components (via lattice-based alternatives) is identified as future work in Chapter~\ref{ch:conclusion}. \hfill $\square$
-
-\subsection{Duress Detection}
+\subsection{Behavioural Duress Detection}
 \label{subsec:duress-detection}
 
-\emph{The behavioral duress detection mechanism described below is a novel contribution of this thesis.} The construction uses HMAC-SHA256~\cite{rfc2104,nist_fips198,nist_fips180_4} as a building block, but the deterministic per-voter equality check via constant-time HMAC comparison, combined with the silent-substitution semantics that interact with the SMDC fake-slot system, are original to this work and are not, to the best of our knowledge, present in prior e-voting systems. Algorithm~\ref{alg:duress} presents the detection procedure.
+\emph{The behavioural duress detection mechanism described below is a novel contribution of this thesis.} The construction uses HMAC-SHA256~\cite{rfc2104,nist_fips198,nist_fips202} as a building block, but the deterministic per-voter equality check via constant-time HMAC comparison, combined with the silent-substitution semantics that interact with the SMDC fake-slot system, are original to this work and are not, to the best of our knowledge, present in prior e-voting systems. The mechanism produces a $\{0, 1\}$ scalar (\texttt{behaviorWeight}) that multiplies the SMDC slot weight at Step~9 of Algorithm~\ref{alg:pipeline}, so that a vote known to be cast under duress contributes the Paillier encryption of zero to the final tally while remaining cryptographically and operationally indistinguishable from a genuine cast.
 
-At registration time the voter selects a secret behavioral pattern of one of five accepted types (blink count, head tilt, long press, time delay, or voice command) together with a value drawn from a per-type allowlist. The server stores only the HMAC-SHA256 of $\text{type}\,\Vert\,\text{``:''}\,\Vert\,\text{value}$ keyed by a server-side secret $K_{d}$; the raw value is never persisted. At vote-cast time, the client may supply a candidate signal alongside the ballot; the server recomputes the HMAC and compares it to the stored hash in constant time.
+At registration time the voter selects a secret behavioural pattern of one of five accepted types (blink count, head tilt, long press, time delay, or voice command) together with a value drawn from a per-type allowlist. The server stores only the HMAC-SHA256 of $\text{type}\,\Vert\,\text{``:''}\,\Vert\,\text{value}$ keyed by a server-side secret $K_d$; the raw value is never persisted. At vote-cast time, the client may supply a candidate signal alongside the ballot; the server recomputes the HMAC and compares it to the stored hash in constant time. Algorithm~\ref{alg:duress} formalises the procedure.
 
 \begin{algorithm}[H]
-\caption{Behavioral Duress Detection (mirrors \texttt{internal/biometric/duress.go})}
+\caption{Behavioural Duress Detection (mirrors \texttt{internal/biometric/duress.go})}
 \label{alg:duress}
 \begin{algorithmic}[1]
 \Require Voter ID $\text{vid}$; presented $(\text{signalType}, \text{signalValue})$; server HMAC key $K_d$; per-voter stored hash $h_{\text{stored}}$ or $\bot$ if none registered
@@ -633,9 +587,448 @@ At registration time the voter selects a secret behavioral pattern of one of fiv
 \end{algorithmic}
 \end{algorithm}
 
-The output $\text{behaviorWeight}$ is multiplied with the SMDC slot weight in the vote-casting pipeline (Step~7 of Algorithm~\ref{alg:pipeline}). When the result is zero, the encrypted vote becomes $E(v)^{0} = E(0)$ via Paillier scalar multiplication, which contributes nothing to the final tally. The pipeline continues to execute the full ring signature and SA\textsuperscript{2} share-split steps before silently discarding the key-image registration (Step~16, coercion short-circuit), so that timing and the receipt returned to the voter are indistinguishable from a genuine cast. The constant-time comparison prevents an HMAC-oracle timing side channel, and storing only the hash means a database compromise cannot recover any voter's secret signal value.
+The output $\text{behaviorWeight}$ is multiplied with the SMDC slot weight in the vote-casting pipeline (Step~9 of Algorithm~\ref{alg:pipeline}, where $\text{finalWeight} = \text{slot.Weight} \times \text{behaviorWeight}$). When the result is zero, each per-candidate encrypted vote becomes $E_j^{0} = E(0)$ via Paillier scalar multiplication, which contributes nothing to the final tally. The pipeline continues to execute the full ring signature and SA\textsuperscript{2} share-split steps before silently discarding the key-image registration via the coercion short-circuit at Steps~17a--17b of Algorithm~\ref{alg:pipeline}, so that timing and the receipt returned to the voter are indistinguishable from a genuine cast. The formal security properties of this construction (timing indistinguishability and database-compromise resistance) are analysed in Section~\ref{subsec:duress-security}.
+
+\section{Vote Casting Pipeline}
+\label{sec:pipeline}
+
+Figure~\ref{fig:pipeline} illustrates the four-phase pipeline, and Algorithm~\ref{alg:pipeline} presents the formal pseudocode.
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{\input{Images/pipeline.tex}}
+\caption[Twenty-Step Vote Casting Pipeline]{The proposed 20-step vote-casting pipeline, organised into four phases (Authentication, Encryption~\& Proofs, Anonymisation, Privacy~\& Submission). Each pastel-coloured wrapper bounds one phase. The decision diamond at Step~16 routes the flow either to the genuine submission branch (Steps~17b--19) or to the silent-discard branch (Step~17a) that returns a plausible receipt to the voter under coercion.}
+\label{fig:pipeline}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{\input{Images/workflow.tex}}
+\caption[Voter Registration and Casting Activity]{Voter activity diagram covering the registration phase (left swimlane) and the vote-casting phase (right swimlane). Decision diamonds carry both the genuine and the coerced execution paths; reject paths terminate at the bullseye end nodes.}
+\label{fig:workflow}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\resizebox{\textwidth}{!}{\input{Images/sequence.tex}}
+\caption[Vote Casting Sequence Diagram]{Sequence diagram of one full vote-cast interaction. Solid arrows are synchronous request messages; dashed arrows are responses; self-arrows are internal computations. The \textbf{alt} block indicates the coercion short-circuit: when the duress signal does not match, steps 14--16 are skipped and the receipt returned to the voter is identical to a genuine cast.}
+\label{fig:sequence}
+\end{figure}
+
+\begin{algorithm}[H]
+\caption{Proposed 20-Step Vote Casting Pipeline (mirrors \texttt{internal/voting/cast.go})}
+\label{alg:pipeline}
+\begin{algorithmic}[1]
+\Require Voter ID $\text{vid}$; candidate selection $j$; SMDC slot index $s_{\text{idx}}$ supplied by client; presented duress signal $(\tau, v_{\sigma})$ or $\bot$; voter record (ring keypair, SMDC credential, fingerprint); election parameters
+\Ensure Encrypted, ring-signed, share-split vote record persisted on Hyperledger Fabric, or a plausible receipt under coercion
+
+\Statex \textit{// Phase 1: Authentication}
+\State Verify election is active and within voting window
+\State Look up voter record $V$ by $\text{vid}$
+\State Fast-path check: voter has not already cast a vote (RLock on \texttt{castVotes})
+\State Validate that candidate $j$ is in the election's candidate list
+\State Validate $0 \le s_{\text{idx}} < k$; let $\text{slot} \gets V.\text{SMDCCredential.Slots}[s_{\text{idx}}]$
+
+\Statex \textit{// Phase 2: Encryption \& Proofs}
+\State Encode 1-hot: $v_j \gets [j = \text{chosen}]$ for $j \in [m]$; encrypt $E_j \gets \text{Paillier.Enc}(\text{pk}_p, v_j)$ \Comment{per-candidate ciphertexts}
+\State Generate per-candidate binary proofs $\pi^{\text{bin}}_j$ and the sum proof $\pi^{\text{sum}}$ directly on $(E_1, \ldots, E_m)$ \Comment{\S\ref{subsec:zkp}; CDS OR-proofs in the ROM}
+\State Compute $\text{behaviorWeight} \gets \textsc{DuressCheck}(\text{vid}, \tau, v_{\sigma}, V.h_{\text{stored}})$ \Comment{Algorithm~\ref{alg:duress}}
+\State $\text{finalWeight} \gets \text{slot.Weight} \times \text{behaviorWeight}$;\ \ $\forall j:\, E_{w,j} \gets E_j^{\text{finalWeight}}$ \Comment{Paillier scalar multiplication per candidate}
+\Statex \textit{(The SMDC slot commitments and their binary/sum proofs were generated and verified at credential-issue time per \S\ref{subsec:smdc} and are re-verified defence-in-depth at cast time per \texttt{cast.go:208}; they are distinct from the per-candidate Paillier proofs generated in the previous step.)}
+
+\Statex \textit{// Phase 3: Anonymisation}
+\State Select random ring $\mathcal{R}$ of size $|\mathcal{R}| = 100$ from registered voter public keys
+\State Compute $\sigma \gets \text{RingSign}(H(E_{w,1} \| \cdots \| E_{w,m}), V.\text{sk}, \mathcal{R}, \text{signerIdx})$ \Comment{sign hash of ciphertext vector}
+\State Extract key image $I \gets H(V.\text{pk})^{V.\text{sk}}$ from $\sigma$
+\State Fast-path check: $I \notin \text{usedKeyImages}$ (in-memory cache, RLock)
+
+\Statex \textit{// Phase 4: Privacy, Submission \& Branch}
+\State $\forall j:\, (S_{A,j}, S_{B,j}) \gets \text{SplitVote}(\text{vid}, E_{w,j})$ \Comment{per-candidate SA\textsuperscript{2} split; $S_{A,j} = E(v_j + m_j)$, $S_{B,j} = E(-m_j)$}
+\State Retrieve Merkle eligibility proof $\pi^{\text{Merkle}}$ for $\text{vid}$
+\If{$\text{behaviorWeight} = 0$} \Comment{Coercion short-circuit (novel; \texttt{cast.go:348})}
+    \State Emit audit event $\textsc{LogDuressSignalMismatch}(\text{vid}, \text{eid})$
+    \State \textbf{return} plausible receipt; \emph{do not} persist key image \Comment{voter can re-vote later}
+\EndIf
+\State $\text{KeyImageStore}.\text{MarkUsed}(I)$ \Comment{atomic; SQLite UNIQUE constraint enforces single-use}
+\State Submit $\{\text{voteID}, \{S_{A,j}, S_{B,j}\}_{j=1}^m, \{\pi^{\text{bin}}_j\}_{j=1}^m, \pi^{\text{sum}}, \sigma, I, C_{s_{\text{idx}}}, \pi^{\text{Merkle}}\}$ to Hyperledger Fabric chaincode \texttt{CastVote}
+\State \textbf{return} receipt $\{\text{vid}, \text{receiptID}, \text{txID}, I\}$
+\end{algorithmic}
+\end{algorithm}
+
+\section{Blockchain Integration}
+\label{sec:blockchain-integration}
+
+The framework uses Hyperledger Fabric v2.5~\cite{androulaki2018} as its blockchain infrastructure. The deployment evaluated in Chapter~\ref{ch:results} consists of:
+
+\begin{itemize}
+    \item \textbf{1 Raft Orderer Node} (\texttt{orderer.covertvote.com:7050}): Provides transaction ordering using the \texttt{etcdraft} consensus type~\cite{ongaro2014raft}. This single-node configuration is sufficient for the development and benchmarking workload reported in Chapter~\ref{ch:results}; a production deployment scales horizontally to three or more orderer nodes for crash fault tolerance through configuration only, since Fabric's \texttt{etcdraft} implementation is configuration-driven and the application code is unaffected by the orderer count.
+    \item \textbf{2 Peer Nodes} (\texttt{peer0.org1}, \texttt{peer0.org2}): Maintain the distributed ledger and execute chaincode under the standard two-organisation MSP model.
+    \item \textbf{MSP Identity Material}: Generated offline by Hyperledger's \texttt{cryptogen} utility for the static development network. A production deployment would replace \texttt{cryptogen} with a \texttt{fabric-ca-server} to enable dynamic enrollment and certificate revocation; the chaincode and application code are unaffected by this substitution.
+    \item \textbf{State Database}: CouchDB, enabling JSON-rich queries used by \texttt{GetVotesByElection} and other public-verifier query endpoints that traverse votes by election ID.
+\end{itemize}
+
+The chaincode (smart contract), deployed on channel \texttt{covertvotechannel}, is written in Go using the \texttt{contractapi} package. It implements the following transaction and query functions:
+
+\begin{itemize}
+    \item \textbf{Election lifecycle}: \texttt{CreateElection} initialises an election with metadata and candidate list; \texttt{GetElection} retrieves election state; \texttt{ElectionExists} performs an existence check.
+    \item \textbf{Vote casting}: \texttt{CastVote} records one per-voter ballot bundle, containing the per-candidate SA\textsuperscript{2} share pairs $\{S_{A,j}, S_{B,j}\}$, per-candidate binary proofs $\{\pi^{\text{bin}}_j\}$, sum proof $\pi^{\text{sum}}$, linkable ring signature $\sigma$, key image $I$, SMDC slot commitment $C_{s_{\text{idx}}}$, and Merkle eligibility proof $\pi^{\text{Merkle}}$; single-use is enforced by application-side \texttt{KeyImageStore.MarkUsed} (SQLite UNIQUE constraint, Algorithm~\ref{alg:pipeline} Step~17b) followed by chaincode-side ballot persistence.
+    \item \textbf{Public verification queries}: \texttt{GetVote} returns one vote bundle by ID; \texttt{GetVotesByElection} returns all ballots for a given election (used by the off-chain Tally Service); \texttt{GetAllVotes} returns a paginated summary view; \texttt{VoteExists} performs an existence check.
+    \item \textbf{Tally persistence}: \texttt{StoreTallyResult} accepts the final plaintext tally vector computed off-chain by the Tally Service (described below); \texttt{GetTallyResult} retrieves it for public auditing.
+    \item \textbf{Access-control helpers}: \texttt{requireAdmin} enforces an admin-organisation MSP identity on administrative transactions (\texttt{CreateElection}, \texttt{GetAllVotes}, \texttt{GetVotesByElection}, \texttt{StoreTallyResult}); \texttt{requireAuthenticated} enforces a valid MSP context on voter-facing transactions (\texttt{CastVote}, \texttt{GetVote}). These Fabric MSP gates complement the cryptographic eligibility proof $\pi^{\text{Merkle}}$ submitted within each \texttt{CastVote} payload.
+\end{itemize}
+
+The chaincode deliberately does \emph{not} perform homomorphic tally aggregation on chain. Aggregating tens of thousands of Paillier ciphertexts inside a single Fabric transaction would exceed the per-transaction time budget and cause world-state contention; furthermore, the threshold-Paillier decryption of Section~\ref{subsec:threshold} inherently requires off-chain multi-party coordination among trustees, which Fabric's deterministic execution model cannot encode natively. Aggregation is therefore performed off chain by the \textbf{Tally Service} (Figure~\ref{fig:architecture}), which (i)~queries all ballots for the election via \texttt{GetVotesByElection}, (ii)~computes the homomorphic per-candidate product $\prod_v E_{w,j,v}$ that materialises $E(\sum_v w_v \cdot v_{j,v})$, (iii)~runs the DJN threshold partial-decryption protocol across the trustee group, recovers the plaintext tally via Lagrange interpolation, and (iv)~publishes the final result back on chain via \texttt{StoreTallyResult}. Any public verifier can subsequently re-fetch both the on-chain ballots and the stored tally to audit the result.
+
+Application-level communication uses the Fabric Gateway SDK v1.10.1 with gRPC over TLS, providing authenticated, encrypted communication between the API server and peer nodes. TLS root certificates are provisioned alongside the MSP material, and every client invocation carries an MSP signature that is validated against the channel's access-control policies before chaincode execution.
+
+\section{Engineering and Societal Considerations}
+\label{sec:engineering}
+
+\subsection{Societal Impact}
+The proposed framework addresses voter coercion, a problem particularly prevalent in developing nations where family voting, vote buying, and employer pressure undermine democratic processes. The SMDC mechanism provides mathematical guarantees of coercion resistance, potentially improving electoral integrity for billions of voters worldwide.
+
+\subsection{Sustainability}
+Unlike proof-of-work blockchain systems, Hyperledger Fabric~\cite{androulaki2018} uses Raft consensus~\cite{ongaro2014raft}, which orders transactions by leader election and majority commit rather than by computational work. The energy cost per transaction is therefore bounded by the ordinary networked-CPU baseline of a Linux container, not by hash-rate. The sustained throughput attained in our deployment (200~TPS in the Caliper saturation scenario; see Chapter~\ref{ch:results}) was reached on commodity hardware without specialised acceleration, so the per-vote energy budget is in line with that of any standard service-tier web application rather than that of a public proof-of-work chain.
+
+\subsection{Accessibility}
+The system is exposed through a REST API that decouples the client form factor from the cryptographic backend, so that browser, mobile, kiosk, and assistive-device front ends can share a single endpoint without protocol changes. The per-vote payload grows linearly in the candidate count rather than in the voter count, which keeps submission size compact and suits low-bandwidth or intermittent-connectivity settings such as rural polling or overseas voting. The duress-signal taxonomy intentionally includes a \emph{voice command} type alongside the visual and haptic types so that voters with limited vision or fine-motor disability retain access to the coercion-resistance mechanism. Remote operation further removes the physical-mobility barrier of polling-station-based voting and improves participation for voters with mobility challenges.
+
+\subsection{Ethical Considerations}
+The framework's privacy and coercion-resistance mechanisms each carry an ethical trade-off that deserves explicit acknowledgement. \emph{Deniable credentials} (SMDC) provide mathematical protection against vote-buying and coercion, but they also make it impossible to prove how any individual voted---a foundational requirement of secret-ballot democracy that simultaneously precludes legitimate voter self-verification beyond the cryptographic casting receipt. \emph{Behavioral duress detection} silently zeroes a vote's weight when a registered signal is supplied; a voter who supplies the signal in error---or who forgets it under stress---will have their vote silently discarded with no out-of-band indication. This is an intentional safety property (the receipt is identical to the genuine path, so a coercer cannot distinguish the two cases), but it places non-trivial cognitive load on the voter at registration time. The \emph{silent-discard short-circuit} (Algorithm~\ref{alg:pipeline}, Steps~17a--17b) protects against coercion at the cost of voter-side opacity: even a genuine voter cannot definitively confirm that their vote reached the tally without trusting the system end-to-end. Finally, the same deniable infrastructure that protects voters from external coercion could in principle be misused by a malicious election authority to silently void targeted votes; the integrity safeguards (Merkle eligibility proofs, per-vote zero-knowledge proofs, and auditable on-chain submissions) are therefore essential and must be preserved during any deployment.
+
+\subsection{Privacy and Data Protection}
+The framework stores only the minimum data required for vote validity and coercion resistance. At registration time, voter identifiers, ring public keys, the Pedersen-based SMDC commitments $\{C_i\}$ with their binary proofs $\{\pi^{\text{bin}}_i\}$ and sum proof $\pi^{\text{sum}}$, and the SHA-3 hash of the fingerprint are persisted; the raw fingerprint image is discarded immediately after hashing. The duress-signal value is \emph{never} stored in plaintext: only the HMAC-SHA256 hash keyed by the server-side secret $K_d$ is retained (Section~\ref{subsec:duress-detection}), so that a database compromise cannot recover any voter's secret signal value. On chain, only the weighted SA\textsuperscript{2} share pairs $\{S_{A,j}, S_{B,j}\}$, the per-candidate ZK proofs, the ring signature, and the key image are written; no plaintext vote and no identifying voter data ever reach Fabric, in keeping with the architectural principle that the ledger should contain auditable cryptographic evidence rather than personally identifying information. The audit log of duress-signal mismatches records only the (vid, eid) pair and a timestamp; it never records the presented signal value, so even an audit-log compromise cannot reconstruct the coercion scenario faced by a particular voter.
+
+\section{Security Analysis}
+\label{sec:security-analysis}
+
+This section presents the formal security properties of the proposed framework in two complementary tiers. \emph{Tier~1} (this section) provides \textbf{computational, game-based reductions} of each property to a standard cryptographic hardness assumption (DCRA, DDH, Module-LWE, or DLog). \emph{Tier~2}, presented in Section~\ref{sec:proverif} of Chapter~\ref{ch:results}, provides complementary \emph{symbolic-model} verification of three protocol-level properties (privacy, individual verifiability, eligibility) using ProVerif under the Dolev--Yao adversary model~\cite{dolev1983}. The two tiers are deliberately complementary: the computational reductions bind security claims to well-studied hard problems in the standard model, while the symbolic verification rules out network-level protocol attacks (replay, message interleaving, parallel-session interference) that are not naturally expressed in the computational setting.
+
+\subsection{Computational Security: Game-Based Reductions}
+\label{subsec:security-theorems}
+
+The reductions in this subsection follow the now-standard \emph{sequence-of-games} methodology: each theorem is proved by exhibiting hybrid experiments $G_0, G_1, \ldots, G_k$ in which $G_0$ is the real attack experiment, $G_k$ is an experiment whose outcome is information-theoretically (or trivially) determined, and consecutive hybrids differ in a way bounded by the advantage of breaking a stated hardness assumption. Notational conventions and the formal hardness assumptions are summarised in Sections~\ref{subsubsec:proof-notation} and~\ref{subsubsec:hardness-assumptions} respectively.
+
+\subsubsection{Notational Conventions for Proofs}
+\label{subsubsec:proof-notation}
+
+Throughout this subsection we use the following conventions: $\lambda$ is the security parameter (the proposed implementation uses Paillier modulus $|n| = 2048$ bits, giving $\lambda \approx 112$); $\text{negl}(\lambda)$ denotes a function negligible in $\lambda$; PPT abbreviates \emph{probabilistic polynomial-time}; $\mathcal{A}$ denotes an adversary, $\mathcal{C}$ a challenger, and $\mathcal{B}$ a reduction algorithm that runs $\mathcal{A}$ as a subroutine; $\stackrel{\$}{\leftarrow}$ denotes uniform random sampling; $\stackrel{c}{\equiv}$ and $\stackrel{s}{\equiv}$ denote computational and statistical indistinguishability respectively; $\text{Adv}^{X}_{\mathcal{A}}(\lambda) = |\Pr[\mathcal{A} \text{ wins game } X] - \tfrac{1}{2}|$ for indistinguishability games and $\Pr[\mathcal{A} \text{ wins game } X]$ for soundness or unforgeability games. Hash functions are modelled as random oracles when the construction relies on the Fiat--Shamir transform.
+
+\subsubsection{Hardness Assumptions}
+\label{subsubsec:hardness-assumptions}
+
+The reductions reduce ballot security to the following four assumptions, all of which are standard in the cryptographic literature.
+
+\begin{description}
+    \item[DCRA (Decisional Composite Residuosity Assumption)~\cite{paillier1999}.] For an RSA modulus $n = pq$ with $|p| = |q| \geq 1024$ bits, the distribution of $\{(n, c) : c \stackrel{\$}{\leftarrow} \mathbb{Z}_{n^2}^*\}$ is computationally indistinguishable from the distribution of $\{(n, c) : c = (1+n)^{m} r^{n} \bmod n^2,\ m \stackrel{\$}{\leftarrow} \mathbb{Z}_n,\ r \stackrel{\$}{\leftarrow} \mathbb{Z}_n^*\}$. Used in Theorems~1, 5.
+    \item[DDH (Decisional Diffie--Hellman)] in the order-$q$ subgroup of $\mathbb{Z}_p^*$: $\{(g^a, g^b, g^{ab})\} \stackrel{c}{\equiv} \{(g^a, g^b, g^c)\}$ for $a, b, c \stackrel{\$}{\leftarrow} \mathbb{Z}_q$. Used in Theorem~3.
+    \item[DLog (Discrete Logarithm)] in the order-$q$ subgroup of $\mathbb{Z}_p^*$: given $g^x$ for $x \stackrel{\$}{\leftarrow} \mathbb{Z}_q$, no PPT adversary outputs $x$ with non-negligible probability. Used in Theorem~\ref{subsubsec:t3-voter-anonymity} (key-image pseudorandomness for ring anonymity) and in the Pedersen-binding analysis of the SMDC slot commitments (Section~\ref{subsec:smdc}). \emph{Note:} Theorem~\ref{subsubsec:t2-vote-validity} (vote validity) does \emph{not} reduce to DLog in the A2 (Paillier-direct) ZK design adopted here; its soundness is unconditional in the ROM.
+    \item[Module-LWE (M-LWE)~\cite{nist_kyber}.] For module rank $k$, modulus $q$, dimension $n$, and error distribution $\chi$ over $R_q = \mathbb{Z}_q[x]/(x^n + 1)$, the distribution $\{(A, As + e) : A \stackrel{\$}{\leftarrow} R_q^{k \times k},\ s \stackrel{\$}{\leftarrow} R_q^k,\ e \stackrel{\$}{\leftarrow} \chi^k\}$ is computationally indistinguishable from $\{(A, u) : u \stackrel{\$}{\leftarrow} R_q^k\}$. For Kyber-768: $n = 256$, $q = 3329$, $k = 3$. Used in Theorem~6.
+\end{description}
+
+In addition, the reductions invoke the non-cryptographic trust assumptions enumerated in Section~\ref{sec:framework}. Of these, four are explicitly cited below: \textbf{Assumption~1} (the Hyperledger Fabric bulletin board provides append-only integrity), used as a backbone in Theorems~2 and~3; \textbf{Assumption~2} (at least one of the two SA\textsuperscript{2} aggregation servers is honest), used in Theorem~5; \textbf{Assumption~5} (credentials are issued out-of-band before the election), used to delimit Theorem~4's threat scope; and \textbf{Assumption~6} (the server HMAC keys $k_{\mathrm{srv}}, K_d$ remain confidential), used in Theorem~4.
+
+\subsubsection{Theorem 1: Ballot Indistinguishability (DCRA)}
+\label{subsubsec:t1-ballot-privacy}
+
+\paragraph{Informal claim.} The complete ballot $\mathsf{Ballot} = (E_1, \ldots, E_m, \pi^{\text{bin}}_1, \ldots, \pi^{\text{bin}}_m, \pi^{\text{sum}}, \sigma, S_A, S_B, \text{ct}_{\text{ky}}, \text{salt}, \text{MAC})$ jointly hides the vote vector $\mathbf{v}$. Distinguishing the ballots cast for any two valid choices is computationally infeasible under DCRA, with negligible additional loss to the zero-knowledge, ring-anonymity, and post-quantum integrity assumptions used by the auxiliary components. This is the central security claim of the framework.
+
+\paragraph{Ballot composition recap.} A ballot for vote $\mathbf{v} = (v_1, \ldots, v_m) \in \{0,1\}^m$ with $\sum_j v_j = 1$ contains: per-candidate Paillier ciphertexts $E_j = \text{Paillier.Enc}(\text{pk}_p, v_j)$; the per-candidate binary $\Sigma$-proofs $\pi^{\text{bin}}_j$ (proving $v_j \in \{0,1\}$ directly on $E_j$, per Section~\ref{subsubsec:binary-proof}); the single sum proof $\pi^{\text{sum}}$ (proving $\sum_j v_j = 1$ on $\prod_j E_j$, per Section~\ref{subsubsec:sum-proof}); a linkable ring signature $\sigma$ over $(E_1, \ldots, E_m)$ in a ring of $|\mathcal{R}| = 100$; the SA\textsuperscript{2} shares $(S_A, S_B)$; and the Kyber-MAC outer wrapper. The Pedersen commitments of the SMDC credential (Section~\ref{subsec:smdc}) are bound separately to the voter's credential and are not part of the per-ballot indistinguishability argument.
+
+\paragraph{IND-Ballot-CPA experiment.} Define $\mathrm{IND\text{-}Ballot\text{-}CPA}_{\mathcal{A}}(\lambda)$ as follows. The challenger $\mathcal{C}$ runs full system setup (Paillier 2048-bit, Pedersen, ring keys $\{(\text{pk}_i, \text{sk}_i)\}_{i=1}^{|\mathcal{R}|}$, SMDC credentials, Kyber-768 keys) and gives $\mathcal{A}$ all public parameters and bulletin-board access. In a pre-challenge phase, $\mathcal{A}$ issues any number of $\mathsf{Cast}(\text{vid}, \mathbf{v})$ queries to an honest-cast oracle, corrupts up to $|\mathcal{R}| - 1 = 99$ ring members (excluding the eventual target voter $\text{id}^*$), and queries a $\mathsf{Reveal}$ oracle for the randomness of any past honest ballot. $\mathcal{A}$ outputs two valid vote vectors $\mathbf{v}_0, \mathbf{v}_1$ and the target voter identity $\text{id}^*$ whose ring secret is uncorrupted. $\mathcal{C}$ samples $b \stackrel{\$}{\leftarrow} \{0,1\}$ and returns the complete challenge ballot $\mathsf{Ballot}^*$ for $\mathbf{v}_b$ signed by $\text{id}^*$. After post-challenge oracle queries (that do not target $\text{id}^*$), $\mathcal{A}$ outputs $b'$ and wins if $b' = b$. Define $\mathrm{Adv}^{\mathrm{IND\text{-}Ballot\text{-}CPA}}_{\mathcal{A}}(\lambda) = |\Pr[b' = b] - 1/2|$.
+
+\textbf{Theorem 1 (Ballot Indistinguishability, Computational).} \textit{Let $\Delta = |\{j : v_{0,j} \neq v_{1,j}\}|$ be the Hamming distance between the two challenge votes ($\Delta = 2$ for distinct valid single-choice votes). For any PPT adversary $\mathcal{A}$,}
+\begin{equation}
+\begin{aligned}
+    \mathrm{Adv}^{\mathrm{IND\text{-}Ballot\text{-}CPA}}_{\mathcal{A}}(\lambda) \;\leq\; & \mathrm{Adv}^{\mathrm{ZK}}_{\mathcal{B}_{\text{ZK}}}(\lambda) \;+\; \mathrm{Adv}^{\mathrm{Anon}}_{\mathcal{B}_{\sigma}}(\lambda) \\
+    & +\; \mathrm{Adv}^{\mathrm{INT\text{-}CTXT}}_{\mathcal{B}_{\text{Hyb}}}(\lambda) \;+\; \Delta \cdot \mathrm{Adv}^{\mathrm{DCRA}}_{\mathcal{B}_{\mathrm{DCRA}}}(\lambda) \;+\; \mathrm{negl}(\lambda).
+\end{aligned}
+    \label{eq:t1-bound}
+\end{equation}
+\textit{Each advantage term on the right is negligible under, respectively, the zero-knowledge property of the Strong-Fiat-Shamir $\Sigma$-protocol (Theorem~\ref{subsubsec:t2-vote-validity}), the LWW signer-ambiguity property (Theorem~\ref{subsubsec:t3-voter-anonymity}), the Kyber-HMAC integrity property (Theorem~\ref{subsubsec:t6-pq-hybrid}), and the Decisional Composite Residuosity Assumption (Section~\ref{subsubsec:hardness-assumptions}).}
+
+\textit{Proof.} We proceed via four hybrids $G_0 \to G_3$ that successively replace the auxiliary ballot components with simulator-generated values, then close the remaining Paillier indistinguishability via a per-position hybrid telescoping over the differing positions.
+
+\emph{Game $G_0$.} The real $\mathrm{IND\text{-}Ballot\text{-}CPA}$ experiment. By definition $\Pr[\mathcal{A} \text{ wins } G_0] = 1/2 + \varepsilon$ where $\varepsilon = \mathrm{Adv}^{\mathrm{IND\text{-}Ballot\text{-}CPA}}_{\mathcal{A}}(\lambda)$.
+
+\emph{Game $G_1$ (simulate ZK proofs).} $\mathcal{C}$ replaces $\pi^{\text{bin}}_j$ and $\pi^{\text{sum}}$ in $\mathsf{Ballot}^*$ with simulator-generated values $\widetilde{\pi}^{\text{bin}}_j$, $\widetilde{\pi}^{\text{sum}}$ produced via the Schnorr / CDS simulator without using the witness. Programming the random oracle at the corresponding hash queries makes the simulated proofs pass verification. Under Strong Fiat--Shamir in the random-oracle model~\cite{bernhard2012,cramer1994or}, real and simulated proofs are computationally indistinguishable. Bound:
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_1] - \Pr[\mathcal{A} \text{ wins } G_0]| \leq \mathrm{Adv}^{\mathrm{ZK}}_{\mathcal{B}_{\text{ZK}}}(\lambda).
+\end{equation*}
+After $G_1$, the proofs in $\mathsf{Ballot}^*$ carry no information about the witness $(\mathbf{v}_b, \mathbf{r})$.
+
+\emph{Game $G_2$ (simulate ring signature).} $\mathcal{C}$ replaces $\sigma$ in $\mathsf{Ballot}^*$ with a simulated signature $\widetilde{\sigma}$ produced using the LWW signer-ambiguity simulator (Liu--Wei--Wong 2004 \\S4.2 Theorem~4~\cite{liu2004}): sample $(c_i, r_i)_{i \in \mathcal{R}}$ uniformly except for one randomly-chosen index $i^*$ used to close the ring. The non-signer values $(c_i, r_i)$ are uncondi\-tion\-al\-ly uniform in the real signing procedure as well, so $\widetilde{\sigma}$ is statistically close to $\sigma$ as a signature object; the only $b$-dependent leakage path through $\sigma$ in the real game is via the key image $I = H(\text{pk}_{\text{id}^*})^{\text{sk}_{\text{id}^*}}$, whose pseudorandomness reduces to DDH. Bound:
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_2] - \Pr[\mathcal{A} \text{ wins } G_1]| \leq \mathrm{Adv}^{\mathrm{Anon}}_{\mathcal{B}_{\sigma}}(\lambda) \leq \mathrm{Adv}^{\mathrm{DDH}}_{\mathcal{B}'_{\sigma}}(\lambda).
+\end{equation*}
+After $G_2$, $\widetilde{\sigma}$ in $\mathsf{Ballot}^*$ is independent of $\text{id}^*$.
+
+\emph{Game $G_3$ (replace MAC with random).} $\mathcal{C}$ replaces $\text{MAC}^*$ with $\widetilde{\text{MAC}}^* \stackrel{\$}{\leftarrow} \{0,1\}^{256}$. By Theorem~\ref{subsubsec:t6-pq-hybrid} (Kyber-768 IND-CCA2 + HMAC-SHA256 EUF-CMA + ROM on the key-derivation step):
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_3] - \Pr[\mathcal{A} \text{ wins } G_2]| \leq \mathrm{Adv}^{\mathrm{INT\text{-}CTXT}}_{\mathcal{B}_{\text{Hyb}}}(\lambda).
+\end{equation*}
+After $G_3$, the MAC in $\mathsf{Ballot}^*$ is independent of $b$.
+
+\emph{No per-candidate Pedersen step.} Unlike a parallel Paillier--Pedersen design, the present ballot carries no per-candidate Pedersen commitments to the vote vector $\mathbf{v}$; the binary and sum proofs operate directly on the Paillier ciphertexts $(E_1, \ldots, E_m)$ via the CDS OR-composition of Section~\ref{subsubsec:binary-proof}--\ref{subsubsec:sum-proof}, so no additional commitment hybrid is required. (The Pedersen commitments of the SMDC credential are bound to the voter's credential and analysed separately in Theorem~\ref{subsubsec:t4-coercion-resistance}; they carry slot-weight information rather than per-candidate vote values and are independent of $b$ in this experiment.)
+
+\emph{Per-position hybrid for the Paillier ciphertexts.} In $G_3$ the only $b$-dependent component of $\mathsf{Ballot}^*$ is the vector of Paillier ciphertexts $(E_1^*, \ldots, E_m^*)$ (the SA\textsuperscript{2} shares are derived deterministically and inherit the Paillier hiding analysis, cf. Theorem~\ref{subsubsec:t5-aggregation-privacy}). Let $\mathsf{Diff} = \{j : v_{0,j} \neq v_{1,j}\}$ with $|\mathsf{Diff}| = \Delta$. Define a sub-hybrid sequence $H_0, H_1, \ldots, H_\Delta$:
+\begin{itemize}
+    \item $H_0 = G_3$ with $\mathsf{Ballot}^*$ generated for $\mathbf{v}_0$.
+    \item $H_k$ ($k = 1, \ldots, \Delta$) is identical to $H_{k-1}$ except that the $k$-th differing position (in some fixed ordering of $\mathsf{Diff}$) is replaced with the corresponding ciphertext for $\mathbf{v}_1$.
+    \item $H_\Delta = G_3$ with $\mathsf{Ballot}^*$ generated for $\mathbf{v}_1$.
+\end{itemize}
+Adjacent hybrids $H_{k-1}, H_k$ differ in exactly one Paillier ciphertext at one position. A reduction $\mathcal{B}_{\mathrm{DCRA}}$ that embeds a Paillier IND-CPA challenge ciphertext at that position perfectly simulates either $H_{k-1}$ or $H_k$ depending on the IND-CPA challenger's hidden bit, while generating all other ciphertexts honestly with known randomness (which lets it answer Reveal queries on non-challenge ballots faithfully). Hence
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } H_k] - \Pr[\mathcal{A} \text{ wins } H_{k-1}]| \leq \mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathcal{B}_{\mathrm{DCRA}}, \mathrm{Paillier}}(\lambda).
+\end{equation*}
+Telescoping over the $\Delta$ steps and applying Paillier 1999 Theorem~15 ($\mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathrm{Paillier}} \leq \mathrm{Adv}^{\mathrm{DCRA}} + \mathrm{negl}(\lambda)$) yields the $\Delta \cdot \mathrm{Adv}^{\mathrm{DCRA}}$ term in Equation~\eqref{eq:t1-bound}. For valid single-choice votes $\Delta = 2$, so the DCRA penalty is at most $2 \cdot \mathrm{Adv}^{\mathrm{DCRA}}$.
+
+Combining the bounds for $G_0 \to G_3$ and the per-position telescope completes the proof of Equation~\eqref{eq:t1-bound}. Each term is negligible by the corresponding Theorem (T2, T3, T6) or assumption (DCRA), so $\mathrm{Adv}^{\mathrm{IND\text{-}Ballot\text{-}CPA}}_{\mathcal{A}}(\lambda) = \mathrm{negl}(\lambda)$. \hfill $\square$
+
+\paragraph{Scope and limitations.} Theorem 1 establishes computational indistinguishability of \emph{individual ballots} under the standard model (with random-oracle assumptions on SHA-256 in the Fiat--Shamir, KEM-KDF, and HMAC components). Composability of all protocol layers in the multi-protocol stack under simultaneous execution, i.e., security in the Universal Composability framework~\cite{canetti2001uc}, is identified as future work in Chapter~\ref{ch:conclusion}. Section~\ref{subsubsec:uc-composition} below outlines the ideal-functionality structure that a future UC proof would target, and reports informally on the composition argument.
+
+\subsubsection{Theorem 2: Vote Validity (Soundness of CDS OR-proofs in the ROM)}
+\label{subsubsec:t2-vote-validity}
+
+\paragraph{Informal claim.} The binary proofs $\pi_j^{\text{bin}}$ and the sum proof $\pi^{\text{sum}}$ together ensure that any ballot accepted by the verifier is well-formed: $\forall j\, v_j \in \{0,1\}$ and $\sum_{j=1}^m v_j = 1$. An adversary cannot produce a verifying proof for an ill-formed ballot except with probability negligible in $\lambda$.
+
+\paragraph{Formal relation.} Let $n = pq$ be a Paillier modulus with $|p| = |q| \geq 1024$ bits. The well-formed-ballot relation is
+\begin{equation}
+    R_{\text{ballot}} = \left\{ \left( (E_1, \ldots, E_m);\ (v_1, \ldots, v_m, r_1, \ldots, r_m) \right) \;:\; \forall j\ E_j \equiv (1+n)^{v_j} r_j^{n} \!\!\!\pmod{n^2} \wedge v_j \in \{0,1\} \wedge \textstyle\sum_{j=1}^{m} v_j = 1 \right\}.
+    \label{eq:r-ballot}
+\end{equation}
+
+\paragraph{Soundness experiment.} Define $\mathrm{Snd}^{R_{\text{ballot}}}_{\mathcal{A}}(\lambda)$ as follows. The challenger $\mathcal{C}$ generates Paillier parameters $n$ and initialises a random oracle $H : \{0,1\}^* \to \{0,1\}^{256}$. The adversary $\mathcal{A}$ receives $n$ and adaptive oracle access to $H$, making at most $q_H$ queries. Finally $\mathcal{A}$ outputs a candidate ballot $(E_1, \ldots, E_m, \pi^{\text{bin}}_1, \ldots, \pi^{\text{bin}}_m, \pi^{\text{sum}})$ with each $E_j \in \mathbb{Z}_{n^2}^*$. We say $\mathcal{A}$ \emph{wins} if (i) every $\pi^{\text{bin}}_j$ verifies, (ii) $\pi^{\text{sum}}$ verifies, and (iii) no opening witness in $R_{\text{ballot}}$ exists for $(E_1, \ldots, E_m)$. Define
+\begin{equation*}
+    \mathrm{Adv}^{\mathrm{Snd}}_{\mathcal{A}}(\lambda) = \Pr\left[ \mathcal{A} \text{ wins } \mathrm{Snd}^{R_{\text{ballot}}}_{\mathcal{A}}(\lambda) \right].
+\end{equation*}
+
+\textbf{Theorem 2 (Vote Validity, Knowledge Soundness).} \textit{Let $H$ be modelled as a random oracle, let the challenge space have size $2^{256}$, and let $m$ be the number of candidates. For any PPT adversary $\mathcal{A}$ making at most $q_H$ hash queries,}
+\begin{equation}
+    \mathrm{Adv}^{\mathrm{Snd}}_{\mathcal{A}}(\lambda) \;\leq\; (m+1) \cdot 2^{-256} \;+\; (m+1) \sqrt{q_H \cdot 2^{-256}} \;+\; \mathrm{negl}(\lambda).
+    \label{eq:t2-bound}
+\end{equation}
+\textit{Soundness holds unconditionally up to the ROM-extraction loss; no additional cryptographic hardness assumption is required.}
+
+\textit{Proof.} We proceed by a sequence of hybrid games $G_0 \to G_1 \to G_2$, then exhibit a knowledge extractor that contradicts $\mathcal{A}$'s winning condition.
+
+\emph{Game $G_0$.} The real soundness experiment defined above. By definition,
+\begin{equation*}
+    \Pr[\mathcal{A} \text{ wins } G_0] = \mathrm{Adv}^{\mathrm{Snd}}_{\mathcal{A}}(\lambda) \;=\; \varepsilon.
+\end{equation*}
+
+\emph{Game $G_1$.} Identical to $G_0$ except that $\mathcal{C}$ implements the random oracle $H$ via lazy sampling: maintain a table $T$ initially empty; on a query $x$, if $T(x)$ is undefined, sample $T(x) \stackrel{\$}{\leftarrow} \{0,1\}^{256}$ and return it; otherwise return $T(x)$. This is a standard ROM bookkeeping change~\cite{bellare1993rom} and induces the same distribution as $G_0$, hence $\Pr[\mathcal{A} \text{ wins } G_1] = \varepsilon$.
+
+\emph{Game $G_2$.} Identical to $G_1$ except that $\mathcal{C}$ aborts and declares loss for $\mathcal{A}$ if any of the $m+1$ proofs in $\mathcal{A}$'s output uses a Fiat--Shamir challenge $c$ such that the corresponding hash query was never issued by $\mathcal{A}$ to $H$ (i.e.\ $\mathcal{A}$ ``guessed'' the challenge). For each individual proof, the probability that $\mathcal{A}$ produces a verifying transcript with an unqueried challenge is at most $2^{-256}$ (the fraction of $\{0,1\}^{256}$ that satisfies the verification equations conditioned on the prover's first message). Taking a union bound over the $m+1$ proofs,
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_2] - \Pr[\mathcal{A} \text{ wins } G_1]| \;\leq\; (m+1) \cdot 2^{-256}.
+\end{equation*}
+
+\emph{Knowledge extraction.} In $G_2$ every accepting proof corresponds to an actual hash query made by $\mathcal{A}$. The extractor $\mathcal{E}$ runs $\mathcal{A}$ once to obtain the ballot and proof transcripts, then for each of the $m+1$ proofs proceeds in two steps:
+
+\begin{enumerate}
+    \item \emph{Forking.} For each proof $\pi$ with challenge $c$ and corresponding hash query $\mathsf{q}$, $\mathcal{E}$ rewinds $\mathcal{A}$ to $\mathsf{q}$, supplies a fresh challenge $c' \stackrel{\$}{\leftarrow} \{0,1\}^{256}$, and re-runs $\mathcal{A}$ from that point. By the General Forking Lemma (Bellare--Neven 2006~\cite{bellare2006forking}, generalising the original Forking Lemma of Pointcheval and Stern~\cite{pointcheval2000security}), conditioned on $\mathcal{A}$ winning $G_2$, the rewound run yields a verifying transcript on the same first message but distinct challenge $c' \neq c$, with probability at least $\varepsilon^2 / q_H - 2^{-256}$.
+
+    \item \emph{Witness extraction (unconditional).} For each binary proof $\pi^{\text{bin}}_j$, the CDS OR-composition~\cite{cramer1994or} applied to the Paillier $n$-th-residuosity language~\cite{damgard_jurik2001} admits direct rewinding: from two accepting transcripts with the same first message $(a_0, a_1)$ and distinct challenges $c_j, c'_j$, the extractor solves the linear equation system on the responses to recover $r_j \in \mathbb{Z}_n^*$ satisfying \emph{either} $E_j \equiv r_j^{n} \pmod{n^2}$ (case $v_j = 0$) \emph{or} $E_j \equiv (1+n) r_j^{n} \pmod{n^2}$ (case $v_j = 1$). For the sum proof $\pi^{\text{sum}}$, analogous extraction recovers $R \in \mathbb{Z}_n^*$ with $\prod_j E_j / (1+n) \equiv R^{n} \pmod{n^2}$, which combined with the per-candidate openings forces $\sum_j v_j = 1$.
+
+    Crucially, extraction is unconditional: the algebraic structure of the $n$-th-residue Schnorr branches admits a direct closed-form recovery of the witness, with no appeal to any number-theoretic hardness assumption. Putting the $m$ binary witnesses and the sum witness together yields $(v_1, \ldots, v_m, r_1, \ldots, r_m) \in R_{\text{ballot}}$, contradicting $\mathcal{A}$'s winning condition (iii) that no such witness exists.
+\end{enumerate}
+
+The probability that forking succeeds for \emph{all} $m+1$ proofs is bounded below by $(m+1) \cdot (\varepsilon^2 / q_H - 2^{-256})$ in the optimistic union-bound regime; setting this success probability equal to a target $\delta$ and inverting yields
+\begin{equation*}
+    \varepsilon \;\leq\; (m+1) \sqrt{q_H \cdot 2^{-256}} \;+\; \mathrm{negl}(\lambda),
+\end{equation*}
+absorbing the $(m+1) \cdot 2^{-256}$ guessing term from $G_2$ into the leading bound. Combining all steps yields Equation~\eqref{eq:t2-bound}.
+
+Since each term on the right is negligible in $\lambda$, we conclude $\mathrm{Adv}^{\mathrm{Snd}}_{\mathcal{A}}(\lambda) = \mathrm{negl}(\lambda)$. \hfill $\square$
+
+\paragraph{Remark on the absence of computational hardness.} Unlike the Pedersen-based binary proof---whose soundness reduction requires DLog hardness to argue Pedersen binding---the CDS OR-proof on the Paillier $n$-th-residuosity language admits \emph{unconditional} witness extraction from two accepting transcripts. Theorem~2 therefore holds in the ROM without invoking DCRA, DLog, or any other cryptographic assumption; computational assumptions enter the framework only through ballot \emph{privacy} (Theorem~\ref{subsubsec:t1-ballot-privacy}, via DCRA), not through vote \emph{validity}. This separation is a structural advantage of the A2 (Helios-style) ZK design.
+
+\paragraph{Remark on Strong Fiat--Shamir.} The hash inputs in the construction (Equations~\eqref{eq:bin-fs} and~\eqref{eq:sum-fs}) include the Paillier modulus $n$, the per-proof nonce, the election identifier, the candidate index, and the statement $E_j$ (or the full ciphertext vector for $\pi^{\text{sum}}$), in line with Bernhard, Pereira, and Warinschi~\cite{bernhard2012}. This binding of the statement into the challenge prevents the malleability attack that affected earlier voting schemes: an adversary cannot reuse a proof transcript by changing a ciphertext, because any modification of $E_j$ changes the hash and thereby the required challenge.
+
+\subsubsection{Theorem 3: Voter Anonymity (DDH)}
+\label{subsubsec:t3-voter-anonymity}
+
+\paragraph{Informal claim.} Given a valid Liu--Wei--Wong linkable ring signature $\sigma = (I, c_0, r_0, \ldots, r_{n-1})$ with ring size $|\mathcal{R}| = 100$, no PPT adversary can determine which ring member produced $\sigma$ with non-negligible advantage over uniform guessing, under DDH in the random-oracle model. Linkability is preserved: two signatures by the same member yield identical key images, enabling double-vote detection without revealing the signer's identity.
+
+\paragraph{Anonymity experiment.} Define $\mathrm{Anon}^{\mathrm{LWW}}_{\mathcal{A}}(\lambda)$ as follows. The challenger $\mathcal{C}$ generates a ring $\mathcal{R} = \{(x_i, g^{x_i})\}_{i=0}^{n-1}$ honestly with $x_i \stackrel{\$}{\leftarrow} \mathbb{Z}_q$ and gives $\mathcal{A}$ only the public ring $\{g^{x_i}\}_i$. $\mathcal{A}$ may issue $\mathsf{Sign}(j, M)$ queries to a signing oracle. $\mathcal{A}$ then outputs two indices $i_0, i_1$ and a fresh message $M^*$ never previously queried for either index, the challenger samples $b \stackrel{\$}{\leftarrow} \{0,1\}$ and returns $\sigma^* \leftarrow \mathsf{Sign}(i_b, M^*)$. After further oracle queries (forbidding only $(i_0, M^*)$ and $(i_1, M^*)$), $\mathcal{A}$ outputs $b'$ and wins if $b' = b$. Define $\mathrm{Adv}^{\mathrm{Anon}}_{\mathcal{A}}(\lambda) = |\Pr[b' = b] - 1/2|$.
+
+\textbf{Theorem 3 (Voter Anonymity).} \textit{In the random-oracle model on $H$, for any PPT adversary $\mathcal{A}$ making at most $q_S$ signing-oracle queries,}
+\begin{equation}
+    \mathrm{Adv}^{\mathrm{Anon}}_{\mathcal{A}}(\lambda) \;\leq\; \mathrm{Adv}^{\mathrm{DDH}}_{\mathcal{B}}(\lambda) \;+\; q_S \cdot 2^{-(\lambda - O(\log q_S))}.
+    \label{eq:t3-bound}
+\end{equation}
+
+\textit{Proof.} We decompose the adversary's view of the challenge signature $\sigma^* = (I^*, c_0^*, r_0^*, \ldots, r_{n-1}^*)$ into two parts and bound each.
+
+\emph{Part (a): Statistical anonymity of $(c_i^*, r_i^*)$.} For each non-signer $i \neq s$ in the signing procedure, $r_i$ is sampled uniformly from $\mathbb{Z}_q$ (chapter3.tex line~\ref{subsubsec:ring-sign}). For the actual signer $s$, $r_s = \alpha - c_s \cdot \text{sk}_s \bmod q$ where $\alpha$ is uniform on $\mathbb{Z}_q$; hence $r_s$ is also uniform on $\mathbb{Z}_q$, regardless of $\text{sk}_s$. The $c_i$ values are random-oracle outputs and therefore uniform on the challenge space. So the joint distribution of $(c_0^*, r_0^*, \ldots, r_{n-1}^*)$ is independent of the signer index $b$, contributing zero statistical advantage. (This matches Liu--Wei--Wong 2004 \\S4.2 Lemma~4~\cite{liu2004}.)
+
+\emph{Part (b): The key image $I^*$ requires DDH.} The remaining $b$-dependent component of $\sigma^*$ is the key image $I^* = H(\text{pk}_{i_b})^{\text{sk}_{i_b}}$. In the random-oracle model, $H(\text{pk}_i)$ is a fresh uniformly-random group element $h_i \in \mathbb{G}_q$. The triple $(\text{pk}_i, h_i, I^*)$ is a Diffie--Hellman triple if and only if $i = i_b$ (the actual signer). We construct a DDH adversary $\mathcal{B}$:
+\begin{enumerate}
+    \item $\mathcal{B}$ receives a DDH challenge $(g^a, g^b, T)$ where $T = g^{ab}$ (case $b_{\text{DDH}} = 1$) or $T \stackrel{\$}{\leftarrow} \mathbb{G}_q$ (case $b_{\text{DDH}} = 0$).
+    \item $\mathcal{B}$ sets the ring so that $\text{pk}_{i_0} = g^a$ (treating $\text{sk}_{i_0} = a$ as unknown). The other public keys are generated honestly.
+    \item $\mathcal{B}$ programs the random oracle so that $H(\text{pk}_{i_0}) = g^b$ at the first query.
+    \item For the challenge query, $\mathcal{B}$ sets $I^* = T$ and generates the remaining signature components $(c_0^*, r_0^*, \ldots, r_{n-1}^*)$ via the LWW simulator (sampling each $r_i$ uniformly, deriving $c_i$ from the random oracle, and closing the ring). Because Part~(a) shows these values are statistically uniform regardless of signer, the simulation is exact.
+    \item For Sign-oracle queries on $\mathsf{Sign}(j, M)$ with $j \neq i_0$, $\mathcal{B}$ has $\text{sk}_j$ and signs honestly. For $\mathsf{Sign}(i_0, M)$ queries (other than the challenge), $\mathcal{B}$ programs $H$ to produce a value $g^{r'}$ for a fresh $r'$ it knows, setting $I = (g^a)^{r'} = g^{a r'}$, which is consistent. (Standard ROM programming; collision probability with $g^b$ is $\leq q_S / |\mathbb{G}_q|$, giving the $q_S \cdot 2^{-(\lambda - O(\log q_S))}$ slack in Equation~\eqref{eq:t3-bound}.)
+    \item $\mathcal{B}$ outputs $b'_{\text{DDH}} = 1$ if $\mathcal{A}$'s guess is $b = 0$ (corresponding to signer $i_0$), else $b'_{\text{DDH}} = 0$.
+\end{enumerate}
+When $T = g^{ab}$, the key image $I^* = H(\text{pk}_{i_0})^{\text{sk}_{i_0}}$ matches a real signature by $i_0$, so $\mathcal{A}$'s view is exactly that of $b = 0$. When $T$ is random, the key image is uniformly random and statistically indistinguishable from the key image of a random ring member; $\mathcal{A}$'s view collapses to one with no signer-dependent information. Hence $\mathrm{Adv}^{\mathrm{DDH}}_{\mathcal{B}}(\lambda) = \mathrm{Adv}^{\mathrm{Anon}}_{\mathcal{A}}(\lambda)$, modulo the ROM programming slack. \hfill $\square$
+
+\paragraph{Linkability is preserved.} Linkability is a deterministic property of the construction: the key image $I = H(\text{pk}_s)^{\text{sk}_s}$ depends only on the signer's identity, so two signatures by the same member produce identical key images, allowing the bulletin board to detect duplicate casts. Theorem~3 establishes that knowing $I$ does not reveal $s$; hence linkability and anonymity coexist without conflict.
+
+\paragraph{Note on the original ``statistically indistinguishable'' claim.} The thesis's earlier proof sketch referred to ``statistical indistinguishability among ring members.'' The formal treatment above shows that this is precise for the $(c_i, r_i)$ component (Part a) but only \emph{computational} under DDH for the key image (Part b). The combined advantage bound in Equation~\eqref{eq:t3-bound} reflects this distinction.
+
+\subsubsection{Theorem 4: Coercion Resistance (Pedersen Perfect Hiding + JCJ)}
+\label{subsubsec:t4-coercion-resistance}
+\label{subsec:t4-coercion-game}
+
+\paragraph{Informal claim.} A coercer observing a voter's SMDC credentials and her bulletin-board cast cannot determine whether the slot used was the real slot (contributing $w = 1$ to the tally) or a fake slot (contributing $w = 0$ and silently discarded). The construction is therefore deniable: the voter can comply with coercion at the surface while ensuring her actual vote, made via the real slot $j^*$, remains private to her.
+
+\paragraph{Threat-model scope.} The formal experiment below covers \emph{slot indistinguishability}: an adversary cannot determine which slot is real from the bulletin-board view plus the credential transcript. The following coercion attacks are explicitly out of scope (consistent with the SMDC system-design treatment in Section~\ref{subsec:smdc}):
+\begin{itemize}
+    \item \emph{Forced abstention:} a coercer who prevents the voter from casting at all.
+    \item \emph{Randomization attacks:} a coercer who demands a random ballot rather than a specific candidate.
+    \item \emph{Device-controlling coercer:} an adversary who observes the cast at the device level rather than the bulletin board.
+    \item \emph{Credential-issuance compromise:} a coercer present during credential issuance (see Assumption~5 of Section~\ref{sec:framework}).
+\end{itemize}
+These limitations mirror the standard demarcation in the coercion-resistance literature~\cite{jcj2005}.
+
+\paragraph{Coercion experiment.} Define $\mathrm{Coerc}^{\mathrm{SMDC}}_{\mathcal{A}}(\lambda)$ as follows. The challenger $\mathcal{C}$ generates Pedersen parameters and an HMAC server key $k_{\mathrm{srv}}$. For the target voter, $\mathcal{C}$ derives the real slot
+\begin{equation*}
+    j^* = \mathrm{HMAC\text{-}SHA256}\bigl(k_{\mathrm{srv}},\ \text{``smdc-real-index:''} \,\Vert\, \mathrm{vid} \,\Vert\, \mathrm{eid}\bigr) \bmod k,
+\end{equation*}
+with $k = 5$ throughout, and constructs the $k$ commitments $\{C_j\}_{j=0}^{k-1}$ with $C_{j^*} = g^1 h^{r_{j^*}}$ and $C_j = g^0 h^{r_j}$ for $j \neq j^*$, plus binary proofs $\{\pi_j^{\text{bin}}\}$ and the sum proof $\pi^{\text{sum}}$. $\mathcal{A}$ receives all $k$ commitments and proofs. $\mathcal{A}$ then outputs two distinct slot indices $j_0, j_1$ (without knowing $j^*$). $\mathcal{C}$ samples $b \stackrel{\$}{\leftarrow} \{0,1\}$ and emits the bulletin-board cast transcript using slot $j_b$ (commitment $C_{j_b}$, simulated proof, and the auxiliary ballot components produced as in Theorem~1). $\mathcal{A}$ outputs $b'$ and wins if $b' = b$. Define $\mathrm{Adv}^{\mathrm{Coerc}}_{\mathcal{A}}(\lambda) = |\Pr[b' = b] - 1/2|$.
+
+\textbf{Theorem 4 (SMDC Coercion Resistance, Slot Indistinguishability).} \textit{For any adversary $\mathcal{A}$ that is unbounded in the Pedersen-commitment component and PPT elsewhere,}
+\begin{equation}
+    \mathrm{Adv}^{\mathrm{Coerc}}_{\mathcal{A}}(\lambda) \;\leq\; \mathrm{Adv}^{\mathrm{ZK}}_{\mathcal{B}_{\mathrm{ZK}}}(\lambda) \;+\; \mathrm{Adv}^{\mathrm{HMAC\text{-}PRF}}_{\mathcal{B}_{\mathrm{HMAC}}}(\lambda) \;+\; \mathrm{negl}(\lambda).
+    \label{eq:t4-bound}
+\end{equation}
+\textit{In particular, when $\mathcal{A}$ is restricted to PPT and HMAC-SHA256 satisfies the PRF assumption, $\mathrm{Adv}^{\mathrm{Coerc}}_{\mathcal{A}}(\lambda) = \mathrm{negl}(\lambda)$.}
+
+\textit{Proof.} We proceed by hybrids $G_0 \to G_2$.
+
+\emph{Game $G_0$.} The real coercion experiment as defined above. $\Pr[\mathcal{A} \text{ wins } G_0] = 1/2 + \varepsilon$ where $\varepsilon = \mathrm{Adv}^{\mathrm{Coerc}}_{\mathcal{A}}(\lambda)$.
+
+\emph{Game $G_1$ (replace HMAC-derived $j^*$ with uniform).} $\mathcal{C}$ samples $j^* \stackrel{\$}{\leftarrow} \{0, 1, \ldots, k-1\}$ uniformly at random, ignoring the HMAC derivation. By the PRF property of HMAC-SHA256~\cite{rfc2104,nist_fips198} (under Assumption~6 of Section~\ref{sec:framework}, namely that $k_{\mathrm{srv}}$ remains unknown to $\mathcal{A}$), the HMAC-derived index is computationally indistinguishable from uniform. Bound:
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_1] - \Pr[\mathcal{A} \text{ wins } G_0]| \;\leq\; \mathrm{Adv}^{\mathrm{HMAC\text{-}PRF}}_{\mathcal{B}_{\mathrm{HMAC}}}(\lambda).
+\end{equation*}
+
+\emph{Game $G_2$ (simulate ZK proofs).} $\mathcal{C}$ replaces $\pi_j^{\text{bin}}$ and $\pi^{\text{sum}}$ in the credential view (and the cast transcript) with simulator outputs that do not use the witnesses. Under Strong Fiat--Shamir in the random-oracle model~\cite{bernhard2012,cramer1994or}, real and simulated proofs are computationally indistinguishable. Bound:
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_2] - \Pr[\mathcal{A} \text{ wins } G_1]| \;\leq\; \mathrm{Adv}^{\mathrm{ZK}}_{\mathcal{B}_{\mathrm{ZK}}}(\lambda).
+\end{equation*}
+After $G_2$, the proofs in $\mathcal{A}$'s view carry no information about the witnesses $\{w_j\}$.
+
+\emph{Pedersen perfect-hiding step.} In $G_2$, the only $b$-dependent component of $\mathcal{A}$'s view is the sequence of slot commitments $\{C_j\}$ together with the cast commitment $C_{j_b}$. Each $C_j = g^{w_j} h^{r_j}$ with $r_j \stackrel{\$}{\leftarrow} \mathbb{Z}_q$ uniform; by the perfect-hiding property of Pedersen commitments (Section~\ref{subsec:pedersen}), $C_j$ is uniformly distributed over the order-$q$ subgroup independently of $w_j \in \{0, 1\}$. Hence $C_{j_0}$ and $C_{j_1}$ have identical statistical distributions regardless of which slot is real, and the auxiliary bulletin-board components are simulated as in Theorem~1's hybrid sequence (independent of $b$). Therefore $\Pr[\mathcal{A} \text{ wins } G_2] = 1/2$ exactly, and combining the hybrid bounds yields Equation~\eqref{eq:t4-bound}. \hfill $\square$
+
+\paragraph{Modulo-$k$ bias remark.} The reduction modulo $k$ of a uniformly distributed $256$-bit HMAC output is not perfectly uniform when $k$ does not divide $2^{256}$. For $k = 5$ the statistical distance from uniform is bounded by $k / 2^{256} < 2^{-253}$, which is dominated by every term in Equation~\eqref{eq:t4-bound} and is therefore absorbed into the $\mathrm{negl}(\lambda)$ component.
+
+\paragraph{Silent-discard semantics.} The deniability guaranteed by Theorem~4 relies on the silent-discard property of the homomorphic tally: a coerced vote made via a fake slot contributes $w = 0$ via per-candidate Paillier scalar multiplication ($E_j^{0} = E(0)$ for every $j$), so the cast contributes nothing to the tally. The tally outcome is therefore identical whether the voter complied with coercion (used $j^*$) or cheated (used a fake slot, then later cast for her true preference via $j^*$). Both transcripts are bulletin-board indistinguishable to the coercer.
+
+\subsubsection{Theorem 5: SA\textsuperscript{2} Aggregation Privacy (DCRA + A1)}
+\label{subsubsec:t5-aggregation-privacy}
+
+\paragraph{Informal claim.} The two-server SA\textsuperscript{2} split (Section~\ref{subsec:sa2}) ensures that, as long as at least one of the two aggregation servers is honest (Trust Assumption~A1), no single corrupted server learns any non-trivial information about an individual vote $v$. The shares $S_A = E(v + \text{mask})$ and $S_B = E(-\text{mask})$ are computationally indistinguishable from encryptions of arbitrary values; only their product, $S_A \cdot S_B = E(v)$, recovers the encrypted vote, and even that does not reveal $v$ until the threshold-Paillier trustees decrypt the aggregated tally.
+
+\paragraph{Single-server-view game.} Define $\mathrm{SA2\text{-}Priv}^{\sigma}_{\mathcal{A}}(\lambda)$ for a corrupted server $\sigma \in \{A, B\}$ as follows. The challenger $\mathcal{C}$ generates Paillier keys $(\text{pk}_p, \text{sk}_p)$ and gives $\mathcal{A}$ only $\text{pk}_p$. $\mathcal{A}$ outputs two votes $v_0, v_1 \in \mathbb{Z}_n$. The challenger samples $b \stackrel{\$}{\leftarrow} \{0,1\}$ and $\text{mask} \stackrel{\$}{\leftarrow} \mathbb{Z}_{n/100}$, computes the split $(S_A^*, S_B^*)$ for $v_b$, and gives $\mathcal{A}$ only the $\sigma$-server's share. $\mathcal{A}$ outputs a guess $b'$ and wins if $b' = b$. Define $\mathrm{Adv}^{\mathrm{SA2\text{-}Priv}, \sigma}_{\mathcal{A}}(\lambda) = |\Pr[b' = b] - 1/2|$.
+
+\textbf{Theorem 5 (SA\textsuperscript{2} Single-Server Privacy).} \textit{Let $\sigma \in \{A, B\}$ index a single corrupted server. For any PPT adversary $\mathcal{A}$,}
+\begin{equation}
+    \mathrm{Adv}^{\mathrm{SA2\text{-}Priv}, \sigma}_{\mathcal{A}}(\lambda) \;\leq\; \mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathcal{B}, \mathrm{Paillier}}(\lambda) \;\leq\; \mathrm{Adv}^{\mathrm{DCRA}}_{\mathcal{B}'}(\lambda) \;+\; \mathrm{negl}(\lambda).
+    \label{eq:t5-bound}
+\end{equation}
+
+\textit{Proof.} We treat the case $\sigma = A$; the case $\sigma = B$ is strictly easier (the share $S_B = E(-\text{mask})$ is independent of $v_b$, giving zero advantage). The reduction $\mathcal{B}$ to Paillier IND-CPA is direct:
+\begin{enumerate}
+    \item $\mathcal{B}$ receives $\text{pk}_p$ from the Paillier IND-CPA challenger and forwards it to $\mathcal{A}$.
+    \item $\mathcal{A}$ outputs $(v_0, v_1)$.
+    \item $\mathcal{B}$ samples $\text{mask} \stackrel{\$}{\leftarrow} \mathbb{Z}_{n/100}$, computes $m_0 = v_0 + \text{mask} \bmod n$ and $m_1 = v_1 + \text{mask} \bmod n$, and submits $(m_0, m_1)$ to the IND-CPA challenger.
+    \item $\mathcal{B}$ receives ciphertext $c^* = E(m_b)$ from the challenger (for the challenger's hidden bit $b$) and forwards $c^*$ to $\mathcal{A}$ as the simulated $S_A^*$.
+    \item $\mathcal{B}$ outputs $\mathcal{A}$'s guess $b'$ as its own.
+\end{enumerate}
+Since the same $\text{mask}$ is added to both $v_0$ and $v_1$, the value $E(m_b) = E(v_b + \text{mask})$ has exactly the distribution of $S_A^*$ in the real $\mathrm{SA2\text{-}Priv}^A$ experiment. Hence $\mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathcal{B}, \mathrm{Paillier}}(\lambda) = \mathrm{Adv}^{\mathrm{SA2\text{-}Priv}, A}_{\mathcal{A}}(\lambda)$. The Paillier semantic-security theorem (Paillier 1999, Theorem 15~\cite{paillier1999}) reduces Paillier IND-CPA to DCRA with negligible loss, completing the bound in Equation~\eqref{eq:t5-bound}. \hfill $\square$
+
+\paragraph{Per-candidate hybrid extension.} The experiment above analyses one candidate position $j$, with $v \in \{0,1\}$ standing in for $v_j$ and $\mathrm{mask}$ for $m_j$. A full 1-hot ballot has $m$ such positions (Section~\ref{subsec:zkp}); the same bound extends to the full $m$-position vector by a standard hybrid argument over candidates, multiplying the right-hand side of Equation~\eqref{eq:t5-bound} by~$m$ in the worst case.
+
+\paragraph{Mask-range remark.} The mask is sampled from $\mathbb{Z}_{n / V_{\max}}$ (rather than $\mathbb{Z}_n$) to prevent additive overflow when up to $V_{\max}$ voters' shares are aggregated by a single server; the current deployment uses $V_{\max} = 100$. With this range, $\sum_{i} (v_{j,i} + m_{j,i})$ stays within $\mathbb{Z}_n$ and the additive homomorphism does not wrap. The smaller mask range does \emph{not} weaken the indistinguishability bound above: the IND-CPA reduction relies only on Paillier semantic security, not on statistical hiding by the mask. (Statistical hiding at the plaintext level would require $\mathrm{mask} \stackrel{\$}{\leftarrow} \mathbb{Z}_n$ and is not invoked anywhere in the construction, since both shares remain Paillier-encrypted and only the threshold-Paillier trustees decrypt the final aggregate.)
+
+\paragraph{Multi-voter extension.} For a corrupted server observing $q$ ballots from $q$ different voters, a standard hybrid argument extends the bound to $\mathrm{Adv} \leq q \cdot \mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathcal{B}, \mathrm{Paillier}}(\lambda)$, which remains negligible under DCRA for any polynomially-bounded $q$. Combined with the per-candidate hybrid above, the cumulative loss against a server observing $q$ ballots over $m$ candidates is $q \cdot m \cdot \mathrm{Adv}^{\mathrm{IND\text{-}CPA}}_{\mathcal{B}, \mathrm{Paillier}}(\lambda)$.
+
+\subsubsection{Theorem 6: Post-Quantum Hybrid (Module-LWE + DCRA)}
+\label{subsubsec:t6-pq-hybrid}
+
+\paragraph{Informal claim.} The Kyber-768 hybrid layer (Section~\ref{subsec:kyber}) provides ciphertext integrity for the transmitted ballot tuple $(\text{ct}_{\text{ky}}, E(v), \text{salt}, \text{MAC})$: any tampering with $E(v)$, $\text{ct}_{\text{ky}}$, or $\text{salt}$ in transit or at rest is detected by MAC failure with overwhelming probability. Confidentiality of the vote $v$ inherits from Theorem~1 (Paillier DCRA). Both properties remain classical against a present-day adversary; the integrity layer additionally remains secure against a future quantum adversary that would solve Module-LWE only after the ballot has been recorded (\emph{harvest-now-decrypt-later}).
+
+\paragraph{Hybrid construction recap.} For each vote, the sender produces $(\text{ct}_{\text{ky}}, \mathbf{E}, \text{salt}, \text{MAC})$ where $\mathbf{E} = (E_1, \ldots, E_m)$ is the 1-hot per-candidate Paillier ciphertext vector, $(K, \text{ct}_{\text{ky}}) \leftarrow \mathrm{KEM}.\mathrm{Encap}(\mathrm{pk}_{\text{ky}})$, $K_{\text{auth}} = \mathrm{SHA256}(K \| \text{salt})$, and $\text{MAC} = \mathrm{HMAC\text{-}SHA256}(K_{\text{auth}}, \mathrm{enc}(\mathbf{E}))$ with $\mathrm{enc}(\cdot)$ a canonical serialisation. Verification recomputes $K$ via $\mathrm{KEM}.\mathrm{Decap}(\mathrm{sk}_{\text{ky}}, \text{ct}_{\text{ky}})$, derives $K_{\text{auth}}$, and checks the MAC. For brevity the proof below writes $E^*$ for a generic ciphertext component of $\mathbf{E}$ (the same bound applies to each $E_j$ independently).
+
+\paragraph{Kyber-768 vs.\ ML-KEM-768.} \emph{Kyber-768} denotes the CRYSTALS-Kyber round-3 NIST PQC submission~\cite{nist_kyber}; \emph{ML-KEM-768} is its standardised form under NIST FIPS~203. The two are the same algorithm up to minor parameter packing and serialisation refinements. The runtime implementation invoked by this thesis is the round-3 Kyber-768 variant provided by Cloudflare's CIRCL library (\texttt{github.com/cloudflare/circl/kem/kyber/kyber768}); migration to the FIPS-203 ML-KEM-768 implementation in the same library is straightforward and is identified as a near-term engineering follow-up. The reductions cited below apply unchanged to either variant because both reduce IND-CCA2 security to the same Module-LWE / Module-SIS hardness assumption.
+
+\paragraph{Integrity experiment.} Define $\mathrm{INT\text{-}CTXT}^{\text{Hybrid}}_{\mathcal{A}}(\lambda)$ as follows. The challenger $\mathcal{C}$ generates Kyber-768 keys $(\text{pk}_{\text{ky}}, \text{sk}_{\text{ky}})$ and Paillier keys $(\text{pk}_p, \text{sk}_p)$ and gives $\mathcal{A}$ both public keys. $\mathcal{A}$ adaptively submits up to $q$ vote queries to an encryption oracle $\mathsf{Enc}(\cdot)$, which returns the corresponding honest ballot tuples. Let $\mathcal{S}$ denote the set of returned tuples. $\mathcal{A}$ outputs a candidate forgery $\mathsf{Ballot}^* = (\text{ct}_{\text{ky}}^*, E^*, \text{salt}^*, \text{MAC}^*)$ and \emph{wins} if $\mathsf{Ballot}^* \notin \mathcal{S}$ and $\mathsf{Ballot}^*$ verifies under $\text{sk}_{\text{ky}}$. Define $\mathrm{Adv}^{\mathrm{INT\text{-}CTXT}}_{\mathcal{A}}(\lambda) = \Pr[\mathcal{A} \text{ wins}]$.
+
+\textbf{Theorem 6 (Hybrid Integrity).} \textit{For any PPT adversary $\mathcal{A}$ making at most $q$ queries to the encryption oracle,}
+\begin{equation}
+    \mathrm{Adv}^{\mathrm{INT\text{-}CTXT}}_{\mathcal{A}}(\lambda) \;\leq\; q \cdot \mathrm{Adv}^{\mathrm{IND\text{-}CCA2}}_{\mathcal{B}_1, \mathrm{Kyber}}(\lambda) \;+\; \mathrm{Adv}^{\mathrm{EUF\text{-}CMA}}_{\mathcal{B}_2, \mathrm{HMAC}}(\lambda) \;+\; \mathrm{negl}(\lambda),
+    \label{eq:t6-bound}
+\end{equation}
+\textit{where $\mathcal{B}_1$ is a PPT adversary against the IND-CCA2 security of ML-KEM-768 (which reduces to Module-LWE and Module-SIS via the Fujisaki--Okamoto transform~\cite{hofheinz2017fo,nist_kyber}) and $\mathcal{B}_2$ is a PPT adversary against the EUF-CMA security of HMAC-SHA256 (which reduces to the PRF property of SHA-256~\cite{rfc2104,nist_fips198}).}
+
+\textit{Proof.} We proceed by hybrids $G_0 \to G_1 \to G_2$, following the standard KEM--DEM analysis of Cramer and Shoup~\cite{cramer2003kemdem} adapted to Encrypt-then-MAC composition.
+
+\emph{Game $G_0$.} The real INT-CTXT experiment. By definition $\Pr[\mathcal{A} \text{ wins } G_0] = \mathrm{Adv}^{\mathrm{INT\text{-}CTXT}}_{\mathcal{A}}(\lambda)$.
+
+\emph{Game $G_1$.} Identical to $G_0$, except $\mathcal{C}$ aborts whenever the forgery's $\text{ct}_{\text{ky}}^*$ decapsulates to a Kyber session key $K^*$ that equals some oracle-derived $K_i$ while $\text{ct}_{\text{ky}}^* \neq \text{ct}_{\text{ky},i}$. By the IND-CCA2 security of ML-KEM-768, encapsulated keys are pseudorandom and uniformly distributed conditioned on distinct ciphertexts; the per-query collision probability is bounded by $\mathrm{Adv}^{\mathrm{IND\text{-}CCA2}}_{\mathcal{B}_1, \mathrm{Kyber}}(\lambda)$ (otherwise $\mathcal{B}_1$ could distinguish a real encapsulated key from random by checking equality with oracle-returned keys). Union bound over $q$ encryption queries:
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_1] - \Pr[\mathcal{A} \text{ wins } G_0]| \;\leq\; q \cdot \mathrm{Adv}^{\mathrm{IND\text{-}CCA2}}_{\mathcal{B}_1, \mathrm{Kyber}}(\lambda).
+\end{equation*}
+
+\emph{Game $G_2$.} Identical to $G_1$, except $\mathcal{C}$ aborts if $\mathcal{A}$'s forgery uses a derived MAC key $K_{\text{auth}}^* = \text{SHA256}(K^* \| \text{salt}^*)$ that was \emph{not} used by any oracle query. To win in this case $\mathcal{A}$ must produce a valid HMAC-SHA256 tag under a key it has not observed any tags under, which is precisely the EUF-CMA experiment for HMAC. Hence
+\begin{equation*}
+    |\Pr[\mathcal{A} \text{ wins } G_2] - \Pr[\mathcal{A} \text{ wins } G_1]| \;\leq\; \mathrm{Adv}^{\mathrm{EUF\text{-}CMA}}_{\mathcal{B}_2, \mathrm{HMAC}}(\lambda).
+\end{equation*}
+We model SHA-256 as a random oracle for the key-derivation step $K_{\text{auth}} = \text{SHA256}(K \| \text{salt})$; under this assumption, distinct $(K, \text{salt})$ pairs yield independent uniformly random $K_{\text{auth}}$ values, so reuse of $K_{\text{auth}}$ across encryption queries occurs with negligible probability and is absorbed into the $\mathrm{negl}(\lambda)$ term.
+
+In $G_2$, the only remaining win path requires $\mathcal{A}$'s forgery to reuse some $K_{\text{auth}}$ from a prior oracle query. By construction, the oracle-supplied $\text{MAC}_i$ uniquely binds $E(v_i)$ under $K_{\text{auth},i}$; producing a different $E^* \neq E(v_i)$ but valid $\text{MAC}^*$ under $K_{\text{auth},i}$ is again an EUF-CMA forgery against HMAC under the previously-revealed key, which is bounded as in $G_1 \to G_2$. The ``ballot $\mathsf{Ballot}^*$ exactly equals some $\mathsf{Ballot}_i$'' case is excluded by the win condition. Therefore $\Pr[\mathcal{A} \text{ wins } G_2] \leq \mathrm{negl}(\lambda)$, and combining the hybrid steps yields Equation~\eqref{eq:t6-bound}. \hfill $\square$
+
+\paragraph{Confidentiality (P1).} Confidentiality of the vote vector $\mathbf{v} = (v_1, \ldots, v_m)$ inside the hybrid tuple inherits directly from Theorem~1: the Kyber/ML-KEM ciphertext $\text{ct}_{\text{ky}}$ is independent of $\mathbf{v}$ (the KEM operates only on the random session key $K$), and the MAC is a deterministic function of $\mathbf{E}$ under a key independent of $\mathbf{v}$. Hence any IND-CPA distinguisher for the hybrid tuple yields an IND-CPA distinguisher against Paillier (applied component-wise to the 1-hot vector) with the same advantage, which by Theorem~1 reduces to DCRA.
+
+\paragraph{Quantum-adversary scope.} The integrity layer remains secure against a future polynomial-time quantum adversary as long as Module-LWE remains hard against quantum algorithms. The confidentiality layer (Paillier under DCRA) does \emph{not} survive a quantum adversary, since Shor's algorithm~\cite{shor1997} solves integer factorisation. The thesis therefore offers post-quantum integrity (preventing future tampering of stored ballots) but classical confidentiality (the harvest-now-decrypt-later threat against $v$ remains, mitigated by the limited utility of decrypting individual ballots after the public tally). A fully post-quantum migration, replacing Paillier with a lattice-based homomorphic encryption such as BGV or CKKS, and replacing Liu-Wei-Wong ring signatures with lattice-based ring signatures, is identified as future work in Chapter~\ref{ch:conclusion}.
+
+\paragraph{Auxiliary AES-256-GCM use.} Generic non-vote payloads (audit metadata, session traffic) are additionally protected by AES-256-GCM~\cite{nist_gcm} authenticated symmetric encryption; this is outside the scope of the INT-CTXT game above, which targets the vote-ballot tuple specifically.
+
+\subsubsection{Composition Discussion: Toward UC Security}
+\label{subsubsec:uc-composition}
+
+\paragraph{Why this discussion is informal.} The six theorems above (Theorems~\ref{subsubsec:t1-ballot-privacy}--\ref{subsubsec:t6-pq-hybrid}) establish per-protocol security under a stand-alone game-based model. Universally Composable (UC) security~\cite{canetti2001uc} would additionally guarantee that the multi-protocol pipeline remains secure under arbitrary concurrent composition with other protocols, but constructing a full UC proof for a system of this scale is itself a research-scale undertaking (typically 15--50 pages per protocol primitive in dedicated papers). The present thesis therefore offers an informal sketch of the UC-style ideal functionalities and the composition argument structure, and identifies a complete UC formalization as future work in Chapter~\ref{ch:conclusion}, building on the recent UC-secure self-tallying construction of E-cclesia~\cite{ecclesia2025}.
+
+\paragraph{Ideal functionalities sketch.} The future UC proof would target three principal ideal functionalities:
+\begin{description}
+    \item[$\mathcal{F}_{\mathrm{Ballot}}$ (Idealized Ballot Privacy).] Receives a vote $\mathbf{v}_i$ from voter $V_i$; outputs only a bulletin-board placeholder ``ballot $i$ posted by $V_i$'' to the adversary, and the aggregate tally $\mathbf{T} = \sum_i \mathbf{v}_i$ to the trustees after election close. Theorem~\ref{subsubsec:t1-ballot-privacy} provides the per-ballot indistinguishability bound that a UC simulator would invoke; full UC additionally requires adaptive-corruption simulator-extractability, which the threshold-Paillier decryption (Section~\ref{subsec:threshold}) supports.
+    \item[$\mathcal{F}_{\mathrm{SMDC}}$ (Idealized Coercion Resistance).] Receives a vote and a coercion-mode flag from each voter; outputs a simulator-generated transcript indistinguishable from the real bulletin-board view, with coerced votes silently dropped from the tally. Theorem~\ref{subsubsec:t4-coercion-resistance} provides the slot-indistinguishability bound; the perfect-hiding step gives statistical (adaptive-secure) indistinguishability for the commitment component.
+    \item[$\mathcal{F}_{\mathrm{SA2}}$ (Idealized Two-Server Aggregation).] Receives encrypted votes from all voters; outputs simulator-generated shares to each server (statistically close to real shares but information-theoretically independent of individual votes); outputs the homomorphic aggregate to threshold trustees. Theorem~\ref{subsubsec:t5-aggregation-privacy} provides the per-server view indistinguishability bound; Trust Assumption~A1 (one honest server) is the foundation for UC simulation.
+\end{description}
+
+\paragraph{Informal composition argument.} For sequential composition under a top-level distinguisher $\mathcal{Z}$, a standard hybrid argument bounds the joint advantage by the sum of per-theorem advantages:
+\begin{equation*}
+    \mathrm{Adv}^{\mathrm{Joint}}_{\mathcal{Z}}(\lambda) \;\leq\; \sum_{i=1}^{6} \mathrm{Adv}^{T_i}_{\mathcal{B}_i}(\lambda) + O(\mathrm{negl}(\lambda)).
+\end{equation*}
+Each $\mathrm{Adv}^{T_i}$ is negligible by the corresponding theorem, so the sequential joint advantage is negligible. UC concurrent composition under arbitrary scheduling is strictly stronger and is not established by this sketch; it would require constructing UC simulators for each ideal functionality and invoking Canetti's UC composition theorem~\cite[Theorem 13]{canetti2001uc}.
+
+\paragraph{Limitations of this discussion (explicitly).} (i)~The argument above is sequential, not concurrent. (ii)~The simulators sketched are non-adaptive; the corruption set is fixed at the start. (iii)~The ideal functionalities are informally stated, full UC formalization requires precise message scheduling and corruption interfaces. (iv)~No machine-checked proof (e.g., EasyCrypt or CryptoVerif) is provided. The thesis intentionally separates Tier~1 (game-based reductions, this section) from Tier~2 (symbolic verification, Section~\ref{sec:proverif}) and from a future UC layer; readers are referred to the corresponding limitations subsection in Chapter~\ref{ch:conclusion}.
+
+\subsection{Duress Detection: Security Properties}
+\label{subsec:duress-security}
+
+The behavioural duress detection construction defined in Section~\ref{subsec:duress-detection} (Algorithm~\ref{alg:duress}) contributes two security guarantees that complete the coercion-resistance argument of Theorem~4. \emph{Timing indistinguishability}: the constant-time comparison \textsc{ConstantTimeCompare} (Algorithm~\ref{alg:duress}, Line~7) prevents an HMAC-oracle timing side channel, so an adversary observing the server's response time cannot distinguish whether the presented hash matches the stored hash. Combined with the silent-discard short-circuit at Steps~17a--17b of Algorithm~\ref{alg:pipeline}, which executes the full ring-signing and SA\textsuperscript{2} share-split phases before suppressing the key-image registration, the end-to-end receipt is indistinguishable in latency, format, and content across the genuine and coerced execution paths. \emph{Database-compromise resistance}: because only the HMAC keyed by the server secret $K_d$ is persisted and the raw signal value is never written to disk, an attacker who compromises the voter database recovers a hash but cannot invert it to obtain a usable duress signal; this reduces secret-signal recovery to inversion of HMAC-SHA256, which is computationally infeasible under standard PRF assumptions on the underlying compression function. Together, these two properties imply that an external coercer who observes both the network traffic and the voter's receipt cannot determine whether the voter submitted the genuine signal, the duress signal, or no signal at all.
 
 \section{Conclusion}
 \label{sec:meth-conclusion}
 
-This chapter presented the complete system design of the proposed framework, including the mathematical formulation of all seven cryptographic protocols, the 17-step vote casting pipeline, and the blockchain integration architecture. Six formal security theorems were stated with proof sketches, demonstrating that the proposed framework provides ballot privacy (Theorem~1), vote validity (Theorem~2), voter anonymity (Theorem~3), coercion resistance (Theorem~4), aggregation privacy (Theorem~5), and post-quantum security (Theorem~6). The genuinely novel cryptographic constructions of this thesis are: (i)~the SMDC coercion resistance mechanism with $k=5$ deniable credential slots, (ii)~the behavioral duress detection mechanism using HMAC-SHA256 equality compare, and (iii)~the silent-discard coercion short-circuit semantics. The remaining cryptographic primitives in the pipeline---Paillier, Pedersen, $\Sigma$-proofs, linkable ring signatures, SA\textsuperscript{2}, Kyber768, and DJN threshold decryption---are existing constructions whose composition into a unified voting pipeline is the engineering contribution of this work. The next chapter presents the implementation details and comprehensive performance evaluation of the system.
+This chapter presented the complete system design of the proposed framework: the mathematical formulation of the multi-protocol cryptographic stack (Section~\ref{sec:crypto-formulation}), the twenty-step vote-casting pipeline (Section~\ref{sec:pipeline}, Algorithm~\ref{alg:pipeline}), the Hyperledger Fabric blockchain integration (Section~\ref{sec:blockchain-integration}), and the engineering, sustainability, accessibility, ethical, and privacy considerations of an at-scale deployment (Section~\ref{sec:engineering}).
+
+The security analysis (Section~\ref{sec:security-analysis}) gave six game-based reductions to standard cryptographic hardness assumptions: ballot indistinguishability (Theorem~1, DCRA), vote validity (Theorem~2, soundness of CDS OR-proofs in the ROM), voter anonymity (Theorem~3, DDH), coercion resistance (Theorem~4, Pedersen perfect hiding combined with JCJ-style slot indistinguishability), SA\textsuperscript{2} aggregation privacy (Theorem~5, single-server reduction to DCRA), and hybrid post-quantum integrity (Theorem~6, Module-LWE for tamper-evidence on top of Paillier's classical confidentiality). The proofs are computational and game-based; formal machine-checked verification (e.g., in EasyCrypt or CryptoVerif) and a full Universal Composability treatment are left as future work.
+
+The genuinely novel cryptographic constructions of this thesis are: (i)~the SMDC coercion-resistance mechanism with $k = 5$ deniable credential slots (Section~\ref{subsec:smdc}); (ii)~the behavioural duress-detection mechanism that uses HMAC-SHA256 equality compare over a server-keyed signal hash (Section~\ref{subsec:duress-detection}, Algorithm~\ref{alg:duress}); and (iii)~the silent-discard coercion short-circuit semantics (Algorithm~\ref{alg:pipeline}, Steps~17a--17b), which preserves bulletin-board indistinguishability between the genuine and coerced execution paths. The remaining cryptographic primitives in the pipeline---Paillier, Pedersen, $\Sigma$-protocols, linkable ring signatures, SA\textsuperscript{2}, Kyber-768/ML-KEM-768, and DJN threshold decryption---are existing constructions whose composition into a unified voting pipeline constitutes the engineering contribution of this work.
+
+The next chapter presents the implementation details and the comprehensive performance evaluation of the system, including per-primitive microbenchmarks, end-to-end election-scale simulations, and Hyperledger Caliper saturation and sustained-load runs.

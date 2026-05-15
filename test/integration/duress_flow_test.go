@@ -34,7 +34,7 @@ func buildDuressTestRouter(t *testing.T) (
 	ringParams, _ := icrypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"alice", "bob", "charlie"}
-	rs := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
+	rs := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register voters with a deterministic fingerprint stub (>= 100 bytes).
 	// RegisterVoter stores the value as-is as FingerprintHash; the voting
@@ -48,7 +48,7 @@ func buildDuressTestRouter(t *testing.T) (
 		}
 		rawFP := raw[:200]
 		fpHash := icrypto.FingerprintToHash(rawFP)
-		if _, err := rs.RegisterVoter(id, fpHash); err != nil {
+		if _, err := rs.RegisterVoter(id, fpHash, "blink_count", "2"); err != nil {
 			t.Fatalf("register %s: %v", id, err)
 		}
 	}

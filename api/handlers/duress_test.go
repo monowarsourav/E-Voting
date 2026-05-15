@@ -22,14 +22,14 @@ func setupDuressTest(t *testing.T) (*DuressHandler, *voter.RegistrationSystem, *
 
 	pp, _ := crypto.GeneratePedersenParams(512)
 	rp, _ := crypto.GenerateRingParams(512)
-	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{"alice", "bob"}, "election001")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{"alice", "bob"}, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register alice so the handler can find her.
 	fp := make([]byte, 200)
 	for i := range fp {
 		fp[i] = byte(i)
 	}
-	if _, err := rs.RegisterVoter("alice", fp); err != nil {
+	if _, err := rs.RegisterVoter("alice", fp, "blink_count", "2"); err != nil {
 		t.Fatalf("failed to register alice: %v", err)
 	}
 
@@ -168,7 +168,7 @@ func TestSetupDuressEndpoint_RateLimit_PerVoter(t *testing.T) {
 	_, rs, router := setupDuressTest(t)
 
 	// Register a second voter.
-	if _, err := rs.RegisterVoterWithPassword("bob", []byte("pw")); err != nil {
+	if _, err := rs.RegisterVoterWithPassword("bob", []byte("pw"), "blink_count", "2"); err != nil {
 		t.Fatalf("register bob: %v", err)
 	}
 

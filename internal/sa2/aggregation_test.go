@@ -7,87 +7,82 @@ import (
 	"github.com/covertvote/e-voting/internal/crypto"
 )
 
+// singletonCiphertextVec wraps a single ciphertext into a one-candidate vector
+// so existing tests can exercise the new per-candidate API without rewriting
+// the underlying vote semantics.
+func singletonCiphertextVec(e *big.Int) []*big.Int {
+	return []*big.Int{e}
+}
+
 func TestVoteSplitAndReconstruct(t *testing.T) {
-	// Setup
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
-	// Encrypt a vote
 	vote := big.NewInt(42)
 	encVote, _ := pk.Encrypt(vote)
 
-	// Split
 	splitter := NewVoteSplitter(pk)
-	share, err := splitter.SplitVote("voter1", encVote)
+	share, err := splitter.SplitVote("voter1", singletonCiphertextVec(encVote))
 	if err != nil {
 		t.Fatalf("Split failed: %v", err)
 	}
 
-	// Reconstruct
-	reconstructed := splitter.ReconstructVote(share)
+	reconstructed, err := splitter.ReconstructVote(share)
+	if err != nil {
+		t.Fatalf("Reconstruct failed: %v", err)
+	}
+	if len(reconstructed) != 1 {
+		t.Fatalf("expected one-element reconstruction, got %d", len(reconstructed))
+	}
 
-	// Decrypt both and compare
 	originalDecrypted, _ := sk.Decrypt(encVote)
-	reconstructedDecrypted, _ := sk.Decrypt(reconstructed)
-
+	reconstructedDecrypted, _ := sk.Decrypt(reconstructed[0])
 	if originalDecrypted.Cmp(reconstructedDecrypted) != 0 {
 		t.Errorf("Reconstruction failed: expected %v, got %v", originalDecrypted, reconstructedDecrypted)
 	}
 }
 
 func TestSA2FullFlow(t *testing.T) {
-	// Setup
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
-	// Create multiple votes
 	votes := []*big.Int{
-		big.NewInt(1), // Vote for candidate 1
-		big.NewInt(2), // Vote for candidate 2
-		big.NewInt(1), // Vote for candidate 1
-		big.NewInt(1), // Vote for candidate 1
+		big.NewInt(1),
+		big.NewInt(2),
+		big.NewInt(1),
+		big.NewInt(1),
 	}
 
 	splitter := NewVoteSplitter(pk)
-	var sharesA []*big.Int
-	var sharesB []*big.Int
+	var columnA []*big.Int
+	var columnB []*big.Int
 
-	// Split all votes
 	for i, vote := range votes {
 		encVote, _ := pk.Encrypt(vote)
-		share, _ := splitter.SplitVote("voter"+string(rune(i)), encVote)
-		sharesA = append(sharesA, share.ShareA)
-		sharesB = append(sharesB, share.ShareB)
+		share, _ := splitter.SplitVote("voter"+string(rune(i)), singletonCiphertextVec(encVote))
+		columnA = append(columnA, share.SharesA[0])
+		columnB = append(columnB, share.SharesB[0])
 	}
 
-	// Aggregate at Server A
 	aggA := NewAggregator("ServerA", pk)
-	aggregatedA := aggA.AggregateShares(sharesA)
-
-	// Aggregate at Server B
+	aggregatedA := aggA.AggregateShares(0, columnA)
 	aggB := NewAggregator("ServerB", pk)
-	aggregatedB := aggB.AggregateShares(sharesB)
+	aggregatedB := aggB.AggregateShares(0, columnB)
 
-	// Combine
 	combiner := NewCombiner(pk)
 	result := combiner.CombineAggregates(aggregatedA, aggregatedB)
 
-	// Decrypt final result
 	tally, _ := sk.Decrypt(result.EncryptedTally)
-
-	// Expected: 1+2+1+1 = 5
 	expected := big.NewInt(5)
 	if tally.Cmp(expected) != 0 {
 		t.Errorf("Tally mismatch: expected %v, got %v", expected, tally)
 	}
-
 	if result.TotalVotes != 4 {
 		t.Errorf("Vote count mismatch: expected 4, got %d", result.TotalVotes)
 	}
 }
 
 func TestSA2Privacy(t *testing.T) {
-	// This test demonstrates that individual shares don't reveal votes
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
 
@@ -95,21 +90,17 @@ func TestSA2Privacy(t *testing.T) {
 	encVote, _ := pk.Encrypt(vote)
 
 	splitter := NewVoteSplitter(pk)
-	share, _ := splitter.SplitVote("voter1", encVote)
+	share, _ := splitter.SplitVote("voter1", singletonCiphertextVec(encVote))
 
-	// Decrypt individual shares - should NOT equal the original vote
-	shareADecrypted, _ := sk.Decrypt(share.ShareA)
-	shareBDecrypted, _ := sk.Decrypt(share.ShareB)
+	shareADecrypted, _ := sk.Decrypt(share.SharesA[0])
+	shareBDecrypted, _ := sk.Decrypt(share.SharesB[0])
 
-	// ShareA should not equal the vote (it's masked)
 	if shareADecrypted.Cmp(vote) == 0 {
 		t.Error("ShareA should not reveal the original vote")
 	}
 
-	// But when we add the decrypted shares mod n, we get the vote
 	sum := new(big.Int).Add(shareADecrypted, shareBDecrypted)
 	sum.Mod(sum, pk.N)
-
 	if sum.Cmp(vote) != 0 {
 		t.Errorf("Sum of decrypted shares should equal vote: expected %v, got %v", vote, sum)
 	}

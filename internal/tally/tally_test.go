@@ -83,17 +83,17 @@ func TestVoteTallying(t *testing.T) {
 		encryptedVotes[i], _ = pk.Encrypt(v)
 	}
 
-	// Create vote shares using SA²
+	// Create vote shares using SA² (single-candidate column).
 	splitter := sa2.NewVoteSplitter(pk)
 	voteShares := make([]*sa2.VoteShare, len(encryptedVotes))
 
 	for i, enc := range encryptedVotes {
-		share, _ := splitter.SplitVote("voter"+string(rune(i)), enc)
+		share, _ := splitter.SplitVote("voter"+string(rune(i)), []*big.Int{enc})
 		voteShares[i] = share
 	}
 
 	// Tally
-	result, err := counter.TallyVotes(voteShares, "election001")
+	result, err := counter.TallyVotes(voteShares, "election001", 1)
 	if err != nil {
 		t.Fatalf("Tallying failed: %v", err)
 	}
@@ -166,7 +166,7 @@ func TestEmptyTally(t *testing.T) {
 	counter := NewCounter(pk, sk)
 
 	// Tally with no votes
-	result, err := counter.TallyVotes([]*sa2.VoteShare{}, "election001")
+	result, err := counter.TallyVotes([]*sa2.VoteShare{}, "election001", 1)
 	if err != nil {
 		t.Fatalf("Empty tally failed: %v", err)
 	}
@@ -236,13 +236,13 @@ func TestSA2TallyIntegrity(t *testing.T) {
 		expectedSum += int64(i % 2)
 
 		enc, _ := pk.Encrypt(vote)
-		share, _ := splitter.SplitVote(fmt.Sprintf("v%d", i), enc)
-		sharesA = append(sharesA, share.ShareA)
-		sharesB = append(sharesB, share.ShareB)
+		share, _ := splitter.SplitVote(fmt.Sprintf("v%d", i), []*big.Int{enc})
+		sharesA = append(sharesA, share.SharesA[0])
+		sharesB = append(sharesB, share.SharesB[0])
 	}
 
-	resultA := aggA.AggregateShares(sharesA)
-	resultB := aggB.AggregateShares(sharesB)
+	resultA := aggA.AggregateShares(0, sharesA)
+	resultB := aggB.AggregateShares(0, sharesB)
 	combined := combiner.CombineAggregates(resultA, resultB)
 
 	decrypted, _ := key.Decrypt(combined.EncryptedTally)
@@ -330,11 +330,11 @@ func TestCounterTallyVotes(t *testing.T) {
 
 	for i, v := range distribution {
 		enc, _ := pk.Encrypt(big.NewInt(v))
-		share, _ := splitter.SplitVote(fmt.Sprintf("voter-%d", i), enc)
+		share, _ := splitter.SplitVote(fmt.Sprintf("voter-%d", i), []*big.Int{enc})
 		voteShares = append(voteShares, share)
 	}
 
-	result, err := counter.TallyVotes(voteShares, "election-001")
+	result, err := counter.TallyVotes(voteShares, "election-001", 1)
 	if err != nil {
 		t.Fatalf("TallyVotes failed: %v", err)
 	}
@@ -375,7 +375,9 @@ func TestVerifyTally(t *testing.T) {
 		TotalVotes:       2,
 	}
 
-	if !counter.VerifyTally(tallyResult, encSum) {
+	// VerifyTally now takes the total number of voters; the structural check
+	// ensures sum of per-candidate counts does not exceed it.
+	if !counter.VerifyTally(tallyResult, 100) {
 		t.Error("VerifyTally returned false")
 	}
 }
@@ -515,21 +517,24 @@ func TestAggregateWeightedVotes(t *testing.T) {
 
 	counter := NewCounter(pk, sk)
 
-	// Vote with weight 1 (real) should count
+	// Single-candidate election: per-voter 1-element ciphertext vector.
+	// Real vote (weight 1) contributes 1; fake vote (weight 0) contributes 0.
 	voteReal, _ := pk.Encrypt(big.NewInt(1))
-	weightedReal := pk.Multiply(voteReal, big.NewInt(1)) // E(1*1) = E(1)
+	weightedReal := pk.Multiply(voteReal, big.NewInt(1))
 
-	// Vote with weight 0 (fake) should not count
 	voteFake, _ := pk.Encrypt(big.NewInt(1))
-	weightedFake := pk.Multiply(voteFake, big.NewInt(0)) // E(1*0) = E(0)
+	weightedFake := pk.Multiply(voteFake, big.NewInt(0))
 
 	weightedVotes := []*voting.WeightedVote{
-		{VoterID: "v1", EncryptedVote: weightedReal},
-		{VoterID: "v2", EncryptedVote: weightedFake},
+		{VoterID: "v1", EncryptedVotes: []*big.Int{weightedReal}},
+		{VoterID: "v2", EncryptedVotes: []*big.Int{weightedFake}},
 	}
 
-	aggregated := counter.AggregateWeightedVotes(weightedVotes)
-	result, _ := sk.Decrypt(aggregated)
+	aggregated := counter.AggregateWeightedVotes(weightedVotes, 1)
+	if len(aggregated) != 1 {
+		t.Fatalf("expected one aggregated ciphertext, got %d", len(aggregated))
+	}
+	result, _ := sk.Decrypt(aggregated[0])
 
 	if result.Int64() != 1 {
 		t.Errorf("Weighted tally: expected 1, got %d (fake vote should not count)", result.Int64())

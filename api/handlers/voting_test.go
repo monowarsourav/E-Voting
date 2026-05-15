@@ -33,6 +33,8 @@ func setupTestVotingHandler() (*VotingHandler, *voter.RegistrationSystem) {
 		5,
 		eligibleVoters,
 		"test-election-001",
+		[]byte("test-smdc-secret-key-do-not-use-in-prod"),
+		biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")),
 	)
 
 	// Biometric components
@@ -84,7 +86,7 @@ func TestCastVoteWithBiometrics(t *testing.T) {
 		fingerprintData[i] = byte((i*37 + i/3*17 + 13) % 256) // Varied pseudo-random pattern
 	}
 
-	_, err := regSystem.RegisterVoterWithPassword("voter001", []byte("password123"))
+	_, err := regSystem.RegisterVoterWithPassword("voter001", []byte("password123"), "blink_count", "2")
 	if err != nil {
 		t.Fatalf("Failed to register voter: %v", err)
 	}
@@ -191,7 +193,7 @@ func TestCastVotePasswordUserRequiresBiometrics(t *testing.T) {
 	handler, regSystem := setupTestVotingHandler()
 
 	// Register voter with PASSWORD only
-	_, err := regSystem.RegisterVoterWithPassword("voter002", []byte("password123"))
+	_, err := regSystem.RegisterVoterWithPassword("voter002", []byte("password123"), "blink_count", "2")
 	if err != nil {
 		t.Fatalf("Failed to register voter: %v", err)
 	}
@@ -242,7 +244,7 @@ func TestCastVoteUnauthorized(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	handler, regSystem := setupTestVotingHandler()
 
-	_, err := regSystem.RegisterVoterWithPassword("voter001", []byte("password123"))
+	_, err := regSystem.RegisterVoterWithPassword("voter001", []byte("password123"), "blink_count", "2")
 	if err != nil {
 		t.Fatalf("Failed to register voter: %v", err)
 	}

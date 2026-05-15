@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/voter"
 	"github.com/covertvote/e-voting/internal/voting"
@@ -573,12 +574,12 @@ func setupPQTestElection(t *testing.T) (*HybridKeyPair, *crypto.RingParams, *vot
 		voterIDs[i] = fmt.Sprintf("pq-voter-%d", i)
 	}
 
-	rs := voter.NewRegistrationSystem(pp, rp, 5, voterIDs, "pq-test-election")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, voterIDs, "pq-test-election", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register voters
 	for _, id := range voterIDs {
 		fingerprint := []byte("fp-" + id)
-		_, err := rs.RegisterVoter(id, fingerprint)
+		_, err := rs.RegisterVoter(id, fingerprint, "blink_count", "2")
 		if err != nil {
 			t.Fatalf("Failed to register %s: %v", id, err)
 		}
@@ -740,7 +741,8 @@ func TestConvertToSA2Shares(t *testing.T) {
 	if sa2Share == nil {
 		t.Fatal("SA2 share is nil")
 	}
-	if sa2Share.ShareA == nil || sa2Share.ShareB == nil {
+	if len(sa2Share.SharesA) == 0 || len(sa2Share.SharesB) == 0 ||
+		sa2Share.SharesA[0] == nil || sa2Share.SharesB[0] == nil {
 		t.Error("SA2 share has nil components")
 	}
 }

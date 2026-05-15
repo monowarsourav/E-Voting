@@ -1,6 +1,7 @@
 package tally
 
 import (
+	"errors"
 	"math/big"
 	"time"
 
@@ -9,7 +10,10 @@ import (
 	"github.com/covertvote/e-voting/internal/voting"
 )
 
-// Counter handles vote counting
+// Counter handles vote counting under the per-candidate SA² aggregation model.
+// Every voter contributes a single VoteShare whose SharesA/SharesB slices are
+// indexed by candidate position; the counter walks each candidate column in
+// parallel and decrypts the resulting per-candidate homomorphic sum.
 type Counter struct {
 	PublicKey  *crypto.PaillierPublicKey
 	PrivateKey *crypto.PaillierPrivateKey
@@ -32,63 +36,64 @@ func NewCounter(
 	}
 }
 
-// TallyVotes tallies all votes and returns the result
+// TallyVotes performs per-candidate homomorphic aggregation across all voters,
+// reconstructs the SA² masks via the two-server combine step, and decrypts the
+// resulting per-candidate ciphertexts to integer vote counts. numCandidates must
+// equal the length of every voter's per-candidate share vector.
 func (c *Counter) TallyVotes(
 	voteShares []*sa2.VoteShare,
 	electionID string,
+	numCandidates int,
 ) (*TallyResult, error) {
-	if len(voteShares) == 0 {
-		return &TallyResult{
-			ElectionID:       electionID,
-			CandidateTallies: make(map[int]*big.Int),
-			TotalVotes:       0,
-			Timestamp:        time.Now().Unix(),
-		}, nil
+	if numCandidates <= 0 {
+		return nil, errors.New("tally: numCandidates must be positive")
 	}
-
-	// Step 1: Separate shares for Server A and Server B
-	sharesA := make([]*big.Int, len(voteShares))
-	sharesB := make([]*big.Int, len(voteShares))
-
-	for i, share := range voteShares {
-		sharesA[i] = share.ShareA
-		sharesB[i] = share.ShareB
-	}
-
-	// Step 2: Aggregate on each server
-	aggregatedA := c.Aggregator.AggregateShares(sharesA)
-
-	aggregatorB := sa2.NewAggregator("ServerB", c.PublicKey)
-	aggregatedB := aggregatorB.AggregateShares(sharesB)
-
-	// Step 3: Combine aggregates
-	combined := c.Combiner.CombineAggregates(aggregatedA, aggregatedB)
-
-	// Step 4: Decrypt final tally
-	totalEncryptedVotes := combined.EncryptedTally
-	totalVotes, err := c.Decryptor.Decrypt(totalEncryptedVotes)
-	if err != nil {
-		return nil, err
-	}
-
-	// Step 5: Create tally result
-	// Note: In a real system with multiple candidates, we'd need to
-	// aggregate votes per candidate. For now, we return total.
 	result := &TallyResult{
 		ElectionID:       electionID,
 		CandidateTallies: make(map[int]*big.Int),
-		TotalVotes:       combined.TotalVotes,
+		TotalVotes:       len(voteShares),
 		Timestamp:        time.Now().Unix(),
 	}
+	if len(voteShares) == 0 {
+		for j := 0; j < numCandidates; j++ {
+			result.CandidateTallies[j] = big.NewInt(0)
+		}
+		return result, nil
+	}
 
-	// Store total as candidate 0 (or parse individual candidates)
-	result.CandidateTallies[0] = totalVotes
+	aggregatorB := sa2.NewAggregator("ServerB", c.PublicKey)
 
+	for j := 0; j < numCandidates; j++ {
+		// Gather column j of A and B shares from every voter.
+		columnA := make([]*big.Int, 0, len(voteShares))
+		columnB := make([]*big.Int, 0, len(voteShares))
+		for _, share := range voteShares {
+			if share == nil {
+				continue
+			}
+			if j >= len(share.SharesA) || j >= len(share.SharesB) {
+				return nil, errors.New("tally: voter share has wrong arity")
+			}
+			columnA = append(columnA, share.SharesA[j])
+			columnB = append(columnB, share.SharesB[j])
+		}
+
+		aggregatedA := c.Aggregator.AggregateShares(j, columnA)
+		aggregatedB := aggregatorB.AggregateShares(j, columnB)
+		combined := c.Combiner.CombineAggregates(aggregatedA, aggregatedB)
+
+		count, err := c.Decryptor.Decrypt(combined.EncryptedTally)
+		if err != nil {
+			return nil, err
+		}
+		result.CandidateTallies[j] = count
+	}
 	return result, nil
 }
 
-// TallyByCandidate tallies votes grouped by candidate
-// This requires the system to track encrypted votes per candidate
+// TallyByCandidate is a convenience helper that homomorphically aggregates a
+// caller-supplied per-candidate ciphertext map and decrypts it. It bypasses
+// SA² and is primarily useful for tests or for off-chain analysis.
 func (c *Counter) TallyByCandidate(
 	votesPerCandidate map[int][]*big.Int,
 	electionID string,
@@ -99,60 +104,58 @@ func (c *Counter) TallyByCandidate(
 		TotalVotes:       0,
 		Timestamp:        time.Now().Unix(),
 	}
-
-	// Aggregate and decrypt for each candidate
 	for candidateID, encryptedVotes := range votesPerCandidate {
-		// Homomorphically add all votes for this candidate
 		aggregated := c.PublicKey.AddMultiple(encryptedVotes)
-
-		// Decrypt
 		count, err := c.Decryptor.Decrypt(aggregated)
 		if err != nil {
 			return nil, err
 		}
-
 		result.CandidateTallies[candidateID] = count
 		result.TotalVotes += len(encryptedVotes)
 	}
-
 	return result, nil
 }
 
-// VerifyTally verifies that the tally is correct
-func (c *Counter) VerifyTally(
-	result *TallyResult,
-	encryptedTally *big.Int,
-) bool {
-	// Re-encrypt the result and compare
-	totalCount := big.NewInt(0)
-	for _, count := range result.CandidateTallies {
-		totalCount.Add(totalCount, count)
-	}
-
-	reEncrypted, err := c.PublicKey.Encrypt(totalCount)
-	if err != nil {
+// VerifyTally is a structural sanity check: every candidate column must have a
+// decrypted count and the sum of counts must not exceed the total number of
+// voters. NIZK-based result correctness verification is identified as future
+// work.
+func (c *Counter) VerifyTally(result *TallyResult, totalVoters int) bool {
+	if result == nil {
 		return false
 	}
-
-	// Note: This won't match exactly due to different randomness
-	// In production, use NIZK proofs for verification
-	_ = reEncrypted
-
-	return true
+	totalCount := big.NewInt(0)
+	for _, count := range result.CandidateTallies {
+		if count == nil {
+			return false
+		}
+		totalCount.Add(totalCount, count)
+	}
+	return totalCount.Cmp(big.NewInt(int64(totalVoters))) <= 0
 }
 
-// AggregateWeightedVotes aggregates weighted votes from the vote caster
+// AggregateWeightedVotes performs per-candidate homomorphic addition over the
+// per-candidate weighted ciphertexts pulled directly from each voter's record
+// (i.e. without going through SA²). Returns one aggregated ciphertext per
+// candidate. Primarily used in tests and as a sanity check against TallyVotes.
 func (c *Counter) AggregateWeightedVotes(
 	weightedVotes []*voting.WeightedVote,
-) *big.Int {
-	if len(weightedVotes) == 0 {
-		return big.NewInt(0)
+	numCandidates int,
+) []*big.Int {
+	out := make([]*big.Int, numCandidates)
+	for j := 0; j < numCandidates; j++ {
+		column := make([]*big.Int, 0, len(weightedVotes))
+		for _, wv := range weightedVotes {
+			if wv == nil || j >= len(wv.EncryptedVotes) {
+				continue
+			}
+			column = append(column, wv.EncryptedVotes[j])
+		}
+		if len(column) == 0 {
+			out[j] = big.NewInt(1) // Paillier identity (encrypts 0)
+			continue
+		}
+		out[j] = c.PublicKey.AddMultiple(column)
 	}
-
-	encryptedVotes := make([]*big.Int, len(weightedVotes))
-	for i, wv := range weightedVotes {
-		encryptedVotes[i] = wv.EncryptedVote
-	}
-
-	return c.PublicKey.AddMultiple(encryptedVotes)
+	return out
 }

@@ -6,9 +6,13 @@ import (
 	"fmt"
 	"math/big"
 	"os"
+	"runtime"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/sa2"
 	"github.com/covertvote/e-voting/internal/smdc"
@@ -19,6 +23,142 @@ import (
 // ============================================================
 // SCALABILITY BENCHMARK - Different Voter Counts
 // ============================================================
+
+// TestE2E10kVoters runs the full end-to-end pipeline (cred gen + cast + tally
+// + decrypt) for exactly 10,000 voters and writes a single-row results file.
+// Useful for focused timing measurements without paying for the warm-up rounds
+// at 100/1000 voters.
+func TestE2E10kVoters(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping 10k benchmark in short mode")
+	}
+	t.Logf("Running end-to-end benchmark with 10,000 voters...")
+	result := runVotingBenchmark(t, 10000)
+	t.Logf("Voters: %d | Total: %v | Per Vote: %v | CredGen: %v | VoteCast: %v",
+		result.VoterCount, result.TotalTime, result.PerVoteTime,
+		result.CredGenTime, result.VoteCastTime)
+	saveResultsToFile([]BenchmarkResult{result}, "test/benchmark/results/e2e_10k_results.md")
+	t.Log("Result saved to test/benchmark/results/e2e_10k_results.md")
+}
+
+// TestE2E10kVotersParallel runs the same pipeline as TestE2E10kVoters but with
+// concurrent vote casting using runtime.NumCPU() workers, which models the
+// realistic server-side throughput a deployed election would see when voters
+// submit ballots concurrently. CredGen + Registration is kept sequential because
+// it mutates the registration system; only the VoteCast phase parallelises.
+func TestE2E10kVotersParallel(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping 10k parallel benchmark in short mode")
+	}
+	const numVoters = 10000
+	workers := runtime.NumCPU()
+	t.Logf("Running parallel 10K benchmark with %d workers...", workers)
+
+	// --- Setup (not timed) ---
+	paillierSK, _ := crypto.GeneratePaillierKeyPair(2048)
+	paillierPK := paillierSK.PublicKey
+	pedersenParams, _ := crypto.GeneratePedersenParams(512)
+	ringParams, _ := crypto.GenerateRingParams(256)
+	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "benchmark_election",
+		[]byte("test-smdc-secret-key-do-not-use-in-prod"))
+
+	eligibleVoters := make([]string, numVoters)
+	for i := 0; i < numVoters; i++ {
+		eligibleVoters[i] = fmt.Sprintf("voter_%d", i)
+	}
+	registrationSystem := voter.NewRegistrationSystem(
+		pedersenParams, ringParams, 5, eligibleVoters, "benchmark_election",
+		[]byte("test-smdc-secret-key-do-not-use-in-prod"),
+		biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")),
+	)
+	election := &voting.Election{
+		ElectionID: "benchmark_election",
+		Title:      "Benchmark Parallel",
+		Candidates: []*voting.Candidate{
+			{ID: 0, Name: "A"}, {ID: 1, Name: "B"}, {ID: 2, Name: "C"},
+		},
+		StartTime: time.Now().Unix() - 3600,
+		EndTime:   time.Now().Unix() + 3600,
+		IsActive:  true,
+	}
+	voteCaster := voting.NewVoteCaster(paillierPK, ringParams, registrationSystem, election)
+
+	totalStart := time.Now()
+
+	// --- Phase 1: CredGen + Registration (sequential) ---
+	credStart := time.Now()
+	for i := 0; i < numVoters; i++ {
+		voterID := eligibleVoters[i]
+		if _, _, err := smdcGen.GenerateCredential(voterID); err != nil {
+			t.Fatalf("cred gen: %v", err)
+		}
+		if _, err := registrationSystem.RegisterVoterWithPassword(
+			voterID, []byte("password123"), "blink_count", "2"); err != nil {
+			t.Fatalf("registration: %v", err)
+		}
+	}
+	credTime := time.Since(credStart)
+
+	// --- Phase 2: VoteCast (PARALLEL) ---
+	voteStart := time.Now()
+	voterCh := make(chan int, numVoters)
+	for i := 0; i < numVoters; i++ {
+		voterCh <- i
+	}
+	close(voterCh)
+
+	var wg sync.WaitGroup
+	var castErrCount int64
+	wg.Add(workers)
+	for w := 0; w < workers; w++ {
+		go func() {
+			defer wg.Done()
+			for i := range voterCh {
+				voterID := eligibleVoters[i]
+				candidateID := i % 3
+				if _, err := voteCaster.CastVote(voterID, candidateID, 0, nil); err != nil {
+					atomic.AddInt64(&castErrCount, 1)
+				}
+			}
+		}()
+	}
+	wg.Wait()
+	voteTime := time.Since(voteStart)
+
+	totalTime := time.Since(totalStart)
+	throughput := float64(numVoters) / voteTime.Seconds()
+
+	t.Logf("=== PARALLEL BENCHMARK RESULTS ===")
+	t.Logf("Workers:           %d", workers)
+	t.Logf("Voters:            %d", numVoters)
+	t.Logf("CredGen (seq):     %v", credTime)
+	t.Logf("VoteCast (par):    %v", voteTime)
+	t.Logf("Per vote (par):    %v", voteTime/time.Duration(numVoters))
+	t.Logf("Throughput:        %.2f votes/sec", throughput)
+	t.Logf("Cast errors:       %d", castErrCount)
+	t.Logf("Total (incl seq):  %v", totalTime)
+
+	// Save result.
+	os.MkdirAll("test/benchmark/results", 0755)
+	if f, err := os.Create("test/benchmark/results/e2e_10k_parallel.md"); err == nil {
+		fmt.Fprintf(f, "# CovertVote Parallel Benchmark — 10K voters\n\n")
+		fmt.Fprintf(f, "**Date:** %s\n", time.Now().Format("2006-01-02 15:04:05"))
+		fmt.Fprintf(f, "**Workers:** %d (NumCPU)\n", workers)
+		fmt.Fprintf(f, "**Candidates:** 3 (1-hot encoding)\n\n")
+		fmt.Fprintf(f, "## Results\n\n")
+		fmt.Fprintf(f, "| Metric | Value |\n")
+		fmt.Fprintf(f, "|--------|-------|\n")
+		fmt.Fprintf(f, "| Voters | %d |\n", numVoters)
+		fmt.Fprintf(f, "| Workers | %d |\n", workers)
+		fmt.Fprintf(f, "| CredGen (sequential) | %v |\n", credTime.Round(time.Millisecond))
+		fmt.Fprintf(f, "| VoteCast (parallel) | %v |\n", voteTime.Round(time.Millisecond))
+		fmt.Fprintf(f, "| Per vote (parallel) | %v |\n", (voteTime/time.Duration(numVoters)).Round(time.Microsecond))
+		fmt.Fprintf(f, "| Throughput | %.2f votes/sec |\n", throughput)
+		fmt.Fprintf(f, "| Total (cred+cast) | %v |\n", totalTime.Round(time.Millisecond))
+		fmt.Fprintf(f, "| Cast errors | %d |\n", castErrCount)
+		f.Close()
+	}
+}
 
 func TestScalabilityBenchmark(t *testing.T) {
 	// Skip in short mode
@@ -68,7 +208,7 @@ func runVotingBenchmark(t *testing.T, numVoters int) BenchmarkResult {
 	paillierPK := paillierSK.PublicKey
 	pedersenParams, _ := crypto.GeneratePedersenParams(512)
 	ringParams, _ := crypto.GenerateRingParams(256)
-	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "benchmark_election")
+	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "benchmark_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	// Eligible voters list
 	eligibleVoters := make([]string, numVoters)
@@ -77,7 +217,7 @@ func runVotingBenchmark(t *testing.T, numVoters int) BenchmarkResult {
 	}
 
 	// Create registration system
-	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "benchmark_election")
+	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "benchmark_election", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Create election
 	election := &voting.Election{
@@ -110,7 +250,7 @@ func runVotingBenchmark(t *testing.T, numVoters int) BenchmarkResult {
 		}
 
 		// Register voter with password
-		_, err = registrationSystem.RegisterVoterWithPassword(voterID, []byte("password123"))
+		_, err = registrationSystem.RegisterVoterWithPassword(voterID, []byte("password123"), "blink_count", "2")
 		if err != nil {
 			t.Fatalf("Registration failed: %v", err)
 		}
@@ -221,7 +361,7 @@ func BenchmarkFullVoteCastPipeline(b *testing.B) {
 	signerIndex := 42 // arbitrary signer
 
 	// SMDC setup
-	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "bench-election")
+	smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, "bench-election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	// SA2 setup
 	splitter := sa2.NewVoteSplitter(paillierKey.PublicKey)
@@ -253,7 +393,7 @@ func BenchmarkFullVoteCastPipeline(b *testing.B) {
 		_, _ = ringParams.Sign(message, ringKeys[signerIndex], ringPubKeys, signerIndex)
 
 		// Step 7: SA2 split
-		_, _ = splitter.SplitVote(fmt.Sprintf("voter-%d", i), weightedVote)
+		_, _ = splitter.SplitVote(fmt.Sprintf("voter-%d", i), []*big.Int{weightedVote})
 	}
 }
 
@@ -296,7 +436,7 @@ func BenchmarkVoteCastPhases(b *testing.B) {
 	})
 
 	b.Run("4_SMDCGenerate", func(b *testing.B) {
-		smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, electionID)
+		smdcGen := smdc.NewSMDCGenerator(pedersenParams, 5, electionID, []byte("test-smdc-secret-key-do-not-use-in-prod"))
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
 			smdcGen.GenerateCredential(fmt.Sprintf("voter-%d", i))
@@ -316,7 +456,7 @@ func BenchmarkVoteCastPhases(b *testing.B) {
 		splitter := sa2.NewVoteSplitter(paillierKey.PublicKey)
 		b.ResetTimer()
 		for i := 0; i < b.N; i++ {
-			splitter.SplitVote("voter-bench", encVote)
+			splitter.SplitVote("voter-bench", []*big.Int{encVote})
 		}
 	})
 }
@@ -368,7 +508,7 @@ func TestIndividualOperationTiming(t *testing.T) {
 	pedersenCommit := time.Since(start) / time.Duration(iterations)
 
 	// SMDC Generate
-	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 	start = time.Now()
 	for i := 0; i < iterations; i++ {
 		gen.GenerateCredential("voter")

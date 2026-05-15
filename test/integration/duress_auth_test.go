@@ -48,9 +48,9 @@ func buildAuthTestRouter(t *testing.T) (*gin.Engine, biometric.DuressDetector) {
 	ringParams, _ := icrypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"alice", "bob"}
-	rs := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
+	rs := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 	for _, id := range eligibleVoters {
-		_, _ = rs.RegisterVoterWithPassword(id, []byte("password123"))
+		_, _ = rs.RegisterVoterWithPassword(id, []byte("password123"), "blink_count", "2")
 	}
 
 	detector := biometric.NewInMemoryDuressDetector([]byte("auth-test-hmac-key-32-bytes-ok!"))
