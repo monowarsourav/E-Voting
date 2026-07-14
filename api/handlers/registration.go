@@ -426,10 +426,12 @@ func (h *RegistrationHandler) GetAllVoters(c *gin.Context) {
 //
 // @Summary      Reveal the voter's real SMDC slot index
 // @Description  Returns the real SMDC slot index for the authenticated voter
-//               only when the submitted behavioral duress signal matches the
-//               one registered at sign-up. A mismatch returns 403 and discloses
-//               nothing about the index. This is the sole path through which a
-//               voter learns which of their k slots is real.
+//
+//	only when the submitted behavioral duress signal matches the
+//	one registered at sign-up. A mismatch returns 403 and discloses
+//	nothing about the index. This is the sole path through which a
+//	voter learns which of their k slots is real.
+//
 // @Tags         Voters
 // @Accept       json
 // @Produce      json

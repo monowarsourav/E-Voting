@@ -83,9 +83,11 @@ func NewDuressHandler(d biometric.DuressDetector, rs *voter.RegistrationSystem) 
 //
 // @Summary      Register a behavioral duress signal
 // @Description  Sets (or replaces) a secret behavioral pattern for a voter.
-//               During a coerced vote the voter presents the WRONG pattern;
-//               the server silently zeros the vote weight without informing
-//               the coercer.
+//
+//	During a coerced vote the voter presents the WRONG pattern;
+//	the server silently zeros the vote weight without informing
+//	the coercer.
+//
 // @Tags         Voters
 // @Accept       json
 // @Produce      json
@@ -170,7 +172,9 @@ func (h *DuressHandler) SetSignal(c *gin.Context) {
 //
 // @Summary      Remove a behavioral duress signal
 // @Description  Clears the voter's registered duress signal. Idempotent:
-//               returns 204 even when no signal was registered.
+//
+//	returns 204 even when no signal was registered.
+//
 // @Tags         Voters
 // @Produce      json
 // @Param        voterID  path  string  true  "Voter ID"

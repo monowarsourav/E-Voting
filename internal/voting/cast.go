@@ -1,11 +1,11 @@
 // SECURITY PROPERTIES verified by formal proofs (see security_analysis.tex):
-// - Ballot Privacy (Theorem 1): Encrypted votes indistinguishable under DCRA
-// - ZKP Soundness (Theorem 2): Invalid votes (w∉{0,1} or Σw≠1) detected with overwhelming probability;
-//   enforced by VerifyCredential (binary + sum-one Strong Fiat-Shamir proofs) at registration AND at cast time
-// - Anonymity (Theorem 3): Ring signature hides voter identity among 100 members
-// - Double-Vote Prevention: Key Image uniqueness enforced by DB UNIQUE constraint
-// - Coercion Resistance (Theorem 4): SMDC fake credentials indistinguishable from real
-// - Composition (Theorem 6): Independent randomness across all 7 protocols
+//   - Ballot Privacy (Theorem 1): Encrypted votes indistinguishable under DCRA
+//   - ZKP Soundness (Theorem 2): Invalid votes (w∉{0,1} or Σw≠1) detected with overwhelming probability;
+//     enforced by VerifyCredential (binary + sum-one Strong Fiat-Shamir proofs) at registration AND at cast time
+//   - Anonymity (Theorem 3): Ring signature hides voter identity among 100 members
+//   - Double-Vote Prevention: Key Image uniqueness enforced by DB UNIQUE constraint
+//   - Coercion Resistance (Theorem 4): SMDC fake credentials indistinguishable from real
+//   - Composition (Theorem 6): Independent randomness across all 7 protocols
 package voting
 
 import (

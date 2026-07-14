@@ -152,7 +152,7 @@ func TestE2E10kVotersParallel(t *testing.T) {
 		fmt.Fprintf(f, "| Workers | %d |\n", workers)
 		fmt.Fprintf(f, "| CredGen (sequential) | %v |\n", credTime.Round(time.Millisecond))
 		fmt.Fprintf(f, "| VoteCast (parallel) | %v |\n", voteTime.Round(time.Millisecond))
-		fmt.Fprintf(f, "| Per vote (parallel) | %v |\n", (voteTime/time.Duration(numVoters)).Round(time.Microsecond))
+		fmt.Fprintf(f, "| Per vote (parallel) | %v |\n", (voteTime / time.Duration(numVoters)).Round(time.Microsecond))
 		fmt.Fprintf(f, "| Throughput | %.2f votes/sec |\n", throughput)
 		fmt.Fprintf(f, "| Total (cred+cast) | %v |\n", totalTime.Round(time.Millisecond))
 		fmt.Fprintf(f, "| Cast errors | %d |\n", castErrCount)

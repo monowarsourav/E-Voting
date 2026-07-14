@@ -16,11 +16,11 @@ import (
 type Ballot struct {
 	VoterID        string
 	CandidateID    int
-	EncryptedVotes []*big.Int                       // E_j = (1+n)^{v_j} r_j^n mod n^2, length m
-	Randomness     []*big.Int                       // r_j per candidate (PRIVATE — prover only)
-	BinaryProofs   []*crypto.PaillierBinaryProof    // per-candidate v_j ∈ {0,1}
-	SumProof       *crypto.PaillierSumProof         // Σ v_j = 1
-	Weight         *big.Int                         // From SMDC real slot (should be 1)
+	EncryptedVotes []*big.Int                    // E_j = (1+n)^{v_j} r_j^n mod n^2, length m
+	Randomness     []*big.Int                    // r_j per candidate (PRIVATE — prover only)
+	BinaryProofs   []*crypto.PaillierBinaryProof // per-candidate v_j ∈ {0,1}
+	SumProof       *crypto.PaillierSumProof      // Σ v_j = 1
+	Weight         *big.Int                      // From SMDC real slot (should be 1)
 	Timestamp      int64
 }
 
@@ -37,14 +37,14 @@ type Ballot struct {
 // required to close this gap and is identified as future work in Chapter~5.
 type WeightedVote struct {
 	VoterID             string
-	EncryptedVotes      []*big.Int                       // E_w_j = E_j^finalWeight (for tally)
-	OriginalCiphertexts []*big.Int                       // E_j (kept so proofs remain checkable)
+	EncryptedVotes      []*big.Int // E_w_j = E_j^finalWeight (for tally)
+	OriginalCiphertexts []*big.Int // E_j (kept so proofs remain checkable)
 	BinaryProofs        []*crypto.PaillierBinaryProof
 	SumProof            *crypto.PaillierSumProof
-	SMDCSlotIndex       int                              // Which SMDC slot was used
-	SMDCCommitment      *big.Int                         // Public commitment of the slot
-	RingSignature       *crypto.RingSignature            // Anonymous signature over ciphertext vector
-	RingPublicKeys      []*big.Int                       // Fixed-size ring used for the signature
+	SMDCSlotIndex       int                   // Which SMDC slot was used
+	SMDCCommitment      *big.Int              // Public commitment of the slot
+	RingSignature       *crypto.RingSignature // Anonymous signature over ciphertext vector
+	RingPublicKeys      []*big.Int            // Fixed-size ring used for the signature
 	Timestamp           int64
 }
 

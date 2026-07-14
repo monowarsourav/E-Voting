@@ -371,7 +371,9 @@ func hashPaillierSum(n *big.Int, nonce []byte, electionID string, ciphertexts []
 
 // writeBig length-prefixes a big.Int into the hasher to prevent concatenation
 // ambiguity attacks in Fiat-Shamir.
-func writeBig(hasher interface{ Write(p []byte) (n int, err error) }, v *big.Int) {
+func writeBig(hasher interface {
+	Write(p []byte) (n int, err error)
+}, v *big.Int) {
 	b := v.Bytes()
 	lenBuf := make([]byte, 4)
 	binary.BigEndian.PutUint32(lenBuf, uint32(len(b)))
