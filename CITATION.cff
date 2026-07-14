@@ -1,5 +1,5 @@
 cff-version: 1.2.0
-title: "CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA2"
+title: "A Coercion-Resistant Blockchain E-Voting Framework with Multi-Protocol Cryptography and Post-Quantum Security"
 message: "If you use this software, please cite our paper."
 type: software
 authors:

@@ -1,4 +1,4 @@
-# CovertVote: A Seven-Protocol Blockchain E-Voting System
+# A Coercion-Resistant Blockchain E-Voting Framework with Multi-Protocol Cryptography and Post-Quantum Security
 
 A secure, anonymous, and coercion-resistant electronic voting system implementing seven cryptographic protocols: Paillier homomorphic encryption, Pedersen commitments, zero-knowledge proofs (strong Fiat-Shamir), linkable ring signatures, SMDC (Self-Masking Deniable Credentials), SA² (Samplable Anonymous Aggregation), and Kyber768 post-quantum key encapsulation.
 
@@ -20,7 +20,7 @@ All security reductions and formal proofs are documented in [`internal/crypto/SE
 ## Architecture
 
 ```
-CovertVote System (3-service deployment)
+E-Voting System (3-service deployment)
 ├── API Server (:8080)           — Voter registration, vote casting, election management
 ├── SA2 Leader (:8081)           — Aggregation server A (must be isolated)
 ├── SA2 Helper (:8082)           — Aggregation server B (must be isolated)
