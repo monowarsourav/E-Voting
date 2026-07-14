@@ -6,7 +6,7 @@ authors:
   - given-names: Student
     family-names: Author
     affiliation: "CSE400 Capstone Project"
-repository-code: "https://github.com/covertvote/e-voting"
+repository-code: "https://github.com/monowarsourav/E-Voting"
 license: MIT
 keywords:
   - e-voting

@@ -17,7 +17,7 @@ If you use this software in your research, please cite:
   title     = {CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA2},
   author    = {CSE400 Capstone Team},
   year      = {2026},
-  url       = {https://github.com/covertvote/e-voting},
+  url       = {https://github.com/monowarsourav/E-Voting},
   license   = {MIT}
 }
 ```
@@ -66,8 +66,8 @@ CovertVote System (3-service deployment)
 
 ```bash
 # Clone and build
-git clone https://github.com/covertvote/e-voting.git
-cd e-voting
+git clone https://github.com/monowarsourav/E-Voting.git
+cd E-Voting
 go mod tidy
 
 # Run all tests
