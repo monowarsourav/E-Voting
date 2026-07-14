@@ -218,10 +218,7 @@ func VerifyPaillierBinary(pk *PaillierPublicKey, E *big.Int, proof *PaillierBina
 	eOverGD1 := new(big.Int).Exp(eOverG, proof.D1, n2)
 	rhs1 := new(big.Int).Mul(proof.A1, eOverGD1)
 	rhs1.Mod(rhs1, n2)
-	if s1n.Cmp(rhs1) != 0 {
-		return false
-	}
-	return true
+	return s1n.Cmp(rhs1) == 0
 }
 
 // ProvePaillierSumToOne proves that the product of ciphertexts encrypts 1.
