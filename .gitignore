@@ -111,3 +111,6 @@ certs/
 *.pem
 *.key
 *.crt
+
+# Thesis (kept locally, not tracked in public repo)
+thesis/
