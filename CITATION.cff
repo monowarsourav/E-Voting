@@ -3,9 +3,15 @@ title: "CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA
 message: "If you use this software, please cite our paper."
 type: software
 authors:
-  - given-names: Student
-    family-names: Author
-    affiliation: "CSE400 Capstone Project"
+  - given-names: Monowar Hossen
+    family-names: Sourav
+    affiliation: "Green University of Bangladesh"
+  - given-names: Md. Sajeeb
+    family-names: Mia
+    affiliation: "Green University of Bangladesh"
+  - given-names: Md. Naim
+    family-names: Ahammed
+    affiliation: "Green University of Bangladesh"
 repository-code: "https://github.com/monowarsourav/E-Voting"
 license: MIT
 keywords:

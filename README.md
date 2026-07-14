@@ -15,7 +15,7 @@ If you use this software in your research, please cite:
 ```bibtex
 @software{covertvote2026,
   title     = {CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA2},
-  author    = {CSE400 Capstone Team},
+  author    = {Sourav, Monowar Hossen and Mia, Md. Sajeeb and Ahammed, Md. Naim},
   year      = {2026},
   url       = {https://github.com/monowarsourav/E-Voting},
   license   = {MIT}
