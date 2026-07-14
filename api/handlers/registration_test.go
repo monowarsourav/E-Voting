@@ -29,6 +29,8 @@ func setupTestRegistrationHandler() *RegistrationHandler {
 		5, // SMDC slots
 		eligibleVoters,
 		"test-election-001",
+		[]byte("test-smdc-secret-key-do-not-use-in-prod"),
+		biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")),
 	)
 
 	// Biometric components
@@ -85,8 +87,10 @@ func TestRegisterWithPassword(t *testing.T) {
 			c, _ := gin.CreateTestContext(w)
 
 			reqBody := models.RegistrationRequest{
-				VoterID:  tt.voterID,
-				Password: tt.password,
+				VoterID:     tt.voterID,
+				Password:    tt.password,
+				SignalType:  "blink_count",
+				SignalValue: "2",
 			}
 			jsonData, _ := json.Marshal(reqBody)
 			c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -163,6 +167,8 @@ func TestRegisterWithBiometric(t *testing.T) {
 				VoterID:         tt.voterID,
 				FingerprintData: tt.fingerprintData,
 				LivenessData:    tt.livenessData,
+				SignalType:      "blink_count",
+				SignalValue:     "2",
 			}
 			jsonData, _ := json.Marshal(reqBody)
 			c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -186,8 +192,10 @@ func TestLogin(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	regReq := models.RegistrationRequest{
-		VoterID:  "test_voter",
-		Password: "TestPassword123",
+		VoterID:     "test_voter",
+		Password:    "TestPassword123",
+		SignalType:  "blink_count",
+		SignalValue: "2",
 	}
 	jsonData, _ := json.Marshal(regReq)
 	c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -268,7 +276,9 @@ func TestRegisterMissingAuthMethod(t *testing.T) {
 
 	// No password or fingerprint
 	reqBody := models.RegistrationRequest{
-		VoterID: "voter001",
+		VoterID:     "voter001",
+		SignalType:  "blink_count",
+		SignalValue: "2",
 	}
 	jsonData, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -304,6 +314,8 @@ func TestRegisterMultipleAuthMethods(t *testing.T) {
 		Password:        "Password123",
 		FingerprintData: fingerprintData,
 		LivenessData:    livenessData,
+		SignalType:      "blink_count",
+		SignalValue:     "2",
 	}
 	jsonData, _ := json.Marshal(reqBody)
 	c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))

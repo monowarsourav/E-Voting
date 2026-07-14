@@ -44,6 +44,15 @@ type CryptoConfig struct {
 	PedersenKeySize int
 	RingKeySize     int
 	SMDCSlots       int
+	// DuressHMACKey is the server-side secret for HMAC-SHA256 of behavioral
+	// duress signals. Loaded from DURESS_HMAC_KEY env var. When empty a
+	// hard-coded dev fallback is used and a warning should be logged.
+	DuressHMACKey string
+	// SMDCSecretKey is the server-held HMAC key used to derive each voter's
+	// real SMDC slot index. Knowledge of this key is what makes the real
+	// index unpredictable to a coercer who knows only (voterID, electionID).
+	// Loaded from SMDC_SECRET_KEY env var; required in production.
+	SMDCSecretKey string
 }
 
 // ElectionConfig holds election parameters.
@@ -188,6 +197,8 @@ func LoadConfig() (*Config, error) {
 	} else if ok {
 		cfg.Crypto.SMDCSlots = v
 	}
+	cfg.Crypto.DuressHMACKey = os.Getenv("DURESS_HMAC_KEY")
+	cfg.Crypto.SMDCSecretKey = os.Getenv("SMDC_SECRET_KEY")
 
 	// SA² URLs
 	if v := os.Getenv("SA2_SERVER_A_URL"); v != "" {
@@ -261,6 +272,16 @@ func (c *Config) Validate() error {
 	}
 
 	if c.IsProduction() {
+		// Predictable HMAC key would let an attacker pre-compute valid duress
+		// hashes and bypass coercion-resistance for all voters.
+		if c.Crypto.DuressHMACKey == "" {
+			return errors.New("DURESS_HMAC_KEY is required when ENVIRONMENT=production")
+		}
+		// A leaked or predictable SMDC secret lets an attacker recompute every
+		// voter's real slot index, collapsing SMDC's coercion resistance.
+		if len(c.Crypto.SMDCSecretKey) < 32 {
+			return errors.New("SMDC_SECRET_KEY must be at least 32 characters when ENVIRONMENT=production")
+		}
 		if len(c.Auth.AdminTokens) == 0 {
 			return errors.New("admin_token must be set in production")
 		}

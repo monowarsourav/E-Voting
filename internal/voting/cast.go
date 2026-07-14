@@ -1,10 +1,11 @@
 // SECURITY PROPERTIES verified by formal proofs (see security_analysis.tex):
-// - Ballot Privacy (Theorem 1): Encrypted votes indistinguishable under DCRA
-// - ZKP Soundness (Theorem 2): Invalid votes (w∉{0,1} or Σw≠1) detected with overwhelming probability
-// - Anonymity (Theorem 3): Ring signature hides voter identity among 100 members
-// - Double-Vote Prevention: Key Image uniqueness enforced by DB UNIQUE constraint
-// - Coercion Resistance (Theorem 4): SMDC fake credentials indistinguishable from real
-// - Composition (Theorem 6): Independent randomness across all 7 protocols
+//   - Ballot Privacy (Theorem 1): Encrypted votes indistinguishable under DCRA
+//   - ZKP Soundness (Theorem 2): Invalid votes (w∉{0,1} or Σw≠1) detected with overwhelming probability;
+//     enforced by VerifyCredential (binary + sum-one Strong Fiat-Shamir proofs) at registration AND at cast time
+//   - Anonymity (Theorem 3): Ring signature hides voter identity among 100 members
+//   - Double-Vote Prevention: Key Image uniqueness enforced by DB UNIQUE constraint
+//   - Coercion Resistance (Theorem 4): SMDC fake credentials indistinguishable from real
+//   - Composition (Theorem 6): Independent randomness across all 7 protocols
 package voting
 
 import (
@@ -15,9 +16,11 @@ import (
 	"sync"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/sa2"
 	"github.com/covertvote/e-voting/internal/voter"
+	"github.com/covertvote/e-voting/pkg/audit"
 )
 
 // KeyImageStore provides persistent storage for key images.
@@ -37,14 +40,42 @@ type KeyImageStore interface {
 // image already exists in persistent storage.
 var ErrKeyImageAlreadyUsed = errors.New("key image already used")
 
+// BlockchainSubmitter publishes a cast vote to a permissioned-blockchain
+// chaincode (e.g. Hyperledger Fabric). The interface is defined here, in the
+// voting package, to break a voting -> blockchain -> voting import cycle: the
+// concrete implementation lives in internal/blockchain (FabricClient) and is
+// injected via WithBlockchainSubmitter so the voting package never depends on
+// the chain SDK directly.
+//
+// The signature mirrors FabricClient.SubmitVote so the production
+// implementation satisfies this interface without an adapter.
+type BlockchainSubmitter interface {
+	// SubmitVote publishes a vote to the chain and returns the chain
+	// transaction ID on success. Implementations should be idempotent on
+	// the (voteID, electionID) pair so retries do not produce duplicate
+	// chain entries.
+	SubmitVote(
+		voteID string,
+		electionID string,
+		encryptedVotes []*big.Int,
+		ringSignature *crypto.RingSignature,
+		keyImage *big.Int,
+		smdcCommitment *big.Int,
+		merkleProof [][]byte,
+	) (string, error)
+}
+
 // VoteCaster handles the complete vote casting process
 type VoteCaster struct {
-	BallotCreator      *BallotCreator
-	VoteSplitter       *sa2.VoteSplitter
-	RingParams         *crypto.RingParams
-	RegistrationSystem *voter.RegistrationSystem
-	Election           *Election
-	KeyImageStore      KeyImageStore // persistent key-image storage (may be nil for legacy/test usage)
+	BallotCreator       *BallotCreator
+	VoteSplitter        *sa2.VoteSplitter
+	RingParams          *crypto.RingParams
+	RegistrationSystem  *voter.RegistrationSystem
+	Election            *Election
+	KeyImageStore       KeyImageStore            // persistent key-image storage (may be nil for legacy/test usage)
+	DuressDetector      biometric.DuressDetector // optional; nil = no behavioral duress check
+	Auditor             *audit.AuditLogger       // optional; nil = no structured audit logging
+	BlockchainSubmitter BlockchainSubmitter      // optional; nil = no on-chain submission (receipt.BlockchainTxID stays empty)
 
 	mu            sync.RWMutex
 	castVotes     map[string]*CastVote // voterID -> CastVote
@@ -86,7 +117,50 @@ func WithKeyImageStore(store KeyImageStore) VoteCasterOption {
 	}
 }
 
+// WithDuressDetector attaches a behavioral duress detector. When set, CastVote
+// will check the submitted detected signal against the voter's registered
+// duress signal and zero the behavioral weight on a mismatch — silently, so
+// that a coercer cannot distinguish coerced from genuine votes.
+func WithDuressDetector(d biometric.DuressDetector) VoteCasterOption {
+	return func(vc *VoteCaster) {
+		vc.DuressDetector = d
+	}
+}
+
+// WithAuditor attaches a structured audit logger. When set, security events
+// (e.g. duress signal mismatches) are persisted via the audit subsystem
+// instead of going to stdout.
+func WithAuditor(a *audit.AuditLogger) VoteCasterOption {
+	return func(vc *VoteCaster) {
+		vc.Auditor = a
+	}
+}
+
+// WithBlockchainSubmitter attaches a BlockchainSubmitter (typically a
+// FabricClient). When set, every successfully cast non-coerced vote is
+// published to the chain after the local key image has been persisted, and the
+// returned chain transaction ID is included in the voter's receipt. A
+// submission failure is logged but does not abort the vote: the local key
+// image is the authoritative race guard, and the vote remains durably stored
+// in the local record so the chain submission can be reconciled
+// asynchronously by an operator. Coerced votes (behaviorWeight == 0) are
+// never sent to the chain.
+func WithBlockchainSubmitter(s BlockchainSubmitter) VoteCasterOption {
+	return func(vc *VoteCaster) {
+		vc.BlockchainSubmitter = s
+	}
+}
+
 // CastVote handles the complete vote casting process.
+//
+// detected carries the optional behavioral duress signal submitted with the
+// vote. When non-nil and the voter has a registered duress signal, the HMAC
+// of detected is compared to the stored hash:
+//   - match  → behaviorWeight = 1 (genuine vote)
+//   - mismatch → behaviorWeight = 0 (coerced vote — silently discarded)
+//
+// The response is identical in both cases; the coercer cannot detect
+// whether the vote was counted. An audit log entry is written on mismatch.
 //
 // Concurrency strategy (double-checked locking):
 //  1. Acquire RLock and check in-memory maps (fast path).
@@ -96,7 +170,7 @@ func WithKeyImageStore(store KeyImageStore) VoteCasterOption {
 //     is the authoritative guard against races; if two goroutines pass
 //     the in-memory check concurrently, only one will succeed at the DB.
 //  4. Acquire full Lock and update the in-memory maps.
-func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex int) (*VoteReceipt, error) {
+func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex int, detected *biometric.DetectedSignal) (*VoteReceipt, error) {
 	// Step 1: Verify election is active
 	if !vc.Election.IsActive {
 		return nil, errors.New("election is not active")
@@ -130,17 +204,61 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 	if smdcSlotIndex < 0 || smdcSlotIndex >= voterRecord.SMDCCredential.K {
 		return nil, errors.New("invalid SMDC slot index")
 	}
+
+	// Step 5a: Verify the SMDC credential's ZK proofs at cast time.
+	// Defense-in-depth: registration-time verification already ran, but
+	// re-verifying here closes the gap if a credential were ever modified
+	// in storage and tightens the precondition for Theorem 2 (Vote
+	// Validity). Cost: a small constant number of modular exponentiations
+	// — negligible compared to ring signing and SA² splitting that follow.
+	if vc.RegistrationSystem != nil && vc.RegistrationSystem.SMDCGenerator != nil {
+		pubCred := voterRecord.SMDCCredential.GetPublicCredential()
+		if !vc.RegistrationSystem.SMDCGenerator.VerifyCredential(pubCred) {
+			return nil, errors.New("smdc credential failed ZK verification at cast time")
+		}
+	}
+
 	slot := voterRecord.SMDCCredential.Slots[smdcSlotIndex]
 
-	// Step 6: Create ballot
-	ballot, err := vc.BallotCreator.CreateBallot(voterID, candidateID)
+	// Step 6: Create the 1-hot Paillier ballot with per-candidate binary
+	// proofs and the sum-to-one proof. The proofs are generated against the
+	// ORIGINAL ciphertexts (before SMDC × duress weighting); they remain valid
+	// after weighting because the proofs are stored alongside the original
+	// vector in the WeightedVote.
+	ballot, err := vc.BallotCreator.CreateBallot(voterID, candidateID, vc.Election.Candidates, vc.Election.ElectionID)
 	if err != nil {
 		return nil, err
 	}
+	// Defence-in-depth: re-verify our own freshly minted ZK proofs before
+	// proceeding, so a programming error in the prover surfaces locally.
+	if !vc.BallotCreator.VerifyBallotZK(ballot.EncryptedVotes, ballot.BinaryProofs, ballot.SumProof) {
+		return nil, errors.New("self-check: freshly generated ballot ZK proofs failed verification")
+	}
 
-	// Step 7: Apply SMDC weight to encrypted vote
-	// E(vote)^weight = E(vote × weight)
-	weightedEncryptedVote := vc.BallotCreator.ApplyWeight(ballot.EncryptedVote, slot.Weight)
+	// Step 7: Compute final weight = smdcWeight × behaviorWeight.
+	//
+	// Behavioral duress signal check:
+	// If the voter registered a secret behavioral pattern (e.g. "2 blinks"),
+	// the client must include the matching detected_signal_* fields. A mismatch
+	// zeros behaviorWeight so the encrypted vote is multiplied by 0 — the vote
+	// is silently not counted. The response to the voter is identical to a
+	// normal successful vote, so a coercer cannot detect the discard.
+	behaviorWeight := big.NewInt(1)
+	if vc.DuressDetector != nil &&
+		vc.DuressDetector.HasSignal(voterID) &&
+		detected != nil {
+		ok, err := vc.DuressDetector.VerifySignal(voterID, detected.SignalType, detected.SignalValue)
+		if err != nil || !ok {
+			// Weight zeroed — the audit event is emitted later at the
+			// short-circuit point where finalWeight is confirmed to be 0.
+			behaviorWeight = big.NewInt(0)
+		}
+	}
+
+	// finalWeight = smdcWeight × behaviorWeight (both are 0 or 1).
+	// Per-candidate Paillier scalar multiplication: E_w_j = E_j^finalWeight.
+	finalWeight := new(big.Int).Mul(slot.Weight, behaviorWeight)
+	weightedEncryptedVotes := vc.BallotCreator.ApplyWeight(ballot.EncryptedVotes, finalWeight)
 
 	// Step 8: Create ring signature with FIXED ring size
 	// Get all registered public keys
@@ -172,8 +290,15 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 		return nil, err
 	}
 
-	// Sign the weighted vote with the fixed-size ring
-	message := weightedEncryptedVote.Bytes()
+	// Sign the SHA-256 hash of the concatenated per-candidate weighted
+	// ciphertexts. Hashing keeps the ring-sig message constant-size regardless
+	// of m and provides domain separation against accidentally signing other
+	// byte-streams that share a prefix.
+	msgHash := sha256.New()
+	for _, ej := range weightedEncryptedVotes {
+		msgHash.Write(ej.Bytes())
+	}
+	message := msgHash.Sum(nil)
 	ringSignature, err := vc.RingParams.Sign(message, voterRecord.RingPublicKey, ringPubKeys, newSignerIndex)
 	if err != nil {
 		return nil, err
@@ -189,19 +314,24 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 	}
 	vc.mu.RUnlock()
 
-	// Step 10: Create weighted vote
+	// Step 10: Create the weighted vote record. We retain the original
+	// (unweighted) ciphertexts so the ZK proofs remain checkable downstream;
+	// the weighted ciphertexts feed the tally.
 	weightedVote := &WeightedVote{
-		VoterID:        voterID,
-		EncryptedVote:  weightedEncryptedVote,
-		SMDCSlotIndex:  smdcSlotIndex,
-		SMDCCommitment: slot.Commitment.C,
-		RingSignature:  ringSignature,
-		RingPublicKeys: ringPubKeys, // Store the fixed-size ring used
-		Timestamp:      currentTime,
+		VoterID:             voterID,
+		EncryptedVotes:      weightedEncryptedVotes,
+		OriginalCiphertexts: ballot.EncryptedVotes,
+		BinaryProofs:        ballot.BinaryProofs,
+		SumProof:            ballot.SumProof,
+		SMDCSlotIndex:       smdcSlotIndex,
+		SMDCCommitment:      slot.Commitment.C,
+		RingSignature:       ringSignature,
+		RingPublicKeys:      ringPubKeys,
+		Timestamp:           currentTime,
 	}
 
-	// Step 11: Split vote for SA²
-	voteShares, err := vc.VoteSplitter.SplitVote(voterID, weightedEncryptedVote)
+	// Step 11: Split the weighted ciphertext vector for SA² (per-candidate).
+	voteShares, err := vc.VoteSplitter.SplitVote(voterID, weightedEncryptedVotes)
 	if err != nil {
 		return nil, err
 	}
@@ -219,6 +349,27 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 		VoteShares:       voteShares,
 		MerkleProof:      merkleProof,
 		PublicCredential: voterRecord.SMDCCredential.GetPublicCredential(),
+	}
+
+	// ---- Coerced-vote short-circuit (Issue 6: iteration attack) ----
+	// When behaviorWeight == 0, the voter is under coercion and intentionally
+	// submitted the wrong behavioral signal. We must NOT persist the key image
+	// or record the voter as having voted — doing so would prevent them from
+	// casting a genuine vote once the coercer is gone. A plausible receipt is
+	// returned so the coercer cannot distinguish this path from a genuine vote.
+	//
+	// We key on behaviorWeight (not finalWeight) because finalWeight=0 can also
+	// arise from an SMDC decoy slot, which is a legitimate privacy mechanism
+	// and should still be recorded as a cast vote to prevent double-voting.
+	//
+	// SECURITY NOTE: The ciphertext produced for behaviorWeight=0 is
+	// E(vote)^0 = E(0), computationally indistinguishable under DCRA.
+	// All expensive crypto (ring sig, SA² split) is completed before this
+	// branch so timing is not observable by the caller.
+	if behaviorWeight.Sign() == 0 {
+		_ = vc.Auditor.LogDuressSignalMismatch(voterID, vc.Election.ElectionID, "")
+		receipt := vc.generateReceipt(voterID, ringSignature.KeyImage)
+		return receipt, nil
 	}
 
 	// ---- Persist key image OUTSIDE the mutex ----
@@ -249,18 +400,70 @@ func (vc *VoteCaster) CastVote(voterID string, candidateID int, smdcSlotIndex in
 	vc.usedKeyImages[keyImageStr] = true
 	vc.mu.Unlock()
 
-	// Step 15: Generate receipt
+	// Step 14: Submit to blockchain (optional, best-effort).
+	//
+	// Performed AFTER local commit so the key image is the race guard and a
+	// transient chain outage does not block the voter. On success the chain
+	// transaction ID is returned in the receipt; on failure the vote is still
+	// considered cast locally and the failure is recorded via the auditor for
+	// later reconciliation.
+	chainTxID := vc.submitToChain(voterID, keyImageStr, weightedVote, castVote.MerkleProof)
+
+	// Step 15: Generate receipt (carrying the chain transaction ID when
+	// submission succeeded, or empty string when the submitter is absent
+	// or returned an error).
 	receipt := vc.generateReceipt(voterID, ringSignature.KeyImage)
+	receipt.BlockchainTxID = chainTxID
 
 	return receipt, nil
 }
 
-// VerifyVote verifies a cast vote
-func (vc *VoteCaster) VerifyVote(castVote *CastVote) bool {
-	// Verify ring signature using the stored ring public keys
-	message := castVote.WeightedVote.EncryptedVote.Bytes()
+// submitToChain publishes a successfully cast vote to the configured
+// blockchain submitter. Returns the chain transaction ID on success, or the
+// empty string if no submitter is configured or the submission failed. A
+// failure is non-fatal: the vote is already durably stored locally and the
+// key image is consumed, so the operator can reconcile asynchronously.
+func (vc *VoteCaster) submitToChain(
+	voterID string,
+	keyImageHex string,
+	wv *WeightedVote,
+	merkleProof [][]byte,
+) string {
+	if vc.BlockchainSubmitter == nil {
+		return ""
+	}
+	voteID := vc.Election.ElectionID + ":" + keyImageHex
+	txID, err := vc.BlockchainSubmitter.SubmitVote(
+		voteID,
+		vc.Election.ElectionID,
+		wv.EncryptedVotes,
+		wv.RingSignature,
+		wv.RingSignature.KeyImage,
+		wv.SMDCCommitment,
+		merkleProof,
+	)
+	if err != nil {
+		_ = vc.Auditor.LogFailure(audit.EventVoteCast, "blockchain_submit", voterID, err.Error(), map[string]interface{}{
+			"election_id": vc.Election.ElectionID,
+			"vote_id":     voteID,
+		})
+		return ""
+	}
+	return txID
+}
 
-	// Use the fixed-size ring that was stored with the vote
+// VerifyVote verifies a cast vote: ring signature over the weighted ciphertext
+// vector, Merkle eligibility proof, SMDC credential ZK proofs, and the
+// per-candidate Paillier-direct ZK proofs (binary + sum-to-one) on the
+// original ciphertexts.
+func (vc *VoteCaster) VerifyVote(castVote *CastVote) bool {
+	// Recompute the ring-sig message over the weighted ciphertext vector.
+	msgHash := sha256.New()
+	for _, ej := range castVote.WeightedVote.EncryptedVotes {
+		msgHash.Write(ej.Bytes())
+	}
+	message := msgHash.Sum(nil)
+
 	if !vc.RingParams.Verify(message, castVote.WeightedVote.RingSignature, castVote.WeightedVote.RingPublicKeys) {
 		return false
 	}
@@ -271,10 +474,25 @@ func (vc *VoteCaster) VerifyVote(castVote *CastVote) bool {
 		return false
 	}
 
-	// Verify SMDC credential
-	// Note: We'd need PedersenParams here, should be passed to VoteCaster
-	// For now, skip detailed SMDC verification
-	_ = castVote.PublicCredential // Use the variable
+	// Verify per-candidate Paillier ZK proofs against the original ciphertexts.
+	if vc.BallotCreator != nil && castVote.WeightedVote.OriginalCiphertexts != nil {
+		if !vc.BallotCreator.VerifyBallotZK(
+			castVote.WeightedVote.OriginalCiphertexts,
+			castVote.WeightedVote.BinaryProofs,
+			castVote.WeightedVote.SumProof,
+		) {
+			return false
+		}
+	}
+
+	// Verify SMDC credential ZK proofs (binary + sum-one) using the
+	// SMDCGenerator that owns the Pedersen parameters. This enforces
+	// Theorem 2 (Vote Validity) at verification time as well.
+	if vc.RegistrationSystem != nil && vc.RegistrationSystem.SMDCGenerator != nil && castVote.PublicCredential != nil {
+		if !vc.RegistrationSystem.SMDCGenerator.VerifyCredential(castVote.PublicCredential) {
+			return false
+		}
+	}
 
 	return true
 }
@@ -328,7 +546,7 @@ func (vc *VoteCaster) generateReceipt(voterID string, keyImage *big.Int) *VoteRe
 		VoterID:        voterID,
 		ReceiptID:      receiptID,
 		Timestamp:      time.Now().Unix(),
-		BlockchainTxID: "", // TODO: Add when blockchain is integrated
+		BlockchainTxID: "", // Populated after blockchain submission
 		KeyImage:       keyImage,
 	}
 }

@@ -1,0 +1,11 @@
+=== RUN   TestScalabilityBenchmark
+    voting_benchmark_test.go:40: Testing with 100 voters...
+    voting_benchmark_test.go:44: Voters: 100 | Total: 6.775674752s | Per Vote: 67.756747ms
+    voting_benchmark_test.go:40: Testing with 1000 voters...
+    voting_benchmark_test.go:44: Voters: 1000 | Total: 1m7.245151016s | Per Vote: 67.245151ms
+    voting_benchmark_test.go:40: Testing with 10000 voters...
+    voting_benchmark_test.go:44: Voters: 10000 | Total: 11m53.665841555s | Per Vote: 71.366584ms
+    voting_benchmark_test.go:50: Results saved to test/benchmark/results/benchmark_results.md
+--- PASS: TestScalabilityBenchmark (791.74s)
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	791.809s

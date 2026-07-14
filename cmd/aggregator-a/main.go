@@ -155,9 +155,14 @@ func (s *AggregatorServerA) aggregate(c *gin.Context) {
 		return
 	}
 
-	// Aggregate shares
+	// Aggregate shares.
+	// NOTE: This standalone aggregator microservice still receives single-position
+	// shares (legacy single-candidate API); the integrated cast pipeline performs
+	// per-candidate aggregation locally via voting.CastVote.VoteShares. The
+	// candidate-index argument is therefore 0 here. A per-candidate aggregator HTTP
+	// API is identified as future work.
 	log.Printf("Server A: Aggregating %d shares for election %s", len(shares), req.ElectionID)
-	result := s.Aggregator.AggregateShares(shares)
+	result := s.Aggregator.AggregateShares(0, shares)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success":          true,

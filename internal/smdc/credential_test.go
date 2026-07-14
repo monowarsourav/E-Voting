@@ -9,7 +9,7 @@ import (
 func TestSMDCGeneration(t *testing.T) {
 	// Setup
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := NewSMDCGenerator(pp, 5, "test-election-001") // k=5 slots
+	gen := NewSMDCGenerator(pp, 5, "test-election-001", []byte("test-smdc-secret-key-do-not-use-in-prod")) // k=5 slots
 
 	// Generate credential
 	cred, realIndex, err := gen.GenerateCredential("voter123")
@@ -48,7 +48,7 @@ func TestSMDCGeneration(t *testing.T) {
 
 func TestSMDCVerification(t *testing.T) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := NewSMDCGenerator(pp, 5, "test-election-001")
+	gen := NewSMDCGenerator(pp, 5, "test-election-001", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	cred, _, _ := gen.GenerateCredential("voter456")
 	pub := cred.GetPublicCredential()
@@ -61,7 +61,7 @@ func TestSMDCVerification(t *testing.T) {
 
 func TestSMDCCoercionResistance(t *testing.T) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := NewSMDCGenerator(pp, 5, "test-election-001")
+	gen := NewSMDCGenerator(pp, 5, "test-election-001", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	cred, realIndex, _ := gen.GenerateCredential("voter789")
 
@@ -92,7 +92,7 @@ func TestSMDCCoercionResistance(t *testing.T) {
 
 func TestSMDCCannotGetRealAsFake(t *testing.T) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := NewSMDCGenerator(pp, 5, "test-election-001")
+	gen := NewSMDCGenerator(pp, 5, "test-election-001", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	cred, realIndex, _ := gen.GenerateCredential("voter000")
 
@@ -105,7 +105,7 @@ func TestSMDCCannotGetRealAsFake(t *testing.T) {
 
 func TestSMDCDeriveRealIndexDeterministic(t *testing.T) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := NewSMDCGenerator(pp, 5, "test-election-001")
+	gen := NewSMDCGenerator(pp, 5, "test-election-001", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	// DeriveRealIndex should return the same value for the same inputs
 	idx1 := gen.DeriveRealIndex("voter123")

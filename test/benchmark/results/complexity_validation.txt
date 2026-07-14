@@ -1,0 +1,17 @@
+=== RUN   TestComplexityValidation
+    scalability_test.go:137: Pre-encrypting vote pool for complexity validation...
+
+=== O(n) Complexity Validation (n=1000 voters) ===
+Candidates | Tally Time (ms) | Per-Candidate (ms)
+-----------|-----------------|--------------------
+         2 |           14.00 |               7.00
+         5 |           32.00 |               6.40
+        10 |           58.00 |               5.80
+        20 |          132.00 |               6.60
+        50 |          320.00 |               6.40
+
+Note: If per-candidate time is roughly constant, this confirms O(n×m) = O(n) per candidate.
+ISE-Voting's O(n×m²) would show per-candidate time GROWING with m.
+--- PASS: TestComplexityValidation (0.63s)
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	0.632s

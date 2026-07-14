@@ -83,7 +83,7 @@ func BenchmarkPedersenCommit(b *testing.B) {
 
 func BenchmarkSMDCGenerate(b *testing.B) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -93,7 +93,7 @@ func BenchmarkSMDCGenerate(b *testing.B) {
 
 func BenchmarkSMDCVerify(b *testing.B) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 	cred, _, _ := gen.GenerateCredential("voter")
 	pub := cred.GetPublicCredential()
 
@@ -106,7 +106,7 @@ func BenchmarkSMDCVerify(b *testing.B) {
 // Different K values
 func BenchmarkSMDCGenerateK3(b *testing.B) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := smdc.NewSMDCGenerator(pp, 3, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 3, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gen.GenerateCredential("voter")
@@ -115,7 +115,7 @@ func BenchmarkSMDCGenerateK3(b *testing.B) {
 
 func BenchmarkSMDCGenerateK5(b *testing.B) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 5, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gen.GenerateCredential("voter")
@@ -124,7 +124,7 @@ func BenchmarkSMDCGenerateK5(b *testing.B) {
 
 func BenchmarkSMDCGenerateK10(b *testing.B) {
 	pp, _ := crypto.GeneratePedersenParams(512)
-	gen := smdc.NewSMDCGenerator(pp, 10, "bench_election")
+	gen := smdc.NewSMDCGenerator(pp, 10, "bench_election", []byte("test-smdc-secret-key-do-not-use-in-prod"))
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		gen.GenerateCredential("voter")
@@ -143,7 +143,7 @@ func BenchmarkSA2Split(b *testing.B) {
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		sg.SplitVote(fmt.Sprintf("voter_%d", i), encVote)
+		sg.SplitVote(fmt.Sprintf("voter_%d", i), []*big.Int{encVote})
 	}
 }
 

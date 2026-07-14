@@ -3,14 +3,16 @@ package main
 import (
 	"encoding/json"
 	"fmt"
-	"time"
 
 	"github.com/hyperledger/fabric-chaincode-go/pkg/cid"
 	"github.com/hyperledger/fabric-contract-api-go/contractapi"
 )
 
 // AdminMSPID is the MSP ID that has administrative privileges for election management.
-const AdminMSPID = "ElectionCommissionMSP"
+// AdminMSPID is the MSP ID with admin privileges.
+// In production, set to a dedicated Election Commission org (e.g. "ElectionCommissionMSP").
+// For testing/demo, Org1 acts as the admin.
+const AdminMSPID = "Org1MSP"
 
 // VoteChaincode provides functions for managing votes on the blockchain
 type VoteChaincode struct {
@@ -138,6 +140,10 @@ func (vc *VoteChaincode) CreateElection(
 		return fmt.Errorf("failed to parse candidates: %v", err)
 	}
 
+	// Use deterministic transaction timestamp (same across all endorsers).
+	txTime, _ := ctx.GetStub().GetTxTimestamp()
+	now := txTime.GetSeconds()
+
 	election := Election{
 		ElectionID:  electionID,
 		Title:       title,
@@ -145,8 +151,8 @@ func (vc *VoteChaincode) CreateElection(
 		Candidates:  candidates,
 		StartTime:   startTime,
 		EndTime:     endTime,
-		IsActive:    startTime <= time.Now().Unix(),
-		CreatedAt:   time.Now().Unix(),
+		IsActive:    startTime <= now,
+		CreatedAt:   now,
 	}
 
 	electionJSON, err := json.Marshal(election)
@@ -194,6 +200,9 @@ func (vc *VoteChaincode) CastVote(
 		return fmt.Errorf("double-vote detected: key image already used")
 	}
 
+	// Use deterministic transaction timestamp.
+	txTime, _ := ctx.GetStub().GetTxTimestamp()
+
 	// Create vote record
 	vote := Vote{
 		VoteID:         voteID,
@@ -203,7 +212,7 @@ func (vc *VoteChaincode) CastVote(
 		KeyImage:       keyImage,
 		SMDCCommitment: smdcCommitment,
 		MerkleProof:    merkleProof,
-		Timestamp:      time.Now().Unix(),
+		Timestamp:      txTime.GetSeconds(),
 		OwnerID:        callerID,
 	}
 
@@ -393,11 +402,13 @@ func (vc *VoteChaincode) StoreTallyResult(
 		return fmt.Errorf("failed to parse candidate tallies: %v", err)
 	}
 
+	txTime, _ := ctx.GetStub().GetTxTimestamp()
+
 	result := TallyResult{
 		ElectionID:       electionID,
 		CandidateTallies: candidateTallies,
 		TotalVotes:       totalVotes,
-		TallyTime:        time.Now().Unix(),
+		TallyTime:        txTime.GetSeconds(),
 		Verified:         true,
 	}
 

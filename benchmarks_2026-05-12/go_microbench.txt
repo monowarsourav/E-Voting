@@ -1,0 +1,68 @@
+=== Homomorphic Tally Scalability ===
+Voters | Tally Time (ms) | Per-Vote (μs)
+-------|-----------------|---------------
+    100 |            0.00 |          6.06
+    500 |            3.00 |          6.49
+   1000 |            5.00 |          5.57
+   5000 |           30.00 |          6.14
+  10000 |           63.00 |          6.37
+  50000 |          302.00 |          6.06
+ 100000 |          664.00 |          6.64
+
+=== Ring Signature Scalability ===
+Ring Size | Sign Time (ms) | Verify Time (ms)
+----------|----------------|------------------
+       10 |           2.40 |             2.40
+       25 |           6.20 |             6.20
+       50 |          12.00 |            12.20
+      100 |          23.60 |            24.00
+      200 |          48.00 |            47.50
+      500 |         120.00 |           120.00
+
+=== O(n) Complexity Validation (n=1000 voters) ===
+Candidates | Tally Time (ms) | Per-Candidate (ms)
+-----------|-----------------|--------------------
+         2 |           11.00 |               5.50
+         5 |           31.00 |               6.20
+        10 |           58.00 |               5.80
+        20 |          115.00 |               5.75
+        50 |          281.00 |               5.62
+
+Note: If per-candidate time is roughly constant, this confirms O(n×m) = O(n) per candidate.
+ISE-Voting's O(n×m²) would show per-candidate time GROWING with m.
+goos: linux
+goarch: amd64
+pkg: github.com/covertvote/e-voting/test/benchmark
+cpu: AMD Ryzen 5 7530U with Radeon Graphics         
+BenchmarkPaillierKeyGen-12             	      44	 119269683 ns/op	 2896216 B/op	    7459 allocs/op
+BenchmarkPaillierEncrypt-12            	     406	   9014522 ns/op	   30901 B/op	      37 allocs/op
+BenchmarkPaillierDecrypt-12            	     410	   8705028 ns/op	   25997 B/op	      29 allocs/op
+BenchmarkPaillierHomomorphicAdd-12     	  628231	      6047 ns/op	    1761 B/op	       3 allocs/op
+BenchmarkPedersenParamsGen-12          	       4	3840917525 ns/op	352966938 B/op	 1319598 allocs/op
+BenchmarkPedersenCommit-12             	   38070	     83404 ns/op	    5322 B/op	      38 allocs/op
+BenchmarkSMDCGenerate-12               	    1958	   1807579 ns/op	   93557 B/op	     801 allocs/op
+BenchmarkSMDCVerify-12                 	    1920	   1841669 ns/op	   91999 B/op	     697 allocs/op
+BenchmarkSMDCGenerateK3-12             	    3370	   1088337 ns/op	   57703 B/op	     495 allocs/op
+BenchmarkSMDCGenerateK5-12             	    1974	   1805145 ns/op	   93481 B/op	     799 allocs/op
+BenchmarkSMDCGenerateK10-12            	     978	   3443967 ns/op	  182812 B/op	    1556 allocs/op
+BenchmarkSA2Split-12                   	      92	  35202477 ns/op	  104060 B/op	     118 allocs/op
+BenchmarkRingSign10-12                 	    4018	    960614 ns/op	   87078 B/op	    1018 allocs/op
+BenchmarkRingSign50-12                 	     766	   4919701 ns/op	  443393 B/op	    5170 allocs/op
+BenchmarkRingSign100-12                	     372	   9523332 ns/op	  889002 B/op	   10372 allocs/op
+BenchmarkZKPBinaryProve-12             	   14227	    252492 ns/op	   12542 B/op	     102 allocs/op
+BenchmarkZKPBinaryVerify-12            	   10000	    321183 ns/op	   16392 B/op	     123 allocs/op
+BenchmarkZKPSumOneProve-12             	   41946	     86081 ns/op	    5787 B/op	      55 allocs/op
+BenchmarkZKPSumOneVerify-12            	   22136	    164319 ns/op	   10037 B/op	      82 allocs/op
+BenchmarkThresholdKeyGen-12            	       1	33562341048 ns/op	908605776 B/op	 2351221 allocs/op
+BenchmarkThresholdPartialDecrypt-12    	     100	  36685188 ns/op	   52473 B/op	      67 allocs/op
+BenchmarkThresholdCombine3of5-12       	   13105	    267354 ns/op	   46550 B/op	     104 allocs/op
+BenchmarkRingVerify100-12              	     375	   9791481 ns/op	  875376 B/op	    9964 allocs/op
+BenchmarkFullVoteCastPipeline-12       	      44	  71621746 ns/op	 1748768 B/op	   12168 allocs/op
+BenchmarkVoteCastPhases/1_PaillierEncrypt-12         	     399	   8911648 ns/op	   26221 B/op	      31 allocs/op
+BenchmarkVoteCastPhases/2_PedersenCommit-12          	   44427	     85005 ns/op	    3962 B/op	      31 allocs/op
+BenchmarkVoteCastPhases/3_ZKPBinaryProve-12          	   13867	    252036 ns/op	   12542 B/op	     102 allocs/op
+BenchmarkVoteCastPhases/4_SMDCGenerate-12            	    2060	   1784985 ns/op	   93570 B/op	     801 allocs/op
+BenchmarkVoteCastPhases/5_RingSign100-12             	     144	  24868582 ns/op	 1506441 B/op	   11082 allocs/op
+BenchmarkVoteCastPhases/6_SA2Split-12                	      98	  35394451 ns/op	  103940 B/op	     117 allocs/op
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	1227.816s

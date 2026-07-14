@@ -14,6 +14,7 @@ type Dependencies struct {
 	Voting       *handlers.VotingHandler
 	Tally        *handlers.TallyHandler
 	Health       *handlers.HealthHandler
+	Duress       *handlers.DuressHandler // optional; nil disables the duress-signal endpoint
 
 	// Rate limiters — standard for public reads, strict for sensitive ops.
 	StandardLimiter *middleware.RateLimiter
@@ -50,6 +51,16 @@ func SetupRoutes(router *gin.Engine, deps Dependencies) {
 			authenticated.POST("/vote", deps.Voting.CastVote)
 			authenticated.POST("/verify-vote", deps.Voting.VerifyVote)
 			authenticated.GET("/results/:electionId", deps.Tally.GetResults)
+
+			// Reveal-slot-index: voter retrieves their real SMDC slot by
+			// presenting the duress signal registered at sign-up.
+			authenticated.POST("/voters/:voterID/reveal-slot-index", deps.Registration.RevealSlotIndex)
+
+			// Behavioral duress signal — coercion-resistance feature.
+			if deps.Duress != nil {
+				authenticated.POST("/voters/:voterID/duress-signal", deps.Duress.SetSignal)
+				authenticated.DELETE("/voters/:voterID/duress-signal", deps.Duress.RemoveSignal)
+			}
 		}
 
 		admin := v1.Group("/admin")

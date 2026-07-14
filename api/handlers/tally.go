@@ -69,8 +69,18 @@ func (h *TallyHandler) TallyVotes(c *gin.Context) {
 		return
 	}
 
+	// Look up the election so we know how many candidate columns to tally.
+	election, ok := h.Elections[req.ElectionID]
+	if !ok || election == nil {
+		c.JSON(http.StatusNotFound, models.ErrorResponse{
+			Error:   "election_not_found",
+			Code:    http.StatusNotFound,
+			Message: "Unknown election ID.",
+		})
+		return
+	}
 	// Tally votes
-	result, err := h.Counter.TallyVotes(voteShares, req.ElectionID)
+	result, err := h.Counter.TallyVotes(voteShares, req.ElectionID, len(election.Candidates))
 	if err != nil {
 		log.Printf("[ERROR] tally failed for election %s: %v", req.ElectionID, err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{
@@ -174,7 +184,7 @@ func (h *TallyHandler) GetResults(c *gin.Context) {
 	}
 
 	// Tally votes
-	result, err := h.Counter.TallyVotes(voteShares, electionID)
+	result, err := h.Counter.TallyVotes(voteShares, electionID, len(election.Candidates))
 	if err != nil {
 		log.Printf("[ERROR] GetResults tally failed for election %s: %v", electionID, err)
 		c.JSON(http.StatusInternalServerError, models.ErrorResponse{

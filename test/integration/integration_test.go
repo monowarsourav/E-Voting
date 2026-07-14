@@ -28,7 +28,7 @@ func TestCompleteVotingFlowWithPassword(t *testing.T) {
 	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"alice", "bob"}
-	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
+	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
 	livenessDetector := biometric.NewLivenessDetector(0.5)
@@ -58,8 +58,10 @@ func TestCompleteVotingFlowWithPassword(t *testing.T) {
 		c, _ := gin.CreateTestContext(w)
 
 		regReq := models.RegistrationRequest{
-			VoterID:  "alice",
-			Password: "SecurePassword123",
+			VoterID:     "alice",
+			Password:    "SecurePassword123",
+			SignalType:  "blink_count",
+			SignalValue: "2",
 		}
 		jsonData, _ := json.Marshal(regReq)
 		c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -171,7 +173,7 @@ func TestCompleteVotingFlowWithBiometric(t *testing.T) {
 	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"bob"}
-	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
+	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
 	livenessDetector := biometric.NewLivenessDetector(0.5)
@@ -214,6 +216,8 @@ func TestCompleteVotingFlowWithBiometric(t *testing.T) {
 			VoterID:         "bob",
 			FingerprintData: fingerprintData,
 			LivenessData:    livenessData,
+			SignalType:      "blink_count",
+			SignalValue:     "2",
 		}
 		jsonData, _ := json.Marshal(regReq)
 		c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))
@@ -300,7 +304,7 @@ func TestVotingWithoutBiometricsRejected(t *testing.T) {
 	ringParams, _ := crypto.GenerateRingParams(512)
 
 	eligibleVoters := []string{"charlie"}
-	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001")
+	registrationSystem := voter.NewRegistrationSystem(pedersenParams, ringParams, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
 	livenessDetector := biometric.NewLivenessDetector(0.5)
@@ -328,8 +332,10 @@ func TestVotingWithoutBiometricsRejected(t *testing.T) {
 	w := httptest.NewRecorder()
 	c, _ := gin.CreateTestContext(w)
 	regReq := models.RegistrationRequest{
-		VoterID:  "charlie",
-		Password: "Password123",
+		VoterID:     "charlie",
+		Password:    "Password123",
+		SignalType:  "blink_count",
+		SignalValue: "2",
 	}
 	jsonData, _ := json.Marshal(regReq)
 	c.Request = httptest.NewRequest("POST", "/register", bytes.NewBuffer(jsonData))

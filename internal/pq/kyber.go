@@ -1,9 +1,12 @@
 package pq
 
 import (
+	"crypto/aes"
+	"crypto/cipher"
 	"crypto/rand"
 	"crypto/sha256"
 	"errors"
+	"fmt"
 	"math/big"
 
 	"github.com/cloudflare/circl/kem"
@@ -89,7 +92,59 @@ func DeriveKey(sharedSecret []byte, salt []byte) []byte {
 	return h.Sum(nil)
 }
 
-// XOREncrypt performs XOR encryption with the derived key
+// AESGCMEncrypt performs AES-256-GCM authenticated encryption.
+// AES-GCM is an AEAD cipher providing both confidentiality and integrity.
+func AESGCMEncrypt(plaintext []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key[:32]) // AES-256 requires 32-byte key
+	if err != nil {
+		return nil, fmt.Errorf("aes.NewCipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.NewGCM: %w", err)
+	}
+
+	nonce := make([]byte, aesGCM.NonceSize())
+	if _, err := rand.Read(nonce); err != nil {
+		return nil, fmt.Errorf("nonce generation: %w", err)
+	}
+
+	// Seal appends the encrypted+authenticated ciphertext to nonce
+	// Output format: nonce || ciphertext || tag
+	return aesGCM.Seal(nonce, nonce, plaintext, nil), nil
+}
+
+// AESGCMDecrypt performs AES-256-GCM authenticated decryption.
+// Returns error if the ciphertext has been tampered with.
+func AESGCMDecrypt(ciphertext []byte, key []byte) ([]byte, error) {
+	block, err := aes.NewCipher(key[:32])
+	if err != nil {
+		return nil, fmt.Errorf("aes.NewCipher: %w", err)
+	}
+
+	aesGCM, err := cipher.NewGCM(block)
+	if err != nil {
+		return nil, fmt.Errorf("cipher.NewGCM: %w", err)
+	}
+
+	nonceSize := aesGCM.NonceSize()
+	if len(ciphertext) < nonceSize {
+		return nil, errors.New("ciphertext too short")
+	}
+
+	nonce, ct := ciphertext[:nonceSize], ciphertext[nonceSize:]
+	plaintext, err := aesGCM.Open(nil, nonce, ct, nil)
+	if err != nil {
+		return nil, fmt.Errorf("AES-GCM decryption failed (possible tampering): %w", err)
+	}
+
+	return plaintext, nil
+}
+
+// XOREncrypt is kept for backward compatibility but deprecated.
+// Use AESGCMEncrypt for new code.
+// Deprecated: Use AESGCMEncrypt instead.
 func XOREncrypt(data []byte, key []byte) []byte {
 	encrypted := make([]byte, len(data))
 	keyLen := len(key)
@@ -101,7 +156,8 @@ func XOREncrypt(data []byte, key []byte) []byte {
 	return encrypted
 }
 
-// XORDecrypt performs XOR decryption (same as encryption)
+// XORDecrypt is kept for backward compatibility but deprecated.
+// Deprecated: Use AESGCMDecrypt instead.
 func XORDecrypt(encrypted []byte, key []byte) []byte {
 	return XOREncrypt(encrypted, key)
 }
@@ -116,7 +172,7 @@ func GenerateRandomSalt() ([]byte, error) {
 	return salt, nil
 }
 
-// EncryptMessage encrypts a message using Kyber KEM
+// EncryptMessage encrypts a message using Kyber KEM + AES-256-GCM
 func EncryptMessage(message []byte, publicKey kem.PublicKey) ([]byte, []byte, []byte, error) {
 	// Encapsulate to get shared secret
 	encap, err := EncapsulateWithPublicKey(publicKey)
@@ -130,16 +186,19 @@ func EncryptMessage(message []byte, publicKey kem.PublicKey) ([]byte, []byte, []
 		return nil, nil, nil, err
 	}
 
-	// Derive encryption key
+	// Derive encryption key (32 bytes for AES-256)
 	key := DeriveKey(encap.SharedKey, salt)
 
-	// Encrypt message
-	ciphertext := XOREncrypt(message, key)
+	// Encrypt message with AES-256-GCM (authenticated encryption)
+	ciphertext, err := AESGCMEncrypt(message, key)
+	if err != nil {
+		return nil, nil, nil, err
+	}
 
 	return ciphertext, encap.Ciphertext, salt, nil
 }
 
-// DecryptMessage decrypts a message using Kyber KEM
+// DecryptMessage decrypts a message using Kyber KEM + AES-256-GCM
 func DecryptMessage(ciphertext []byte, kemCiphertext []byte, salt []byte, privateKey kem.PrivateKey) ([]byte, error) {
 	scheme := kyber768.Scheme()
 
@@ -152,8 +211,11 @@ func DecryptMessage(ciphertext []byte, kemCiphertext []byte, salt []byte, privat
 	// Derive decryption key
 	key := DeriveKey(sharedSecret, salt)
 
-	// Decrypt message
-	message := XORDecrypt(ciphertext, key)
+	// Decrypt message with AES-256-GCM
+	message, err := AESGCMDecrypt(ciphertext, key)
+	if err != nil {
+		return nil, err
+	}
 
 	return message, nil
 }

@@ -308,11 +308,14 @@ func (pqvc *PQVoteCaster) GetAllPQVoteShares() []*PQVoteShares {
 	return shares
 }
 
-// ConvertToSA2Shares converts post-quantum shares to regular SA² shares for tallying
+// ConvertToSA2Shares converts post-quantum shares to per-candidate SA² shares.
+// The PQ shim was built around the legacy single-ciphertext pipeline, so it
+// currently emits a one-element per-candidate slice. Refactoring the PQ path
+// to natively carry m-vector shares is identified as follow-up work.
 func ConvertToSA2Shares(pqShares *PQVoteShares) *sa2.VoteShare {
 	return &sa2.VoteShare{
 		VoterID: "pq-voter",
-		ShareA:  pqShares.ShareA.PaillierCiphertext,
-		ShareB:  pqShares.ShareB.PaillierCiphertext,
+		SharesA: []*big.Int{pqShares.ShareA.PaillierCiphertext},
+		SharesB: []*big.Int{pqShares.ShareB.PaillierCiphertext},
 	}
 }

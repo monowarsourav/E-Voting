@@ -1,69 +1,84 @@
 package voting
 
 import (
+	"crypto/sha256"
 	"fmt"
 	"math/big"
 	"testing"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/voter"
 )
 
+func smallCandidateList() []*Candidate {
+	return []*Candidate{
+		{ID: 1, Name: "A"},
+		{ID: 5, Name: "B"},
+		{ID: 7, Name: "C"},
+	}
+}
+
 func TestBallotCreation(t *testing.T) {
-	// Setup
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
-
 	bc := NewBallotCreator(pk)
+	cands := smallCandidateList()
 
-	// Create ballot
-	ballot, err := bc.CreateBallot("voter001", 1)
+	ballot, err := bc.CreateBallot("voter001", 1, cands, "test-election")
 	if err != nil {
 		t.Fatalf("Ballot creation failed: %v", err)
 	}
-
 	if ballot.VoterID != "voter001" {
 		t.Errorf("VoterID mismatch")
 	}
-
 	if ballot.CandidateID != 1 {
 		t.Errorf("CandidateID mismatch")
 	}
+	if len(ballot.EncryptedVotes) != len(cands) {
+		t.Fatalf("expected %d ciphertexts, got %d", len(cands), len(ballot.EncryptedVotes))
+	}
 
-	// Decrypt to verify
-	decrypted, _ := sk.Decrypt(ballot.EncryptedVote)
-	if decrypted.Cmp(big.NewInt(1)) != 0 {
-		t.Errorf("Decrypted vote mismatch: expected 1, got %v", decrypted)
+	// Position 0 corresponds to candidate ID 1 (the chosen one) → should decrypt to 1.
+	got0, _ := sk.Decrypt(ballot.EncryptedVotes[0])
+	if got0.Cmp(big.NewInt(1)) != 0 {
+		t.Errorf("position 0 (chosen) decryption: expected 1, got %v", got0)
+	}
+	// Other positions decrypt to 0.
+	for j := 1; j < len(cands); j++ {
+		got, _ := sk.Decrypt(ballot.EncryptedVotes[j])
+		if got.Sign() != 0 {
+			t.Errorf("position %d decryption: expected 0, got %v", j, got)
+		}
+	}
+	// ZK proofs should self-verify.
+	if !bc.VerifyBallotZK(ballot.EncryptedVotes, ballot.BinaryProofs, ballot.SumProof) {
+		t.Error("freshly generated ballot ZK proofs failed verification")
 	}
 }
 
 func TestWeightApplication(t *testing.T) {
 	sk, _ := crypto.GeneratePaillierKeyPair(2048)
 	pk := sk.PublicKey
-
 	bc := NewBallotCreator(pk)
+	cands := smallCandidateList()
 
-	// Create ballot for candidate 5
-	ballot, _ := bc.CreateBallot("voter001", 5)
+	ballot, _ := bc.CreateBallot("voter001", 5, cands, "test-election")
 
-	// Apply weight 1 (real slot)
-	weightedVote := bc.ApplyWeight(ballot.EncryptedVote, big.NewInt(1))
-
-	// Decrypt
-	decrypted, _ := sk.Decrypt(weightedVote)
-	expected := big.NewInt(5) // 5 × 1 = 5
-
-	if decrypted.Cmp(expected) != 0 {
-		t.Errorf("Weighted vote mismatch: expected %v, got %v", expected, decrypted)
+	// Weight 1: per-candidate decrypts to v_j (1-hot for position of candidate 5 = index 1).
+	weighted := bc.ApplyWeight(ballot.EncryptedVotes, big.NewInt(1))
+	got, _ := sk.Decrypt(weighted[1])
+	if got.Cmp(big.NewInt(1)) != 0 {
+		t.Errorf("weighted vote (w=1) position 1: expected 1, got %v", got)
 	}
-
-	// Apply weight 0 (fake slot)
-	weightedVoteZero := bc.ApplyWeight(ballot.EncryptedVote, big.NewInt(0))
-	decryptedZero, _ := sk.Decrypt(weightedVoteZero)
-
-	if decryptedZero.Cmp(big.NewInt(0)) != 0 {
-		t.Errorf("Zero-weighted vote should be 0, got %v", decryptedZero)
+	// Weight 0: every position collapses to encryption-of-0 (literal 1 in Z_{n^2}^*).
+	weightedZero := bc.ApplyWeight(ballot.EncryptedVotes, big.NewInt(0))
+	for j, e := range weightedZero {
+		d, _ := sk.Decrypt(e)
+		if d.Sign() != 0 {
+			t.Errorf("weighted vote (w=0) position %d: expected 0, got %v", j, d)
+		}
 	}
 }
 
@@ -89,7 +104,7 @@ func TestVoteCasting(t *testing.T) {
 
 	// Create registration system with eligible voters
 	eligibleVoters := []string{"voter001", "voter002", "voter003"}
-	rs := voter.NewRegistrationSystem(pp, rp, 5, eligibleVoters, "election001")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, eligibleVoters, "election001", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register some voters
 	fingerprint1 := make([]byte, 200)
@@ -132,11 +147,11 @@ func TestElectionTiming(t *testing.T) {
 		IsActive:   true,
 	}
 
-	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{}, "future")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, []string{}, "future", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 	vc := NewVoteCaster(pk, rp, rs, futureElection)
 
 	// Try to vote (should fail - not in voting period)
-	_, err := vc.CastVote("voter001", 1, 0)
+	_, err := vc.CastVote("voter001", 1, 0, nil)
 	if err == nil {
 		t.Error("Should not allow voting before election starts")
 	}
@@ -150,7 +165,7 @@ func TestElectionTiming(t *testing.T) {
 	}
 
 	vc2 := NewVoteCaster(pk, rp, rs, pastElection)
-	_, err = vc2.CastVote("voter001", 1, 0)
+	_, err = vc2.CastVote("voter001", 1, 0, nil)
 	if err == nil {
 		t.Error("Should not allow voting after election ends")
 	}
@@ -180,13 +195,13 @@ func setupTestElection() (*Election, *crypto.PaillierPrivateKey, *crypto.RingPar
 }
 
 func setupTestRS(pp *crypto.PedersenParams, rp *crypto.RingParams, voterIDs []string, electionID string) *voter.RegistrationSystem {
-	return voter.NewRegistrationSystem(pp, rp, 5, voterIDs, electionID)
+	return voter.NewRegistrationSystem(pp, rp, 5, voterIDs, electionID, []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 }
 
 func registerVoter(t *testing.T, rs *voter.RegistrationSystem, voterID string) {
 	t.Helper()
 	fingerprint := []byte("fingerprint-" + voterID)
-	_, err := rs.RegisterVoter(voterID, fingerprint)
+	_, err := rs.RegisterVoter(voterID, fingerprint, "blink_count", "2")
 	if err != nil {
 		t.Fatalf("Failed to register voter %s: %v", voterID, err)
 	}
@@ -208,7 +223,7 @@ func TestCastVoteFullPipeline(t *testing.T) {
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
 	// Cast vote for voter-0, candidate 1, SMDC slot 0
-	receipt, err := vc.CastVote("voter-0", 1, 0)
+	receipt, err := vc.CastVote("voter-0", 1, 0, nil)
 	if err != nil {
 		t.Fatalf("CastVote failed: %v", err)
 	}
@@ -240,13 +255,13 @@ func TestCastVoteDoubleVotePrevention(t *testing.T) {
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
 	// First vote should succeed
-	_, err := vc.CastVote("voter-0", 1, 0)
+	_, err := vc.CastVote("voter-0", 1, 0, nil)
 	if err != nil {
 		t.Fatalf("First vote failed: %v", err)
 	}
 
 	// Second vote by same voter should fail
-	_, err = vc.CastVote("voter-0", 0, 0)
+	_, err = vc.CastVote("voter-0", 0, 0, nil)
 	if err == nil {
 		t.Fatal("Expected error for double vote, got nil")
 	}
@@ -268,7 +283,7 @@ func TestCastVoteInvalidCandidate(t *testing.T) {
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
 	// Invalid candidate ID (only 0, 1, 2 exist)
-	_, err := vc.CastVote("voter-0", 99, 0)
+	_, err := vc.CastVote("voter-0", 99, 0, nil)
 	if err == nil {
 		t.Fatal("Expected error for invalid candidate, got nil")
 	}
@@ -290,7 +305,7 @@ func TestCastVoteInactiveElection(t *testing.T) {
 
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
-	_, err := vc.CastVote("voter-0", 1, 0)
+	_, err := vc.CastVote("voter-0", 1, 0, nil)
 	if err == nil {
 		t.Fatal("Expected error for inactive election, got nil")
 	}
@@ -313,7 +328,7 @@ func TestCastVoteExpiredElection(t *testing.T) {
 
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
-	_, err := vc.CastVote("voter-0", 1, 0)
+	_, err := vc.CastVote("voter-0", 1, 0, nil)
 	if err == nil {
 		t.Fatal("Expected error for expired election, got nil")
 	}
@@ -334,7 +349,7 @@ func TestCastVoteUnregisteredVoter(t *testing.T) {
 
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
-	_, err := vc.CastVote("unregistered-voter", 1, 0)
+	_, err := vc.CastVote("unregistered-voter", 1, 0, nil)
 	if err == nil {
 		t.Fatal("Expected error for unregistered voter, got nil")
 	}
@@ -356,13 +371,13 @@ func TestCastVoteInvalidSMDCSlot(t *testing.T) {
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
 	// SMDC has k=5 slots (0-4), so 10 is invalid
-	_, err := vc.CastVote("voter-0", 1, 10)
+	_, err := vc.CastVote("voter-0", 1, 10, nil)
 	if err == nil {
 		t.Fatal("Expected error for invalid SMDC slot, got nil")
 	}
 
 	// Negative slot
-	_, err = vc.CastVote("voter-1", 1, -1)
+	_, err = vc.CastVote("voter-1", 1, -1, nil)
 	if err == nil {
 		t.Fatal("Expected error for negative SMDC slot, got nil")
 	}
@@ -383,7 +398,7 @@ func TestVerifyVote(t *testing.T) {
 
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
-	_, err := vc.CastVote("voter-0", 1, 0)
+	_, err := vc.CastVote("voter-0", 1, 0, nil)
 	if err != nil {
 		t.Fatalf("CastVote failed: %v", err)
 	}
@@ -399,8 +414,13 @@ func TestVerifyVote(t *testing.T) {
 	// rebuild ordering; the important thing is code path coverage.
 	_ = vc.VerifyVote(castVote)
 
-	// Verify the ring signature directly (the first check in VerifyVote)
-	message := castVote.WeightedVote.EncryptedVote.Bytes()
+	// Verify the ring signature directly: the cast pipeline signs the
+	// SHA-256 hash of the concatenated weighted ciphertext vector.
+	h := sha256.New()
+	for _, e := range castVote.WeightedVote.EncryptedVotes {
+		h.Write(e.Bytes())
+	}
+	message := h.Sum(nil)
 	if !vc.RingParams.Verify(message, castVote.WeightedVote.RingSignature, castVote.WeightedVote.RingPublicKeys) {
 		t.Error("Ring signature verification failed")
 	}
@@ -427,7 +447,7 @@ func TestGetVoteCount(t *testing.T) {
 
 	// Cast 3 votes
 	for i := 0; i < 3; i++ {
-		_, err := vc.CastVote(fmt.Sprintf("voter-%d", i), i%3, 0)
+		_, err := vc.CastVote(fmt.Sprintf("voter-%d", i), i%3, 0, nil)
 		if err != nil {
 			t.Fatalf("Vote %d failed: %v", i, err)
 		}
@@ -454,8 +474,8 @@ func TestGetAllVoteShares(t *testing.T) {
 	vc := NewVoteCaster(sk.PublicKey, rp, rs, election)
 
 	// Cast 2 votes
-	_, _ = vc.CastVote("voter-0", 0, 0)
-	_, _ = vc.CastVote("voter-1", 1, 0)
+	_, _ = vc.CastVote("voter-0", 0, 0, nil)
+	_, _ = vc.CastVote("voter-1", 1, 0, nil)
 
 	shares := vc.GetAllVoteShares()
 	if len(shares) != 2 {
@@ -497,7 +517,7 @@ func TestSMDCWeightAffectsTally(t *testing.T) {
 	}
 
 	// Cast with real slot
-	receipt0, err := vc.CastVote("voter-0", 1, realIdx0)
+	receipt0, err := vc.CastVote("voter-0", 1, realIdx0, nil)
 	if err != nil {
 		t.Fatalf("Real slot vote failed: %v", err)
 	}
@@ -523,7 +543,7 @@ func TestSMDCWeightAffectsTally(t *testing.T) {
 		t.Fatal("No fake slot found for voter-1")
 	}
 
-	receipt1, err := vc.CastVote("voter-1", 1, fakeIdx1)
+	receipt1, err := vc.CastVote("voter-1", 1, fakeIdx1, nil)
 	if err != nil {
 		t.Fatalf("Fake slot vote failed: %v", err)
 	}
@@ -534,4 +554,183 @@ func TestSMDCWeightAffectsTally(t *testing.T) {
 	// Both votes cast successfully - but fake slot vote has weight 0
 	// The tally should only count voter-0's vote
 	t.Log("Real slot vote and fake slot vote both cast - tally correctness depends on SMDC weight")
+}
+
+// --- Behavioral duress signal tests ---
+
+func setupDuressVoteCaster(t *testing.T) (*VoteCaster, *voter.RegistrationSystem, *crypto.PaillierPrivateKey) {
+	t.Helper()
+	election, sk, rp, pp := setupTestElection()
+
+	voterIDs := []string{"voter-duress-0", "voter-duress-1", "voter-duress-2"}
+	rs := setupTestRS(pp, rp, voterIDs, election.ElectionID)
+	for _, id := range voterIDs {
+		registerVoter(t, rs, id)
+	}
+
+	detector := newInMemoryDetector()
+	vc := NewVoteCaster(sk.PublicKey, rp, rs, election, WithDuressDetector(detector))
+	return vc, rs, sk
+}
+
+// newInMemoryDetector creates a detector using the biometric package's constructor.
+func newInMemoryDetector() *inMemoryDetectorAdapter {
+	return &inMemoryDetectorAdapter{}
+}
+
+// inMemoryDetectorAdapter wraps biometric.InMemoryDuressDetector for use in
+// the voting package's test (avoids import cycle via the interface).
+type inMemoryDetectorAdapter struct {
+	signals map[string]string // voterID -> "signalType:signalValue" (simplified)
+}
+
+func (a *inMemoryDetectorAdapter) init() {
+	if a.signals == nil {
+		a.signals = make(map[string]string)
+	}
+}
+
+func (a *inMemoryDetectorAdapter) SetSignal(voterID, signalType, signalValue string) ([]byte, error) {
+	a.init()
+	a.signals[voterID] = signalType + ":" + signalValue
+	return []byte("test-hash"), nil
+}
+
+func (a *inMemoryDetectorAdapter) VerifySignal(voterID, signalType, detectedValue string) (bool, error) {
+	a.init()
+	stored, ok := a.signals[voterID]
+	if !ok {
+		return true, nil
+	}
+	return stored == signalType+":"+detectedValue, nil
+}
+
+func (a *inMemoryDetectorAdapter) HasSignal(voterID string) bool {
+	a.init()
+	_, ok := a.signals[voterID]
+	return ok
+}
+
+func (a *inMemoryDetectorAdapter) RemoveSignal(voterID string) error {
+	a.init()
+	delete(a.signals, voterID)
+	return nil
+}
+
+func TestCastVote_WithMatchingSignal_VoteCounts(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	// Register a duress signal for voter-duress-0.
+	_, _ = vc.DuressDetector.SetSignal("voter-duress-0", "blink_count", "2")
+
+	detected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "2"}
+	receipt, err := vc.CastVote("voter-duress-0", 1, 0, detected)
+	if err != nil {
+		t.Fatalf("CastVote with matching signal failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("receipt is nil for matching-signal vote")
+	}
+}
+
+func TestCastVote_WithMismatchSignal_VoteIgnored(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	// Register "2 blinks" as the real signal.
+	_, _ = vc.DuressDetector.SetSignal("voter-duress-1", "blink_count", "2")
+
+	// Submit "3 blinks" — mismatch. Vote is silently discarded (weight 0),
+	// but CastVote must still return a receipt (coercer must not notice).
+	detected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "3"}
+	receipt, err := vc.CastVote("voter-duress-1", 1, 0, detected)
+	if err != nil {
+		t.Fatalf("CastVote with mismatched signal must still succeed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("receipt must not be nil even when duress signal mismatches")
+	}
+}
+
+func TestCastVote_NoSignalSet_NormalBehavior(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	// No duress signal registered → vote proceeds normally (weight 1 from SMDC).
+	receipt, err := vc.CastVote("voter-duress-2", 1, 0, nil)
+	if err != nil {
+		t.Fatalf("CastVote without duress signal failed: %v", err)
+	}
+	if receipt == nil {
+		t.Fatal("receipt is nil when no duress signal is registered")
+	}
+}
+
+func TestCastVote_CoercerCannotDetectMismatch(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	_, _ = vc.DuressDetector.SetSignal("voter-duress-0", "blink_count", "2")
+
+	// Coercer forces voter to cast with wrong signal "5".
+	wrongDetected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "5"}
+	coercedReceipt, coercedErr := vc.CastVote("voter-duress-0", 1, 0, wrongDetected)
+
+	// Voter with no duress signal casts normally.
+	normalReceipt, normalErr := vc.CastVote("voter-duress-1", 1, 0, nil)
+
+	// Both must succeed (no error) — coercer sees identical outcome.
+	if coercedErr != nil {
+		t.Fatalf("coerced vote must not return an error: %v", coercedErr)
+	}
+	if normalErr != nil {
+		t.Fatalf("normal vote returned error: %v", normalErr)
+	}
+	if coercedReceipt == nil || normalReceipt == nil {
+		t.Fatal("both receipts must be non-nil")
+	}
+	// Receipt structure is the same type regardless of duress outcome.
+	if coercedReceipt.VoterID != "voter-duress-0" {
+		t.Errorf("coerced receipt has wrong voter ID: %s", coercedReceipt.VoterID)
+	}
+}
+
+// TestCastVote_CoercedVote_AllowsRetry verifies the iteration-attack fix:
+// a coerced vote (weight=0) must NOT consume the voter's slot, so they can
+// re-vote with the correct signal after the coercer leaves.
+//
+//  1. Register signal "2" for voter-duress-0.
+//  2. Cast with wrong signal "3" (coerced) → receipt returned, vote NOT counted.
+//  3. Cast again with correct signal "2" (genuine) → succeeds, vote IS counted.
+//  4. GetVoteCount() == 1 (only the genuine vote is stored).
+func TestCastVote_CoercedVote_AllowsRetry(t *testing.T) {
+	vc, _, _ := setupDuressVoteCaster(t)
+
+	const voterID = "voter-duress-0"
+	_, _ = vc.DuressDetector.SetSignal(voterID, "blink_count", "2")
+
+	// Step 2: coerced vote — wrong signal.
+	wrongDetected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "3"}
+	coercedReceipt, err := vc.CastVote(voterID, 1, 0, wrongDetected)
+	if err != nil {
+		t.Fatalf("coerced CastVote must not error: %v", err)
+	}
+	if coercedReceipt == nil {
+		t.Fatal("coerced receipt must not be nil (coercer must see success)")
+	}
+	if vc.GetVoteCount() != 0 {
+		t.Errorf("vote count after coerced cast: want 0, got %d", vc.GetVoteCount())
+	}
+
+	// Step 3: genuine re-vote — correct signal.
+	realDetected := &biometric.DetectedSignal{SignalType: "blink_count", SignalValue: "2"}
+	realReceipt, err := vc.CastVote(voterID, 1, 0, realDetected)
+	if err != nil {
+		t.Fatalf("genuine CastVote after coerced attempt failed: %v", err)
+	}
+	if realReceipt == nil {
+		t.Fatal("genuine receipt must not be nil")
+	}
+
+	// Step 4: only the genuine vote should be counted.
+	if vc.GetVoteCount() != 1 {
+		t.Errorf("vote count after genuine cast: want 1, got %d", vc.GetVoteCount())
+	}
 }

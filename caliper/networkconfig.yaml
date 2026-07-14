@@ -17,8 +17,8 @@ organizations:
           path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/peers/peer0.org1.covertvote.com/tls/ca.crt'
     identities:
       certificates:
-        - name: 'User1'
+        - name: 'Admin'
           clientPrivateKey:
-            path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/users/User1@org1.covertvote.com/msp/keystore/priv_sk'
+            path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/users/Admin@org1.covertvote.com/msp/keystore/priv_sk'
           clientSignedCert:
-            path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/users/User1@org1.covertvote.com/msp/signcerts/User1@org1.covertvote.com-cert.pem'
+            path: '../network/crypto-config/peerOrganizations/org1.covertvote.com/users/Admin@org1.covertvote.com/msp/signcerts/Admin@org1.covertvote.com-cert.pem'

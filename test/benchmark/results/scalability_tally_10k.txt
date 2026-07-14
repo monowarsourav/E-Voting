@@ -1,0 +1,15 @@
+=== RUN   TestScalabilityTally
+    scalability_test.go:29: Pre-encrypting pool of 1000 votes...
+=== Homomorphic Tally Scalability ===
+Voters | Tally Time (ms) | Per-Vote (μs)
+-------|-----------------|---------------
+    100 |            0.00 |          6.68
+    500 |            3.00 |          6.52
+   1000 |            7.00 |          7.06
+   5000 |           37.00 |          7.53
+  10000 |           73.00 |          7.33
+  50000 |          435.00 |          8.71
+ 100000 |          715.00 |          7.16
+--- PASS: TestScalabilityTally (11.35s)
+PASS
+ok  	github.com/covertvote/e-voting/test/benchmark	11.355s

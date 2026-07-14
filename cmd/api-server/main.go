@@ -22,6 +22,7 @@ import (
 	"github.com/covertvote/e-voting/api/routes"
 	_ "github.com/covertvote/e-voting/docs"
 	"github.com/covertvote/e-voting/internal/biometric"
+	"github.com/covertvote/e-voting/internal/blockchain"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/database"
 	"github.com/covertvote/e-voting/internal/repository/keyimage"
@@ -144,6 +145,24 @@ func run() error {
 	fingerprintProcessor := biometric.NewFingerprintProcessor()
 	livenessDetector := biometric.NewLivenessDetector(0.5)
 
+	// Behavioral duress detector — coercion resistance via secret behavioral signal.
+	// SQLite-backed so signals survive server restarts; the DB columns were added
+	// by migration 008_add_duress_signal.sql.
+	// The HMAC key is loaded from DURESS_HMAC_KEY; a dev fallback is used when absent.
+	duressHMACKey := []byte(cfg.Crypto.DuressHMACKey)
+	if len(duressHMACKey) == 0 {
+		log.Warn("DURESS_HMAC_KEY not set — using insecure dev fallback; set in production")
+	}
+	duressDetector := biometric.NewSQLiteDuressDetector(db.DB, duressHMACKey)
+
+	// SMDC real-slot HMAC key — must remain confidential to the election
+	// authority. Disclosure lets an attacker recompute every voter's real
+	// slot index from public (voterID, electionID) inputs.
+	smdcSecretKey := []byte(cfg.Crypto.SMDCSecretKey)
+	if len(smdcSecretKey) == 0 {
+		log.Warn("SMDC_SECRET_KEY not set — using insecure dev fallback; set in production")
+	}
+
 	eligibleVoters := make([]string, 0, 105)
 	for i := 1; i <= 100; i++ {
 		eligibleVoters = append(eligibleVoters, fmt.Sprintf("voter%03d", i))
@@ -151,7 +170,7 @@ func run() error {
 	eligibleVoters = append(eligibleVoters, "test_voter", "admin", "alice", "bob", "charlie")
 
 	registrationSystem := voter.NewRegistrationSystem(
-		pedersenParams, ringParams, cfg.Crypto.SMDCSlots, eligibleVoters, "election001",
+		pedersenParams, ringParams, cfg.Crypto.SMDCSlots, eligibleVoters, "election001", smdcSecretKey, duressDetector,
 	)
 
 	election := &voting.Election{
@@ -167,12 +186,47 @@ func run() error {
 		IsActive:  true,
 	}
 
+	// --- Blockchain submitter (optional) ---
+	// FabricClient is always instantiated so that the cast pipeline produces
+	// a non-empty BlockchainTxID even in dev (mock mode). When
+	// cfg.Blockchain.Enabled is true we additionally attempt a real Fabric
+	// Gateway connection; failure is non-fatal and the client falls back to
+	// the in-process mock implementation so the API stays usable while
+	// network operators bring the peer back up.
+	fabricClient := blockchain.NewFabricClient(
+		cfg.Blockchain.ChannelName,
+		cfg.Blockchain.ChaincodeName,
+		true, // submitter is enabled; mock vs real is decided below
+	)
+	if cfg.Blockchain.Enabled {
+		fabricCfg := blockchain.FabricConfig{
+			PeerEndpoint: getEnvOr("FABRIC_PEER_ENDPOINT", "localhost:7051"),
+			GatewayPeer:  getEnvOr("FABRIC_GATEWAY_PEER", "peer0.org1.example.com"),
+			MSPID:        getEnvOr("FABRIC_MSP_ID", "Org1MSP"),
+			CryptoPath:   getEnvOr("FABRIC_CRYPTO_PATH", "./network/crypto-config"),
+			TLSCertPath:  getEnvOr("FABRIC_TLS_CERT_PATH", ""),
+			CertPath:     getEnvOr("FABRIC_CERT_PATH", ""),
+			KeyPath:      getEnvOr("FABRIC_KEY_PATH", ""),
+		}
+		if err := fabricClient.ConnectGateway(fabricCfg); err != nil {
+			log.Warn("fabric gateway unavailable; falling back to mock submitter",
+				"error", err.Error())
+		} else {
+			defer func() { _ = fabricClient.Disconnect() }()
+		}
+	} else {
+		log.Info("blockchain integration disabled in config; using mock submitter (set BLOCKCHAIN_ENABLED=true to connect to a real Fabric peer)")
+	}
+
 	voteCaster := voting.NewVoteCaster(
 		paillierSK.PublicKey,
 		ringParams,
 		registrationSystem,
 		election,
 		voting.WithKeyImageStore(keyImageStore),
+		voting.WithDuressDetector(duressDetector),
+		voting.WithAuditor(auditLogger),
+		voting.WithBlockchainSubmitter(fabricClient),
 	)
 
 	counter := tally.NewCounter(paillierSK.PublicKey, paillierSK)
@@ -189,12 +243,14 @@ func run() error {
 	votingHandler.Elections[election.ElectionID] = election
 	tallyHandler := handlers.NewTallyHandler(counter, voteCaster, votingHandler.Elections)
 	healthHandler := handlers.NewHealthHandler(version, db.DB)
+	duressHandler := handlers.NewDuressHandler(duressDetector, registrationSystem)
 
 	routes.SetupRoutes(router, routes.Dependencies{
 		Registration:    registrationHandler,
 		Voting:          votingHandler,
 		Tally:           tallyHandler,
 		Health:          healthHandler,
+		Duress:          duressHandler,
 		StandardLimiter: standardLimiter,
 		StrictLimiter:   strictLimiter,
 	})
@@ -260,6 +316,16 @@ func run() error {
 	}
 	log.Info("server exited gracefully")
 	return nil
+}
+
+// getEnvOr returns the value of the named environment variable, or fallback
+// when the variable is unset or empty. Used by the blockchain bootstrap to
+// keep production overrides out of config files.
+func getEnvOr(key, fallback string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return fallback
 }
 
 // sessionJanitor periodically evicts expired sessions.

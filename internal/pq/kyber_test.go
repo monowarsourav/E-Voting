@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/covertvote/e-voting/internal/biometric"
 	"github.com/covertvote/e-voting/internal/crypto"
 	"github.com/covertvote/e-voting/internal/voter"
 	"github.com/covertvote/e-voting/internal/voting"
@@ -325,6 +326,7 @@ func init() {
 }
 
 func TestXOREncryptDecrypt(t *testing.T) {
+	// Deprecated: XOR is kept for backward compatibility
 	message := []byte("Hello CovertVote! This is a test message.")
 	key := make([]byte, 32)
 	_, _ = rand.Read(key)
@@ -339,6 +341,68 @@ func TestXOREncryptDecrypt(t *testing.T) {
 	decrypted := XORDecrypt(encrypted, key)
 	if string(decrypted) != string(message) {
 		t.Errorf("Decrypted mismatch: got %s", string(decrypted))
+	}
+}
+
+func TestAESGCMEncryptDecrypt(t *testing.T) {
+	message := []byte("Hello CovertVote! AES-256-GCM authenticated encryption.")
+	key := make([]byte, 32) // AES-256 key
+	_, _ = rand.Read(key)
+
+	// Encrypt
+	ciphertext, err := AESGCMEncrypt(message, key)
+	if err != nil {
+		t.Fatalf("AES-GCM encrypt failed: %v", err)
+	}
+
+	// Ciphertext should differ from plaintext
+	if string(ciphertext) == string(message) {
+		t.Error("Ciphertext should differ from plaintext")
+	}
+
+	// Ciphertext should be longer (nonce + tag overhead)
+	if len(ciphertext) <= len(message) {
+		t.Error("AES-GCM ciphertext should be longer than plaintext (nonce+tag)")
+	}
+
+	// Decrypt
+	decrypted, err := AESGCMDecrypt(ciphertext, key)
+	if err != nil {
+		t.Fatalf("AES-GCM decrypt failed: %v", err)
+	}
+
+	if string(decrypted) != string(message) {
+		t.Errorf("AES-GCM roundtrip failed: got %s", string(decrypted))
+	}
+}
+
+func TestAESGCMTamperDetection(t *testing.T) {
+	message := []byte("Tamper detection test")
+	key := make([]byte, 32)
+	_, _ = rand.Read(key)
+
+	ciphertext, err := AESGCMEncrypt(message, key)
+	if err != nil {
+		t.Fatalf("Encrypt failed: %v", err)
+	}
+
+	// Tamper with ciphertext
+	tampered := make([]byte, len(ciphertext))
+	copy(tampered, ciphertext)
+	tampered[len(tampered)-1] ^= 0xFF // Flip last byte
+
+	// Decryption of tampered ciphertext should fail
+	_, err = AESGCMDecrypt(tampered, key)
+	if err == nil {
+		t.Error("AES-GCM should detect tampering and fail")
+	}
+
+	// Wrong key should also fail
+	wrongKey := make([]byte, 32)
+	_, _ = rand.Read(wrongKey)
+	_, err = AESGCMDecrypt(ciphertext, wrongKey)
+	if err == nil {
+		t.Error("AES-GCM should fail with wrong key")
 	}
 }
 
@@ -510,12 +574,12 @@ func setupPQTestElection(t *testing.T) (*HybridKeyPair, *crypto.RingParams, *vot
 		voterIDs[i] = fmt.Sprintf("pq-voter-%d", i)
 	}
 
-	rs := voter.NewRegistrationSystem(pp, rp, 5, voterIDs, "pq-test-election")
+	rs := voter.NewRegistrationSystem(pp, rp, 5, voterIDs, "pq-test-election", []byte("test-smdc-secret-key-do-not-use-in-prod"), biometric.NewInMemoryDuressDetector([]byte("test-duress-hmac-key")))
 
 	// Register voters
 	for _, id := range voterIDs {
 		fingerprint := []byte("fp-" + id)
-		_, err := rs.RegisterVoter(id, fingerprint)
+		_, err := rs.RegisterVoter(id, fingerprint, "blink_count", "2")
 		if err != nil {
 			t.Fatalf("Failed to register %s: %v", id, err)
 		}
@@ -677,7 +741,8 @@ func TestConvertToSA2Shares(t *testing.T) {
 	if sa2Share == nil {
 		t.Fatal("SA2 share is nil")
 	}
-	if sa2Share.ShareA == nil || sa2Share.ShareB == nil {
+	if len(sa2Share.SharesA) == 0 || len(sa2Share.SharesB) == 0 ||
+		sa2Share.SharesA[0] == nil || sa2Share.SharesB[0] == nil {
 		t.Error("SA2 share has nil components")
 	}
 }
