@@ -4,26 +4,6 @@ A secure, anonymous, and coercion-resistant electronic voting system implementin
 
 Built in Go 1.24+ with **production-ready Hyperledger Fabric v2.5** blockchain integration, benchmarked with Hyperledger Caliper.
 
-## Paper
-
-This software accompanies a research paper submitted as part of the CSE400 capstone project. The system implements the full CovertVote protocol specification with formal security properties verified through property-based tests.
-
-## Citation
-
-If you use this software in your research, please cite:
-
-```bibtex
-@software{covertvote2026,
-  title     = {CovertVote: A Seven-Protocol Blockchain E-Voting System with SMDC and SA2},
-  author    = {Sourav, Monowar Hossen and Mia, Md. Sajeeb and Ahammed, Md. Naim},
-  year      = {2026},
-  url       = {https://github.com/monowarsourav/E-Voting},
-  license   = {MIT}
-}
-```
-
-See also [`CITATION.cff`](CITATION.cff) for GitHub's built-in citation support.
-
 ## Security Properties
 
 | Property | Protocol | Theorem | Status |
@@ -85,7 +65,7 @@ go build -o bin/aggregator-a cmd/aggregator-a/main.go
 go build -o bin/aggregator-b cmd/aggregator-b/main.go
 
 # Start Hyperledger Fabric network
-cd network && ./start.sh
+./scripts/setup_hf_network.sh
 
 # Docker deployment
 docker-compose up
@@ -155,7 +135,9 @@ E-voting/
 ├── cmd/                          # Entry points
 │   ├── api-server/               # Main API server
 │   ├── aggregator-a/             # SA2 Leader
-│   └── aggregator-b/             # SA2 Helper
+│   ├── aggregator-b/             # SA2 Helper
+│   ├── cli/                      # Command-line client
+│   └── election-sim/             # End-to-end election simulation (benchmark harness)
 ├── internal/                     # Core implementation
 │   ├── crypto/                   # Paillier, Pedersen, ZKP, Ring Signatures, Threshold Paillier
 │   ├── pq/                       # Kyber768 post-quantum hybrid encryption
@@ -164,6 +146,8 @@ E-voting/
 │   ├── voting/                   # Vote casting orchestration (17-step pipeline)
 │   ├── tally/                    # Homomorphic tallying & threshold decryption
 │   ├── voter/                    # Registration & Merkle eligibility
+│   ├── election/                 # Election lifecycle service & repository
+│   ├── repository/               # Persistence (key-image, session) with SQLite
 │   ├── biometric/                # Fingerprint, liveness, & duress detection
 │   ├── blockchain/               # Hyperledger Fabric Gateway SDK integration
 │   └── database/                 # SQLite persistence
@@ -239,8 +223,10 @@ See [`network/`](network/) for setup scripts and [`chaincode/covertvote/`](chain
 
 ## Documentation
 
+- [`QUICKSTART.md`](QUICKSTART.md) — Quick setup and first-run guide
 - [`internal/crypto/SECURITY.md`](internal/crypto/SECURITY.md) — Cryptographic security properties and theorem references
 - [`SECURITY.md`](SECURITY.md) — Security policy and vulnerability reporting
+- [`SECURITY_PROOF_VERIFICATION.md`](SECURITY_PROOF_VERIFICATION.md) — Detailed formal proof verification
 - [`API_DOCUMENTATION.md`](API_DOCUMENTATION.md) — REST API reference
 - [`RESEARCH_ANALYSIS.md`](RESEARCH_ANALYSIS.md) — Comprehensive research analysis and comparative study
 - [`test/benchmark/results/PAPER_RESULTS.md`](test/benchmark/results/PAPER_RESULTS.md) — Benchmark results for paper
