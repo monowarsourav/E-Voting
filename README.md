@@ -8,8 +8,6 @@ Built in Go 1.24+ with **production-ready Hyperledger Fabric v2.5** blockchain i
 
 This software accompanies a research paper submitted as part of the CSE400 capstone project. The system implements the full CovertVote protocol specification with formal security properties verified through property-based tests.
 
-**Target venue:** IEEE Transactions on Information Forensics and Security (TIFS)
-
 ## Citation
 
 If you use this software in your research, please cite:
